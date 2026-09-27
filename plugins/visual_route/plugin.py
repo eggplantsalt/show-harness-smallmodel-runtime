@@ -96,6 +96,8 @@ class TransportIntent:
     raw_text: str = ""
     latency_s: Optional[float] = None
     held_assessment_accepted: bool = True
+    prompt_tokens: Optional[int] = None
+    completion_tokens: Optional[int] = None
 
     def to_dict(self) -> dict[str, Any]:
         return dict(self.__dict__)
@@ -270,6 +272,7 @@ class VisualRoutePlugin:
         self._descent_stall_count = self._hold_missing_count = 0
         self._held_latched = False
         self._holding_arbiter: dict[str, Any] = {"state": "UNKNOWN", "reason": "transport_not_started", "rejected_qwen_assessment": None}
+        self._goal_context: dict[str, str] = {}
 
     def _next_destination(self, subgoals: Any, current_index: int) -> tuple[str, str]:
         try:
@@ -408,7 +411,9 @@ class VisualRoutePlugin:
             self.route.freshness_frames += 1; self.route.confidence = max(0.0, self.route.confidence - 0.05)
             self.route.last_reason = f"refresh_rejected:{reason}:{candidate.last_reason}"
         else:
-            candidate.last_reason = reason; self.route = candidate
+            if candidate.valid:
+                candidate.last_reason = reason
+            self.route = candidate
         self._frames_since_geometry_refresh = 0
         self._geometry_refresh_count += 1
         self._last_geometry_refresh_frame, self._last_geometry_refresh_reason = int(frame_id), str(reason)
@@ -478,7 +483,7 @@ class VisualRoutePlugin:
         if self._held_latched and gripper_closed and present:
             self._hold_missing_count = 0; self._holding_arbiter = {"state": "HELD", "reason": "latched_closed_with_visual_track", "visual_track_confidence": round(confidence, 4), "hold_comotion_score": comotion, "rejected_qwen_assessment": None}
         elif self._held_latched and gripper_closed:
-            self._hold_missing_count += 1; self._holding_arbiter = {"state": "LOST" if self._hold_missing_count >= 2 else "UNKNOWN", "reason": "visual_track_missing_consecutive_frames", "missing_frames": self._hold_missing_count, "hold_comotion_score": comotion, "rejected_qwen_assessment": None}
+            self._hold_missing_count += 1; self._holding_arbiter = {"state": "SUSPECTED_LOST" if self._hold_missing_count >= 2 else "UNKNOWN", "reason": "visual_track_missing_consecutive_frames", "missing_frames": self._hold_missing_count, "hold_comotion_score": comotion, "rejected_qwen_assessment": None}
         else:
             self._holding_arbiter = {"state": "UNKNOWN", "reason": "gripper_not_closed_or_hold_not_latched", "rejected_qwen_assessment": None}
 
@@ -500,7 +505,7 @@ class VisualRoutePlugin:
         if self._forced_intent_event: return self._forced_intent_event, self._forced_intent_critical
         if self.last_intent is None: return "transport_entry", True
         if self.last_progress and self.last_progress.contact_or_stall: return "contact_or_stall", True
-        if self._holding_arbiter.get("state") == "LOST": return "possible_hold_loss", True
+        if self._holding_arbiter.get("state") in {"SUSPECTED_LOST", "LOST"}: return "possible_hold_loss", True
         if not self.route or not self.route.valid: return "route_invalid", True
         if self.route.phase.value != self._last_route_phase: return "geometry_relation_changed", False
         if self._prediction_miss_count >= 2: return "prediction_miss_two_steps", False
@@ -512,17 +517,21 @@ class VisualRoutePlugin:
         self._intent_counter += 1; intent_id = f"intent-{self._intent_counter:04d}"; route_id = self.route.route_id if self.route else ""
         if self.client is None:
             return TransportIntent(intent_id, "REACQUIRE", "UNKNOWN", "UNKNOWN", "REACQUIRE_HOLD", "LOW", "intent planner unavailable", route_id, int(frame_id), trigger)
-        evidence = {"trigger": trigger, "previous_intent": self.last_intent.to_dict() if self.last_intent else None, "previous_action": previous_action, "observed_progress": self.last_progress.to_dict() if self.last_progress else None, "route": {key: self.route.to_dict().get(key) for key in ("route_id", "valid", "active_leg", "confidence", "safe_transport_z_m", "last_reason")} if self.route else None, "holding_arbiter": self._holding_arbiter, "opening_alignment": self._alignment_signal(held, destination)}
+        evidence = {"goal": self._goal_context, "trigger": trigger, "previous_intent": self.last_intent.to_dict() if self.last_intent else None, "previous_action": previous_action, "observed_progress": self.last_progress.to_dict() if self.last_progress else None, "route": {key: self.route.to_dict().get(key) for key in ("route_id", "valid", "active_leg", "confidence", "safe_transport_z_m", "last_reason")} if self.route else None, "holding_arbiter": self._holding_arbiter, "opening_alignment": self._alignment_signal(held, destination)}
         prompt = ROUTE_PROMPT_PATH.read_text(encoding="utf-8").strip() + "\n\nCURRENT CLOSED-LOOP EVIDENCE:\n" + json.dumps(evidence, ensure_ascii=False, separators=(",", ":"))
         schema = {"type": "object", "properties": {"intent": {"type": "string", "enum": sorted(INTENTS)}, "route_assessment": {"type": "string", "enum": ["VALID", "REPLAN", "UNKNOWN"]}, "held_assessment": {"type": "string", "enum": ["HELD", "LOST", "UNKNOWN"]}, "expected_change": {"type": "string", "enum": sorted(EXPECTED_CHANGES)}, "confidence": {"type": "string", "enum": ["HIGH", "MEDIUM", "LOW"]}, "reasoning": {"type": "string"}}, "required": ["intent", "route_assessment", "held_assessment", "expected_change", "confidence", "reasoning"], "additionalProperties": False}
         started = time.monotonic()
+        before_metrics = dict(getattr(self.client, "metrics", {}) or {})
         try:
             response = self.client.complete_json(prompt, image, wrist_image=wrist, schema=schema, max_tokens=self.review_max_tokens, temperature=0.0, chat_template_kwargs={"enable_thinking": False, "thinking": False}, debug=debug, agentview_label="AgentView with thin CPU route", wrist_label="Wrist live holding evidence")
             payload = response.payload.get("json")
             if not isinstance(payload, dict): raise RuntimeError("transport intent planner returned no JSON")
             held_assessment = str(payload.get("held_assessment", "UNKNOWN")).upper(); accepted = not (held_assessment == "LOST" and self._holding_arbiter.get("state") == "HELD")
             if not accepted: self._holding_arbiter["rejected_qwen_assessment"] = "LOST"
-            result = TransportIntent(intent_id, str(payload["intent"]).upper(), str(payload["route_assessment"]).upper(), held_assessment, str(payload["expected_change"]).upper(), str(payload["confidence"]).upper(), str(payload.get("reasoning", "")), route_id, int(frame_id), trigger, response.raw_text, time.monotonic() - started, accepted)
+            after_metrics = dict(getattr(self.client, "metrics", {}) or {})
+            prompt_tokens = int(after_metrics.get("prompt_tokens", 0)) - int(before_metrics.get("prompt_tokens", 0))
+            completion_tokens = int(after_metrics.get("completion_tokens", 0)) - int(before_metrics.get("completion_tokens", 0))
+            result = TransportIntent(intent_id, str(payload["intent"]).upper(), str(payload["route_assessment"]).upper(), held_assessment, str(payload["expected_change"]).upper(), str(payload["confidence"]).upper(), str(payload.get("reasoning", "")), route_id, int(frame_id), trigger, response.raw_text, time.monotonic() - started, accepted, prompt_tokens, completion_tokens)
             if result.route_assessment == "REPLAN": self._geometry_replan_requested = "qwen_route_assessment_replan"
             return result
         except Exception as exc:
@@ -535,6 +544,25 @@ class VisualRoutePlugin:
             self.route = None; self.last_intent = None; self.last_progress = None; self._geometry_samples = []; self._active_grasp_epoch = None; self._last_stage = stage_name
             return {"agentview": agentview, "context": "", "evidence": {"enabled": True, "mode": self.mode, "route": None, "stage": stage_name, "frame_id": int(frame_id), "route_discarded": "stage_outside_transport"}, "route_gate": None}
         entering = stage_name != self._last_stage or self._active_grasp_epoch is None
+        try:
+            current_goal = list(subgoals)[int(current_index)]
+        except (TypeError, ValueError, IndexError):
+            current_goal = None
+        held_target = held_affordance = ""
+        try:
+            for item in reversed(list(subgoals)[: int(current_index)]):
+                if str(getattr(item, "motion", "")).upper() == "GRASP":
+                    held_target = str(getattr(item, "target", "") or "")
+                    held_affordance = str(getattr(item, "affordance", "") or "")
+                    break
+        except (TypeError, ValueError):
+            pass
+        self._goal_context = {
+            "held_target": held_target,
+            "held_affordance": held_affordance,
+            "destination_target": str(getattr(current_goal, "target", "") or ""),
+            "destination_affordance": str(getattr(current_goal, "affordance", "") or ""),
+        }
         if entering:
             self._grasp_epoch_counter += 1; self._active_grasp_epoch = self._grasp_epoch_counter; self._held_latched = bool(gripper_closed)
             self._geometry_samples = []; self._previous_metrics = {}; self._previous_eef = self._previous_eef_px = self._previous_held_center = None
@@ -552,12 +580,29 @@ class VisualRoutePlugin:
         self._update_holding(held_evidence, gripper_closed, self.last_progress.hold_comotion_score)
         if self.last_progress.expected_change_satisfied is False: self._prediction_miss_count += 1
         elif self.last_progress.expected_change_satisfied is True: self._prediction_miss_count = 0
+        phase_before_update = self.route.phase if self.route and self.route.valid else None
         self._update_phase(stage_name, eef_world, held_evidence, destination_evidence, previous_action=previous_action)
+        if (
+            phase_before_update == RoutePhase.RECOVER_CLEAR
+            and self.route is not None
+            and self.route.phase != RoutePhase.RECOVER_CLEAR
+        ):
+            self._geometry_replan_requested = "contact_recovery_complete"
+            self.request_intent_refresh("contact_recovery_complete")
         if self.route: self.last_progress = replace(self.last_progress, active_leg=self.route.active_leg)
         rendered = self.render(agentview, held_evidence=held_evidence, destination_evidence=destination_evidence)
         self._frames_since_intent += 1; trigger, critical = self._intent_trigger(int(frame_id)); cooldown = int(frame_id) - self._last_intent_frame >= self.intent_cooldown
         if trigger and (critical or cooldown):
             self.last_intent = self._plan_intent(image=rendered, wrist=wrist, frame_id=frame_id, trigger=trigger, held=held_evidence, destination=destination_evidence, previous_action=previous_action, debug=debug)
+            if (
+                self.last_intent.held_assessment == "LOST"
+                and self.last_intent.held_assessment_accepted
+                and self._hold_missing_count >= 2
+            ):
+                self._holding_arbiter["state"] = "LOST"
+                self._holding_arbiter["reason"] = (
+                    "two_frame_visual_loss_confirmed_by_qwen_temporal_review"
+                )
             self._intent_refresh_count += 1; self._last_intent_frame = int(frame_id); self._last_intent_trigger = trigger; self._frames_since_intent = self._prediction_miss_count = 0; self._forced_intent_event = ""; self._forced_intent_critical = False
             if self.last_intent.intent == "CLEAR" and self.last_progress.clearance_residual_m == 0.0 and not self.last_progress.contact_or_stall: self.request_intent_refresh("intent_disagreement_clearance_complete")
         self._last_route_phase = self.route.phase.value if self.route else ""
@@ -573,6 +618,11 @@ class VisualRoutePlugin:
         if progress and progress.contact_or_stall and requested == "MV_DOWN": reasons.append("down_during_contact_or_stall")
         if progress and progress.clearance_residual_m and requested in MOVE_TOKENS: reasons.append("lateral_before_measured_clearance")
         if intent == "TRANSFER" and requested == "MV_UP" and progress and progress.clearance_residual_m == 0.0: reasons.append("continued_lift_after_clearance")
+        alignment = self._alignment_signal(held_evidence, destination_evidence)
+        if requested == "MV_DOWN" and alignment.get("known") and not alignment.get("aligned"):
+            reasons.append("down_while_not_aligned")
+        if requested == "MV_DOWN" and bool((held_evidence or {}).get("rim_contact_risk")):
+            reasons.append("rim_contact_risk")
         if reasons: self.request_intent_refresh("action_route_conflict")
         return RouteGateDecision(requested, requested, True, ";".join(reasons), bool(reasons), phase)
 
@@ -607,7 +657,14 @@ class VisualRoutePlugin:
         route = f"route={self.route.route_id}, active_leg={self.route.active_leg}, confidence={self.route.confidence:.2f}" if self.route and self.route.valid else "route=INVALID/UNKNOWN"
         intent = f"intent={self.last_intent.intent}, expected_change={self.last_intent.expected_change}, confidence={self.last_intent.confidence}, age={self._frames_since_intent}" if self.last_intent else "intent=UNKNOWN"
         progress = json.dumps(self.last_progress.to_dict(), ensure_ascii=False, separators=(",", ":")) if self.last_progress else "unknown"
-        return "\nTRANSPORT CLOSED LOOP: This is one continuous transport goal, not a LIFT/MOVE/PLACE stage sequence. The short-term intent below was produced by Qwen and is revisable, not a host action. CPU route geometry supplies evidence only and never replaces your token. The thin overlay has no text: blue is remaining payload path, green is completed path, yellow marks the carried object/current waypoint, and the blue ring is the opening endpoint. " + f"{intent}; {route}. Observed progress={progress}. Choose the next atomic action from the live images and residuals. If current evidence contradicts the old intent or route, output DONE to request an immediate intent refresh. Do not infer that more lifting is needed merely because the payload appears below the hand."
+        lost_note = ""
+        if self._holding_arbiter.get("state") == "LOST":
+            lost_note = (
+                " The two-frame holding arbiter and Qwen temporal review agree that "
+                "the object was lost. Choose RELEASE to reopen before the runner "
+                "returns to visual reacquisition; do not continue the stale route."
+            )
+        return "\nTRANSPORT CLOSED LOOP: This is one continuous transport goal, not a LIFT/MOVE/PLACE stage sequence. The short-term intent below was produced by Qwen and is revisable, not a host action. CPU route geometry supplies evidence only and never replaces your token. The thin overlay has no text: blue is remaining payload path, green is completed path, yellow marks the carried object/current waypoint, and the blue ring is the opening endpoint. " + f"{intent}; {route}. Observed progress={progress}. Choose the next atomic action from the live images and residuals. If current evidence contradicts the old intent or route, output DONE to request an immediate intent refresh. Do not infer that more lifting is needed merely because the payload appears below the hand." + lost_note
 
     def metadata(self) -> dict[str, Any]:
         return {"enabled": self.enabled, "mode": self.mode, "transport_loop_enabled": self.transport_loop_enabled, "clearance_margin_m": self.clearance_margin_m, "geometry_window": self.geometry_window, "stall_steps": self.stall_steps, "geometry_refresh_interval": self.replan_interval, "intent_interval": self.intent_interval, "intent_ttl": self.intent_ttl, "intent_cooldown": self.intent_cooldown, "geometry_refresh_count": self._geometry_refresh_count, "intent_refresh_count": self._intent_refresh_count, "route": self.route.to_dict() if self.route else None, "intent": self.last_intent.to_dict() if self.last_intent else None, "progress": self.last_progress.to_dict() if self.last_progress else None, "holding_arbiter": dict(self._holding_arbiter)}

@@ -1,0 +1,73 @@
+defaults:
+  - robot_libero_clean_qwen3vl_c3_long.yaml
+
+# Qwen follow-up: preserve the local clean Qwen backend while using the diagnosed
+# SAM3 threshold and the two stage-transition safeguards.
+research_profile: clean_qwen3vl_c3_threshold04_approachguard
+log_dir: rollouts/libero_clean_qwen3vl_c3_threshold04_approachguard
+lift_clear_height_m: 0.17
+step_m: 0.02
+fine_step_m: 0.02
+up_step_m: 0.04
+coarse_step_m: 0.04
+# Shared CPU route for LIFT -> MOVE -> PLACE.  In route mode this replaces the
+# old single-height LIFT completion cue with camera-calibrated transport clearance.
+plugins:
+  visual_route: true
+visual_route_mode: active
+route_clearance_margin_m: 0.02
+route_geometry_window: 3
+route_stall_steps: 2
+route_replan_interval: 8
+route_intent_interval: 6
+route_intent_ttl: 6
+route_intent_cooldown: 2
+route_intent_max_tokens: 192
+# Route alignment is normalized by the currently detected opening size; it is
+# not a fixed bottle/basket pixel offset.  These are generic visual tolerances.
+route_alignment_fraction: 0.30
+route_alignment_min_px: 4.0
+v0:
+  # A bounded, Agent-driven replan is allowed after a fresh final visual check says
+  # the previous plan did not complete. It is not a scripted recovery sequence.
+  max_replans: 2
+vlm_backends:
+  qwen3vl_local:
+    # Let Qwen perform a short visual self-review before committing each action. Planner
+    # and verifier calls still override thinking off for strict structured JSON.
+    reasoning_cot: true
+    # The local Qwen server has a 4096-token context. Route intent refresh is
+    # useful only if the normal controller request still fits that window.
+    cot_max_tokens: 256
+    reasoning_directive: >-
+      Before the final action, briefly inspect the live AgentView and Wrist relation:
+      identify the held object's visible body and destination opening, check centering,
+      height/contact/tilt, compare with the recent action, then commit one action.
+    chat_template_kwargs:
+      enable_thinking: true
+      thinking: true
+capabilities:
+  confidence_threshold: 0.4
+  sam3_ambiguity_margin: 0.05
+  # The AgentView EEF projection and the lower bottle center are at different
+  # depths.  A zero-centered pixel test therefore accepted a low, empty grasp.
+  # The band below was measured with a robot-only open/close probe on this Panda.
+  alignment_ready_px: 13.5
+  # Visual bbox center back-projection for the LIBERO salad-dressing bottle.
+  # This is a static camera/task calibration, never simulator object state.
+  target_reference_height_m: 0.073
+  occlusion_hold_frames: 8
+  approach_completion_guard_enabled: true
+  approach_completion_guard_mode: active
+  approach_completion_guard_freshness_frames: 1
+  approach_completion_min_height_m: 0.105
+  approach_completion_max_height_m: 0.14
+  grasp_agentview_fallback_enabled: true
+  grasp_agentview_guard_enabled: true
+  # AgentView alignment remains logged as evidence, but it must not close the
+  # gripper by itself when the Wrist view is ambiguous/occluded. Qwen owns GRASP.
+  grasp_agentview_guard_mode: shadow
+  grasp_agentview_guard_freshness_frames: 1
+  grasp_agentview_guard_alignment_px: 13.5
+  grasp_agentview_guard_min_height_m: 0.105
+  grasp_agentview_guard_height_m: 0.14

@@ -341,6 +341,7 @@ class ControllerAgent:
         client: Any,
         prompt_template: str,
         common_context: str,
+        transport_prompt_template: str | None = None,
         cot_mode: bool = False,
         gripper_color: str = "black",
         proprio_plugin: Any = None,
@@ -355,6 +356,7 @@ class ControllerAgent:
     ) -> None:
         self.client = client
         self.prompt_template = prompt_template
+        self.transport_prompt_template = transport_prompt_template
         self.common_context = common_context
         self.cot_mode = cot_mode
         # Physical color of the gripper as seen in the camera views, substituted for
@@ -420,6 +422,324 @@ class ControllerAgent:
             or getattr(self.rotation_plugin, "enabled", False)
         )
 
+    def verify_grasp(
+        self,
+        *,
+        task: str,
+        target: str,
+        affordance: str,
+        agentview_image,
+        wrist_image=None,
+        debug: bool = False,
+    ) -> dict[str, Any]:
+        """Ask the VLM once whether the just-commanded close visually holds.
+
+        This is deliberately a semantic visual check, separate from the atomic action
+        policy. It does not use a gripper-width threshold and does not require Wrist to
+        show the object: AgentView is the global view, while Wrist is supplementary and
+        may be occluded by the gripper mount.
+        """
+        prompt = (
+            "You are the high-level post-action grasp verifier for a robot task.\n"
+            f"TASK: {task}\n"
+            f"TARGET: {target}\n"
+            f"AFFORDANCE: {affordance}\n\n"
+            "A GRASP command has just closed the gripper. Inspect both live images. "
+            "AgentView is authoritative for the global relation between the EEF, target, "
+            "and scene; Wrist is supplementary local evidence. The Wrist camera is mounted "
+            "on/above the gripper and can be occluded at contact. Do not answer NO merely "
+            "because the target is absent or clipped in Wrist. Answer YES when the target "
+            "is visibly enclosed between the fingers and its body is supported by the closed "
+            "gripper rather than merely appearing underneath it. Do not treat a bottle that "
+            "is still on the table below the hand, or a coincidental 2D overlap, as a held "
+            "grasp. Answer NO only when the target is visibly outside/on the table or the "
+            "closed gripper is clearly empty. Answer UNKNOWN when the views cannot separate "
+            "a real hold from contact/occlusion; do not convert uncertainty into YES. "
+            "Answer UNKNOWN when the views do not contain enough evidence. Do not use any "
+            "fixed gripper-width or object-size threshold.\n\n"
+            'Return JSON only: {"grasped":"YES|NO|UNKNOWN",'
+            '"reasoning":"one short visual sentence"}'
+        )
+        schema = {
+            "type": "object",
+            "properties": {
+                "grasped": {"type": "string", "enum": ["YES", "NO", "UNKNOWN"]},
+                "reasoning": {"type": "string"},
+            },
+            "required": ["grasped", "reasoning"],
+            "additionalProperties": False,
+        }
+        try:
+            response = self.client.complete_json(
+                prompt,
+                agentview_image,
+                wrist_image=wrist_image,
+                schema=schema,
+                max_tokens=128,
+                temperature=0.0,
+                chat_template_kwargs=TOKEN_CHAT_TEMPLATE_KWARGS,
+                debug=debug,
+                agentview_label="AgentView after GRASP",
+                wrist_label="Wrist after GRASP (supplementary; may be occluded)",
+            )
+            payload = response.payload.get("json")
+            if not isinstance(payload, dict):
+                raise RuntimeError("grasp verifier returned no JSON object")
+            verdict = str(payload.get("grasped", "UNKNOWN")).strip().upper()
+            if verdict not in {"YES", "NO", "UNKNOWN"}:
+                verdict = "UNKNOWN"
+            return {
+                "decision": verdict,
+                "reasoning": str(payload.get("reasoning") or "").strip(),
+                "raw_text": response.raw_text,
+                "latency_s": (response.payload or {}).get("latency_s"),
+            }
+        except Exception as exc:
+            # A verifier transport/parse failure is uncertainty, not evidence of an
+            # empty grasp. The runner keeps the original Agent decision inspectable.
+            return {
+                "decision": "UNKNOWN",
+                "reasoning": "grasp verifier unavailable; visual verdict is unknown",
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+
+    def verify_place(
+        self,
+        *,
+        task: str,
+        target: str,
+        affordance: str,
+        agentview_image,
+        wrist_image=None,
+        debug: bool = False,
+    ) -> dict[str, Any]:
+        """Ask whether a held object is visibly placed, with a recovery action."""
+        prompt = (
+            "You are the high-level post-action placement verifier for a robot task.\n"
+            f"TASK: {task}\n"
+            f"RECEPTACLE: {target}\n"
+            f"AFFORDANCE: {affordance}\n\n"
+            "The robot has attempted to place a still-held object. Inspect "
+            "both live images. AgentView is authoritative for the global relation between "
+            "the held object and the receptacle; Wrist is supplementary and may be blocked "
+            "by the gripper mount. Answer YES only when the target object is visibly inside "
+            "the receptacle boundary or clearly seated in its opening. Answer NO only when "
+            "the attempted placement is visibly off-center/failed or the object is clearly "
+            "outside/fallen away. If it is merely still above the receptacle and no final "
+            "placement attempt is visually complete, answer UNKNOWN. For NO, choose the "
+            "single safest immediate recovery action from the image: lift with MV_UP to "
+            "clear the rim before horizontal correction when needed, otherwise choose the "
+            "appropriate MV_LEFT/MV_RIGHT/MV_FWD/MV_BACK correction. Do not release on NO.\n\n"
+            'Return JSON only: {"placed":"YES|NO|UNKNOWN",'
+            '"recovery_action":"MV_UP|MV_LEFT|MV_RIGHT|MV_FWD|MV_BACK|HOLD",'
+            '"reasoning":"one short visual sentence"}'
+        )
+        schema = {
+            "type": "object",
+            "properties": {
+                "placed": {"type": "string", "enum": ["YES", "NO", "UNKNOWN"]},
+                "recovery_action": {
+                    "type": "string",
+                    "enum": ["MV_UP", "MV_LEFT", "MV_RIGHT", "MV_FWD", "MV_BACK", "HOLD"],
+                },
+                "reasoning": {"type": "string"},
+            },
+            "required": ["placed", "recovery_action", "reasoning"],
+            "additionalProperties": False,
+        }
+        try:
+            response = self.client.complete_json(
+                prompt,
+                agentview_image,
+                wrist_image=wrist_image,
+                schema=schema,
+                max_tokens=128,
+                temperature=0.0,
+                chat_template_kwargs=TOKEN_CHAT_TEMPLATE_KWARGS,
+                debug=debug,
+                agentview_label="AgentView after PLACE",
+                wrist_label="Wrist after PLACE (supplementary; may be occluded)",
+            )
+            payload = response.payload.get("json")
+            if not isinstance(payload, dict):
+                raise RuntimeError("place verifier returned no JSON object")
+            verdict = str(payload.get("placed", "UNKNOWN")).strip().upper()
+            if verdict not in {"YES", "NO", "UNKNOWN"}:
+                verdict = "UNKNOWN"
+            recovery_action = str(payload.get("recovery_action", "HOLD")).strip().upper()
+            if recovery_action not in {"MV_UP", "MV_LEFT", "MV_RIGHT", "MV_FWD", "MV_BACK", "HOLD"}:
+                recovery_action = "HOLD"
+            return {
+                "decision": verdict,
+                "recovery_action": recovery_action,
+                "reasoning": str(payload.get("reasoning") or "").strip(),
+                "raw_text": response.raw_text,
+                "latency_s": (response.payload or {}).get("latency_s"),
+            }
+        except Exception as exc:
+            return {
+                "decision": "UNKNOWN",
+                "recovery_action": "HOLD",
+                "reasoning": "place verifier unavailable; visual verdict is unknown",
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+
+    def review_place_alignment(
+        self,
+        *,
+        task: str,
+        target: str,
+        affordance: str,
+        agentview_image,
+        wrist_image=None,
+        recent_moves: str = "",
+        debug: bool = False,
+    ) -> dict[str, Any]:
+        """Review horizontal alignment before the controller lowers or releases."""
+        prompt = (
+            "You are the high-level pre-placement alignment reviewer for a robot task.\n"
+            f"TASK: {task}\n"
+            f"RECEPTACLE: {target}\n"
+            f"AFFORDANCE: {affordance}\n\n"
+            "The gripper is still closed around the target object and the robot is about "
+            "to place it. Inspect both live images in detail. AgentView is authoritative "
+            "for the global relation between object, gripper, and receptacle; Wrist is "
+            "supplementary and may be occluded by the gripper mount. Decide whether the "
+            "object is horizontally over the receptacle opening with a safe visible margin "
+            "for lowering. Do not use a fixed pixel, object-size, or world-height threshold; "
+            "judge the actual visual relation in these frames. Explicitly locate the held "
+            "object's visible body and lowest point, compare its footprint with the opening, "
+            "and check whether it is tilted or contacting a rim; the gripper center alone is "
+            "not proof of alignment. If not aligned, choose the single best immediate action: "
+            "use MV_UP only when the fresh image shows the object is too low/near a rim and "
+            "must first be cleared, otherwise choose the horizontal correction direction. "
+            "If aligned, choose MV_DOWN. If the views are insufficient, choose HOLD. "
+            "The following actions were executed immediately before this review, newest first: "
+            f"{recent_moves or 'none'}. If the same correction has repeated without visibly "
+            "improving the object/receptacle relation, do not blindly repeat it: clear any "
+            "possible rim contact with MV_UP or choose the other axis, then reassess a fresh "
+            "frame.\n\n"
+            'Return JSON only: {"aligned":"YES|NO|UNKNOWN",'
+            '"recommended_action":"MV_DOWN|MV_UP|MV_LEFT|MV_RIGHT|MV_FWD|MV_BACK|HOLD",'
+            '"reasoning":"one short visual sentence"}'
+        )
+        schema = {
+            "type": "object",
+            "properties": {
+                "aligned": {"type": "string", "enum": ["YES", "NO", "UNKNOWN"]},
+                "recommended_action": {
+                    "type": "string",
+                    "enum": ["MV_DOWN", "MV_UP", "MV_LEFT", "MV_RIGHT", "MV_FWD", "MV_BACK", "HOLD"],
+                },
+                "reasoning": {"type": "string"},
+            },
+            "required": ["aligned", "recommended_action", "reasoning"],
+            "additionalProperties": False,
+        }
+        try:
+            response = self.client.complete_json(
+                prompt,
+                agentview_image,
+                wrist_image=wrist_image,
+                schema=schema,
+                max_tokens=160,
+                temperature=0.0,
+                chat_template_kwargs=TOKEN_CHAT_TEMPLATE_KWARGS,
+                debug=debug,
+                agentview_label="AgentView before PLACE alignment",
+                wrist_label="Wrist before PLACE alignment (supplementary; may be occluded)",
+            )
+            payload = response.payload.get("json")
+            if not isinstance(payload, dict):
+                raise RuntimeError("place alignment reviewer returned no JSON object")
+            decision = str(payload.get("aligned", "UNKNOWN")).strip().upper()
+            if decision not in {"YES", "NO", "UNKNOWN"}:
+                decision = "UNKNOWN"
+            action = str(payload.get("recommended_action", "HOLD")).strip().upper()
+            if action not in {"MV_DOWN", "MV_UP", "MV_LEFT", "MV_RIGHT", "MV_FWD", "MV_BACK", "HOLD"}:
+                action = "HOLD"
+            return {
+                "decision": decision,
+                "recommended_action": action,
+                "reasoning": str(payload.get("reasoning") or "").strip(),
+                "raw_text": response.raw_text,
+                "latency_s": (response.payload or {}).get("latency_s"),
+            }
+        except Exception as exc:
+            return {
+                "decision": "UNKNOWN",
+                "recommended_action": "HOLD",
+                "reasoning": "place alignment reviewer unavailable; visual alignment is unknown",
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+
+    def verify_task(
+        self,
+        *,
+        task: str,
+        agentview_image,
+        wrist_image=None,
+        debug: bool = False,
+    ) -> dict[str, Any]:
+        """Re-judge the whole task from a fresh, unobstructed observation.
+
+        This is intentionally an Agent judgment rather than a runner state machine:
+        the runner only uses the verdict to decide whether the planner should look at
+        the current scene again.  The model must distinguish a target inside the
+        receptacle from one on a rim, beside it, or visibly fallen/tilted.
+        """
+        prompt = (
+            "You are the final visual outcome reviewer for a robot manipulation task.\n"
+            f"TASK: {task}\n\n"
+            "The previous controller plan has ended, but simulator success has not been "
+            "confirmed. Inspect the fresh AgentView first and the Wrist view only as "
+            "supplementary evidence. Decide whether the requested task is actually complete. "
+            "For pick-and-place, answer complete=true only if the requested object is visibly "
+            "inside/seated in the destination opening, not on its rim, beside it, tilted outside, "
+            "or missing. If it is incomplete, describe what is visibly wrong and where the object "
+            "currently is so a new planner call can choose a grounded recovery plan. Do not assume "
+            "that a previous RELEASE succeeded, and do not use gripper width or simulator state "
+            "as proof of placement.\n\n"
+            'Return JSON only: {"complete":true|false,"reason":"one concise visual sentence"}'
+        )
+        schema = {
+            "type": "object",
+            "properties": {
+                "complete": {"type": "boolean"},
+                "reason": {"type": "string"},
+            },
+            "required": ["complete", "reason"],
+            "additionalProperties": False,
+        }
+        try:
+            response = self.client.complete_json(
+                prompt,
+                agentview_image,
+                wrist_image=wrist_image,
+                schema=schema,
+                max_tokens=192,
+                temperature=0.0,
+                chat_template_kwargs=TOKEN_CHAT_TEMPLATE_KWARGS,
+                debug=debug,
+                agentview_label="AgentView final task check",
+                wrist_label="Wrist final task check (supplementary)",
+            )
+            payload = response.payload.get("json")
+            if not isinstance(payload, dict):
+                raise RuntimeError("final task verifier returned no JSON object")
+            return {
+                "complete": bool(payload.get("complete", False)),
+                "reason": str(payload.get("reason") or "").strip(),
+                "raw_text": response.raw_text,
+                "latency_s": (response.payload or {}).get("latency_s"),
+            }
+        except Exception as exc:
+            return {
+                "complete": False,
+                "reason": "final task verifier unavailable; current outcome is unknown",
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+
     def decide(
         self,
         task: str,
@@ -432,6 +752,7 @@ class ControllerAgent:
         prev_agentview_image=None,
         proprio: dict[str, Any] | None = None,
         recovery_context: str = "",
+        capability_context: str = "",
         debug: bool = False,
     ) -> VLMResponse:
         # Tools choose the prompt's context block and answer protocol. proprio (context
@@ -480,9 +801,15 @@ class ControllerAgent:
             allowed_tokens = tuple(CONTROLLER_TOKENS) + rotation_tokens
             output_contract = _default_output_contract(rotation_tokens)
 
+        stage_name = str(subgoal.get("motion", "")).strip().upper()
+        prompt_template = (
+            self.transport_prompt_template
+            if stage_name == "TRANSPORT" and self.transport_prompt_template
+            else self.prompt_template
+        )
         prompt = _join_prompt_parts(
             self.common_context,
-            self.prompt_template.format(
+            prompt_template.format(
                 task=task,
                 subgoal_json=json.dumps(subgoal, sort_keys=True),
                 stage=str(subgoal.get("motion", "")),
@@ -509,6 +836,7 @@ class ControllerAgent:
                 gripper_proprio=gripper_proprio,
                 output_contract=output_contract,
             ),
+            str(capability_context or "").strip(),
         )
         ablation = self.action_ablation_plugin
         ablation_on = ablation is not None and getattr(ablation, "enabled", False)

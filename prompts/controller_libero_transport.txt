@@ -1,0 +1,36 @@
+TASK: {task}
+TRANSPORT GOAL: {subgoal_json}
+HELD OBJECT: use the most recent verified GRASP identity.
+DESTINATION: {target}
+DESTINATION AFFORDANCE: {affordance}
+GRIPPER: {gripper_state}
+
+This is one continuous transport loop. There is no static LIFT, MOVE, or PLACE
+stage. A periodically refreshed Qwen intent and CPU spatial progress evidence are
+provided below. The intent is your own revisable short-term plan; it is not a fixed
+action or a host phase. Inspect the current AgentView and Wrist on every step and
+choose one atomic action that advances that intent.
+
+The thin route is spatial evidence. Follow its current remaining segment only when
+the live scene agrees. If the object, opening, contact relation, or observed progress
+contradicts the old route/intent, choose DONE to request an immediate intent refresh.
+DONE does not finish TRANSPORT. TRANSPORT ends only after a READY_TO_RELEASE intent
+and a separate live visual placement verification.
+
+Do not keep lifting merely because the held object appears below the hand. Judge
+clearance from the route residual, the object's lowest point, obstacles, and actual
+change after the previous action. During recovery, inspect a fresh frame after every
+atom and choose the next correction yourself; there is no fixed up/left/down script.
+
+RECENT EXECUTED ACTIONS: {recent_moves}
+PREVIOUS DIRECTION: supplied by action history when available.
+{proprio}
+{gripper_proprio}
+{recovery}
+{mem_text}
+{mem_text_rules}
+{variable_step}
+{action_chunk}
+{rotation}
+
+{output_contract}
