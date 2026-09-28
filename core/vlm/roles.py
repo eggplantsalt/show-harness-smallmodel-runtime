@@ -836,11 +836,11 @@ class ControllerAgent:
             )
         if stage_name == "TRANSPORT":
             # Keep live route/intent evidence immediately before the answer
-            # contract.  Appending evidence after "Return JSON only" made the
-            # 8B controller attend to destination pixels while overlooking the
-            # current route leg and its residual.
+            # contract. TRANSPORT deliberately excludes the staged controller's
+            # common context: that LIBERO context contains pre-grasp height rules
+            # which are correct before GRASP but directly contradict a carried
+            # payload's clearance leg.
             prompt = _join_prompt_parts(
-                self.common_context,
                 formatted_prompt,
                 str(capability_context or "").strip(),
                 output_contract,

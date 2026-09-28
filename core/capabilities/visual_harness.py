@@ -1856,9 +1856,6 @@ class VisualHarness:
                 ),
                 "destination_confidence": self.last_evidence.get("confidence"),
                 "held_object": held_summary,
-                "held_object_alignment": self.last_evidence.get(
-                    "held_object_alignment"
-                ),
                 "geometry": transport_geometry,
             }
             return (

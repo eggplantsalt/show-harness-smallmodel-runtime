@@ -5,6 +5,10 @@ DESTINATION: {target}
 DESTINATION AFFORDANCE: {affordance}
 GRIPPER: {gripper_state}
 
+LIBERO ACTION FRAME: screen-down/world +X is MV_FWD; screen-up/world -X is
+MV_BACK; screen-right/world -Y is MV_RIGHT; screen-left/world +Y is MV_LEFT;
+world +Z is MV_UP and world -Z is MV_DOWN.
+
 This is one continuous transport loop. There is no static LIFT, MOVE, or PLACE
 stage. A periodically refreshed Qwen intent and CPU spatial progress evidence are
 provided below. The intent is your own revisable short-term plan; it is not a fixed
@@ -30,6 +34,11 @@ unsafe, or based on stale geometry; explain that visual contradiction. Do not le
 large destination-centering error override an unfinished earlier route leg. If the
 route evidence disagrees with the live view, choose DONE so the intent/route is
 replanned rather than silently following a different leg.
+
+GRASP has already been visually verified. Pre-grasp height bands and approach rules
+are no longer relevant in TRANSPORT. A positive Z clearance residual means the active
+waypoint is above the current EEF; it never means descend. Do not describe a nonzero
+metric residual as complete merely because it looks small in the image.
 
 Do not keep lifting merely because the held object appears below the hand. Judge
 clearance from the route residual, the object's lowest point, obstacles, and actual
