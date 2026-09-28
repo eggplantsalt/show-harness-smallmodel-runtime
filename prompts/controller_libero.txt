@@ -1,0 +1,101 @@
+TASK: {task}
+STAGE: {stage}
+TARGET: {target}
+AFFORD: {affordance}
+Stage goal: {description}
+DONE WHEN: {completion}
+Gripper now: {gripper_state}
+{mem_text}
+{recovery}
+{proprio}
+
+LIBERO CAMERA AND ACTION CALIBRATION:
+- Both images are upright for this backend. In both AgentView and Wrist view,
+  screen-down means world +X and therefore MV_FWD.
+- Screen-up means world -X and therefore MV_BACK.
+- Screen-right means world -Y and therefore MV_RIGHT.
+- Screen-left means world +Y and therefore MV_LEFT.
+- These are the executed action mappings; do not reverse them based on the Panda
+  base name or on the word "backward" in a visual explanation.
+
+DECISION:
+- During APPROACH or MOVE, use AgentView for global target position. Choose the
+  single direction that reduces the largest visible error. Repeat a direction if
+  the target remains on that side; never alternate opposite horizontal actions
+  merely because the view changes slightly. The target is lower than the EEF in
+  depth, so its screen-down position is not by itself evidence that another
+  forward move is needed. When the EEF is high and the target is already left/right
+  aligned, descend with MV_DOWN into the final pre-grasp height band first; only
+  then use MV_FWD/MV_BACK for the remaining depth correction.
+- During MOVE while holding an object, keep the EEF at its lifted height and
+  correct only world X/Y alignment with MV_FWD/MV_BACK/MV_LEFT/MV_RIGHT when the
+  route is visibly clear. Compare the held object's lowest point against visible
+  tabletop objects and the destination rim; if the horizontal path would contact
+  an obstacle or the object is too close to a rim, choose MV_UP first and inspect
+  the new frame before continuing. Do not descend just because the basket appears
+  lower in AgentView; PLACE owns the vertical descent after MOVE is aligned.
+- During LIFT, the current goal is to raise the held object clear of the table. Use
+  the live views to confirm that the object is still enclosed. If a visual route cue
+  is present, use its current phase and the visible object/rim relation to decide
+  whether clearance is complete and transfer should begin; do not treat a lower
+  eye-in-hand image position alone as proof that another MV_UP is required. Without
+  a route cue, raise until the object is visibly clear, then DONE. Before DONE,
+  inspect the route and make sure the object's body can clear visible obstacles or
+  the receptacle rim during the next horizontal move. If the route is uncertain,
+  reassess the fresh views rather than repeating a fixed sequence. A fresh route
+  reflection with intent=TRANSFER is a signal to consider ending this lift stage
+  and continuing the plan, not a command to keep lifting.
+  If it is no longer held, the recovery evidence must be re-evaluated before any
+  new GRASP.
+- During PLACE, inspect AgentView first and use Wrist only as supplementary
+  evidence. Keep correcting the held object over the receptacle opening while
+  lowering; if it becomes off-center or reaches a rim, lift clear before the next
+  horizontal correction. Once the object is visibly seated/inside, emit DONE so
+  the visual placement verifier can confirm it. Do not repeat MV_DOWN indefinitely
+  when the object is already at the receptacle or the downward motion has stalled.
+- If placement verification says the object is outside, on the rim, or otherwise
+  not seated, assume the gripper still holds it: do not RELEASE and do not jump
+  back to an old GRASP/MOVE pose. First issue MV_UP to clear contact, inspect a
+  fresh observation, then correct X/Y, descend again, and only release after a
+  new placement verification says it is seated.
+- During GRASP, first align X and Y while the gripper is above the table. Use the
+  Wrist view for local confirmation when it can see the object, then descend only
+  into the calibrated final pre-grasp height band. If the EEF is already below
+  that band, issue MV_UP; never issue MV_DOWN or GRASP from the low empty-wrist
+  pose. The Wrist camera is mounted on/above the gripper and may be occluded at
+  final contact; an empty Wrist view does not prove that the object is absent.
+- Emit GRASP only after your own fresh visual review: AgentView must show the
+  target body at the intended finger span and Wrist must be consistent with the
+  object entering the finger gap. AgentView alignment evidence from the harness is
+  advisory and never a substitute for your GRASP decision. If Wrist shows the body
+  below/behind the finger entry, or the gap/enclosure is ambiguous, make one
+  visually justified correction and inspect both views again; do not close merely
+  because the target bbox is near the EEF. A Wrist view occluded by the camera can
+  be unknown, but it is not positive grasp evidence. Emit RELEASE only when a held
+  object is visibly above the destination and lowered into it.
+- MV_UP is for lifting a grasped object clear of the table and retreating.
+- DONE is allowed only when DONE WHEN is visibly satisfied.
+- GRASP is a stage-specific close: emit it only when STAGE is GRASP, the gripper is
+  OPEN, and the fresh views support a new close. If the gripper is CLOSED or the stage
+  is LIFT/MOVE/PLACE/RELEASE/RETREAT, never repeat GRASP; choose the action that advances
+  the current stage or let recovery reacquire the object.
+- RELEASE is stage-specific as well: do not release during MOVE or PLACE merely because
+  the object looks near the opening; PLACE must first be visually settled and the RELEASE
+  stage must be reached.
+- For MOVE/PLACE, do not call the target aligned merely because the gripper is near an
+  image edge. Compare the held object's visible body/lowest point with the full destination
+  opening in AgentView; an edge-clipped receptacle is not evidence of a centered placement.
+- Before every action, silently self-review: is the requested object still held; where is
+  its body relative to the destination opening; is it centered/upright/seated or touching a
+  rim/outside; and did the previous action reduce that visual error? Then choose the action
+  justified by that fresh comparison. Host evidence is a cue, not a substitute for the image.
+- If a placement or release failed, classify the current image yourself. If the object is
+  still in the fingers, lift/re-align/re-lower as the two views justify. If it has fallen or
+  is tilted on the table, reacquire its current silhouette in AgentView and guide a new
+  approach/grasp; never assume the old grasp pose still holds.
+{rotation}
+{variable_step}
+{action_chunk}
+{mem_text_rules}
+After the silent self-review, commit to one action and give one concise visual reason.
+{output_contract}
