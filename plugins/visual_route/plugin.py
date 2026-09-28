@@ -666,9 +666,23 @@ class VisualRoutePlugin:
         else:
             self._frames_since_geometry_refresh += 1; refresh = self._geometry_replan_requested
             if not refresh and self.replan_interval and self._frames_since_geometry_refresh >= self.replan_interval: refresh = f"periodic_{self.replan_interval}_frames"
-            if refresh: self._replace_route(frame_id=frame_id, eef_world=eef_world, geometry=geometry, held_evidence=held_evidence, destination_evidence=destination_evidence, reason=refresh, reset_anchor=refresh == "contact_recovery_complete")
+            holding_unreliable = self._holding_arbiter.get("state") in {"SUSPECTED_LOST", "LOST"}
+            if refresh and not holding_unreliable: self._replace_route(frame_id=frame_id, eef_world=eef_world, geometry=geometry, held_evidence=held_evidence, destination_evidence=destination_evidence, reason=refresh, reset_anchor=refresh == "contact_recovery_complete")
         self.last_progress = self._compute_progress(eef_world, held_evidence, destination_evidence, previous_action)
         self._update_holding(held_evidence, gripper_closed, self.last_progress.hold_comotion_score)
+        if self._holding_arbiter.get("state") in {"SUSPECTED_LOST", "LOST"}:
+            # A route for an object no longer rigidly associated with the hand
+            # is misleading evidence. Suspend it and show Qwen the raw scene for
+            # holding review; do not invent a recovery action in the host.
+            if self.route is not None:
+                self.route.valid = False
+                self.route.last_reason = "suspended_while_holding_unreliable"
+            self.last_progress = replace(
+                self.last_progress,
+                active_leg="HOLD_CHECK",
+                active_waypoint_residual_world_m=None,
+                route_direction_candidates=[],
+            )
         if self.last_progress.expected_change_satisfied is False: self._prediction_miss_count += 1
         elif self.last_progress.expected_change_satisfied is True: self._prediction_miss_count = 0
         phase_before_update = self.route.phase if self.route and self.route.valid else None
@@ -681,7 +695,12 @@ class VisualRoutePlugin:
             self._geometry_replan_requested = "contact_recovery_complete"
             self.request_intent_refresh("contact_recovery_complete")
         if self.route: self.last_progress = replace(self.last_progress, active_leg=self.route.active_leg)
-        rendered = self.render(agentview, held_evidence=held_evidence, destination_evidence=destination_evidence)
+        holding_review = self._holding_arbiter.get("state") in {"SUSPECTED_LOST", "LOST"}
+        rendered = (
+            np.asarray(agentview).copy()
+            if holding_review
+            else self.render(agentview, held_evidence=held_evidence, destination_evidence=destination_evidence)
+        )
         self._frames_since_intent += 1; trigger, critical = self._intent_trigger(int(frame_id)); cooldown = int(frame_id) - self._last_intent_frame >= self.intent_cooldown
         if trigger and (critical or cooldown):
             self.last_intent = self._plan_intent(image=rendered, wrist=wrist, frame_id=frame_id, trigger=trigger, held=held_evidence, destination=destination_evidence, previous_action=previous_action, debug=debug)
@@ -793,6 +812,14 @@ class VisualRoutePlugin:
                 " The two-frame holding arbiter and Qwen temporal review agree that "
                 "the object was lost. Choose RELEASE to reopen before the runner "
                 "returns to visual reacquisition; do not continue the stale route."
+            )
+        elif self._holding_arbiter.get("state") == "SUSPECTED_LOST":
+            lost_note = (
+                " The held-instance track has diverged from the hand for multiple "
+                "consecutive frames, so the old route is suspended and the AgentView "
+                "is intentionally raw. Inspect both views: decide whether the payload "
+                "is still securely between the fingers or has slipped/fallen. Do not "
+                "continue the stale route merely because another similar object is visible."
             )
         return "\nTRANSPORT CLOSED LOOP: This is one continuous transport goal, not a LIFT/MOVE/PLACE stage sequence. The short-term intent below was produced by Qwen and is revisable, not a host action. CPU route geometry supplies evidence only and never replaces your token. The thin overlay has no text: blue is remaining payload path, green is completed path, yellow marks the carried object/current waypoint, and the blue ring is the opening endpoint. " + f"{intent}; {route}. Observed progress={progress}. Choose the next atomic action from the live images and residuals. If current evidence contradicts the old intent or route, output DONE to request an immediate intent refresh. Do not infer that more lifting is needed merely because the payload appears below the hand." + lost_note
 

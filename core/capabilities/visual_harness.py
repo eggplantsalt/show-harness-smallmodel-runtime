@@ -133,6 +133,7 @@ class VisualHarness:
         self.held_stage_identity: Optional[str] = None
         self.held_last_grounding_frame: Optional[int] = None
         self.last_held_evidence: dict[str, Any] = {}
+        self._held_instance_anchor_bbox: Optional[tuple[int, int, int, int]] = None
         self.held_rim_anchor_y: Optional[float] = None
         self.held_horizontal_stall = False
         self.opening_stage_identity: Optional[str] = None
@@ -241,6 +242,7 @@ class VisualHarness:
         self.held_stage_identity = None
         self.held_last_grounding_frame = None
         self.last_held_evidence = {}
+        self._held_instance_anchor_bbox = None
         self.held_rim_anchor_y = None
         self.held_horizontal_stall = False
         self.opening_stage_identity = None
@@ -593,6 +595,7 @@ class VisualHarness:
             self.held_stage_identity = None
             self.held_last_grounding_frame = None
             self.last_held_evidence = {}
+            self._held_instance_anchor_bbox = None
             self.held_rim_anchor_y = None
             self.held_horizontal_stall = False
             if self.held_tracker is not None:
@@ -605,6 +608,7 @@ class VisualHarness:
             self.held_stage_identity = identity
             self.held_last_grounding_frame = None
             self.last_held_evidence = {}
+            self._held_instance_anchor_bbox = None
             self.held_rim_anchor_y = None
             self.held_horizontal_stall = False
             if self.held_tracker is not None:
@@ -618,6 +622,7 @@ class VisualHarness:
                 else None
             )
             if stage_name == "TRANSPORT" and handoff_bbox is not None:
+                self._held_instance_anchor_bbox = handoff_bbox
                 self.last_held_evidence = {
                     "bbox_xyxy": list(handoff_bbox),
                     "confidence": float((handoff_evidence or {}).get("confidence", 0.0) or 0.0),
@@ -656,7 +661,7 @@ class VisualHarness:
                 self.last_held_evidence.get("bbox_xyxy")
                 if isinstance(self.last_held_evidence, dict)
                 else None
-            )
+            ) or self._held_instance_anchor_bbox
             # Associate all semantic candidates to the live instance track,
             # rather than accepting the detector's highest-confidence object.
             # This is category-agnostic and prevents a periodic refresh from
@@ -822,6 +827,13 @@ class VisualHarness:
             result["horizontal_delta_px"] = round(horizontal_delta_px, 2)
         result["previous_action"] = previous_action_name or None
         result["horizontal_motion_stalled"] = bool(self.held_horizontal_stall)
+        if bbox is not None:
+            self._held_instance_anchor_bbox = bbox
+        result["instance_anchor_bbox_xyxy"] = (
+            list(self._held_instance_anchor_bbox)
+            if self._held_instance_anchor_bbox is not None
+            else None
+        )
         self.last_held_evidence = result
         return dict(result)
 

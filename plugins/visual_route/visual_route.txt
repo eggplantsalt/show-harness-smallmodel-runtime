@@ -31,6 +31,15 @@ when the object visibly fails to move with the closed gripper or is visibly left
 the table/fallen across frames. The host may reject this semantic judgment when
 strong multi-frame visual co-motion contradicts it.
 
+The holding arbiter state SUSPECTED_LOST is not a single-frame guess: it is emitted
+only after the grasp-bound object instance has diverged from the EEF for multiple
+consecutive frames. On this event the AgentView is raw (the stale route and held box
+are removed). Use AgentView and Wrist to resolve whether the payload remains securely
+between the fingers. If it is visibly below/outside the finger contact or left on the
+table, choose REACQUIRE with held_assessment=LOST and route_assessment=REPLAN. If it
+is visibly still secured, report HELD and request a route replan. RECOVER_CLEAR is for
+contact/obstruction, not for an uncertain or lost grasp.
+
 Keep reasoning to one concise visual sentence. Return exactly one JSON object with
 all six fields below; do not stop after the first field:
 
