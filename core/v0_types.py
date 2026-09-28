@@ -111,6 +111,7 @@ class SkillContext:
     wrist: Optional[np.ndarray]
     proprio: dict[str, Any]
     debug: bool
+    capability_context: str = ""
 
 
 @dataclass

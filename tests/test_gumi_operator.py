@@ -215,6 +215,9 @@ class DecisionTests(unittest.TestCase):
         image_parts = [part for part in content if part["type"] == "image_url"]
         self.assertEqual(len(image_parts), 3)
         self.assertTrue(all(part["image_url"]["detail"] == "high" for part in image_parts))
+        text = content[-1]["text"]
+        self.assertIn("Image A: agentview RGB", text)
+        self.assertIn("Image B: wrist RGB", text)
 
 
 class OperatorCycleTests(unittest.TestCase):

@@ -1,0 +1,11 @@
+defaults:
+  - robot_libero_siliconflow_kimi26_c3.yaml
+
+# Long single-episode pilot.  The global and per-stage budgets are aligned so
+# the result reflects the agent/harness behavior rather than a 200-step stage
+# truncation.
+research_profile: siliconflow_kimi26_c3_long
+log_dir: rollouts/libero_siliconflow_kimi26_c3_long
+max_steps: 500
+v0:
+  max_subgoal_steps: 500

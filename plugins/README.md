@@ -54,6 +54,7 @@ plugins it builds.
 | Visual Prompt | `affordance` | grounded contact-point dot with draw-and-verify |
 | Action History | `mem_text` | recent-move line + anti-oscillation rules |
 | Failure Recovery | `recovery`, `auto_release` | empty-grasp detection, reopen, plan rollback |
+| Visual Route | `visual_route` | CPU geometry route, key-event Qwen review, phase-aware clearance/recovery gate |
 
 Not in the paper's table: `rotation` (offers the ROTATE units + eye-in-hand
 yaw compensation), `smooth` (min-jerk setpoint ramp), `dagger` (live human

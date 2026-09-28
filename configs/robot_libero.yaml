@@ -1,0 +1,127 @@
+# Show-Harness full planner/controller zero-shot evaluation on standard LIBERO.
+# This uses only LIBERO's checked-in BDDL + pruned initial states; no demo dataset.
+libero_dir: /root/autodl-tmp/OpenETA/vendor/LIBERO
+suite_name: LIBERO_OBJECT
+task_id: 0
+init_state_index: 0
+gripper_color: black
+seed: 0
+episode_index: 0
+episodes: 1
+
+camera_height: 256
+camera_width: 256
+camera_names: [agentview, robot0_eye_in_hand]
+agentview_camera: agentview
+wrist_camera: robot0_eye_in_hand
+agentview_rotation_degrees: 180
+# LIBERO's raw wrist image already matches Show-Harness's training orientation:
+# the fingers enter from the top. Rotating it 180 degrees puts them at the bottom
+# and reverses the vertical direction semantics used by controller.txt.
+wrist_rotation_degrees: 0
+agentview_flip: none
+wrist_flip: none
+agentview_crop_aspect: null
+wrist_crop_aspect: null
+agentview_square_size: 256
+wrist_square_size: 256
+use_wrist_image: true
+
+# OSC_POSE maps normalized XYZ to +/-0.05 m. One harness decision is split over
+# four simulator control steps so the effective nudge is about 2 cm.
+step_m: 0.02
+fine_step_m: 0.02
+coarse_step_m: 0.04
+up_step_m: 0.04
+sim_steps_per_decision: 4
+settle_steps_per_decision: 1
+gripper_hold_steps: 12
+position_scale_m: 0.05
+empty_width_m: 0.004
+gripper_close_threshold_m: 0.008
+# LIBERO tabletop task coordinates put the object/table surface around z=0.015;
+# the Panda eef observations are in the same world frame.
+table_height_m: 0.015
+# LIBERO AgentView is a global overhead view: horizontal alignment must happen
+# before descent.  Keep the proprioception tool enabled, but do not inject its
+# RoboLab-specific "height > 8 cm -> MV_DOWN first" hint at the initial 25 cm pose.
+high_above_table_m: 0.30
+fingertip_offset_m: 0.0
+move_vectors:
+  # With the upright AgentView transform used below, screen-down maps to +X
+  # and screen-right maps to -Y in LIBERO's world frame.
+  MV_FWD: [1.0, 0.0, 0.0]
+  MV_BACK: [-1.0, 0.0, 0.0]
+  MV_LEFT: [0.0, 1.0, 0.0]
+  MV_RIGHT: [0.0, -1.0, 0.0]
+  MV_UP: [0.0, 0.0, 1.0]
+  MV_DOWN: [0.0, 0.0, -1.0]
+
+plugins:
+  subgoal: true
+  auto_release: false
+  # LIBERO's overhead view makes the generic RoboLab height-first hint harmful:
+  # horizontal alignment must be decided from the live images first.
+  proprioception: false
+  recovery: true
+  variable_step: true
+  action_chunk: true
+  mem_text: true
+action_chunk_step_num: 3
+mem_text_len: 5
+
+num_steps_wait: 5
+max_steps: 100
+loop_period_s: 0.0
+planner_max_tokens: 4096
+log_dir: rollouts/libero_zeroshot
+v0:
+  max_subgoal_steps: 50
+  video_fps: 5.0
+
+# Reuse the currently selected hosted model/backend profile from the RoboLab config.
+vlm_backend: siliconflow_qwen35_35b
+vlm:
+  timeout_s: 120
+  temperature: 0.0
+vlm_backends:
+  siliconflow_kimi_k27_code:
+    provider: openai
+    api_dialect: siliconflow
+    base_url: https://api.siliconflow.cn/v1
+    model: moonshotai/Kimi-K2.7-Code
+    api_key_env: SILICONFLOW_API_KEY
+    max_tokens: 1024
+    reasoning_cot: false
+    reasoning_effort: null
+    chat_template_kwargs:
+      enable_thinking: false
+    max_retries: 5
+    retry_base_delay_s: 2.0
+    retry_max_delay_s: 30.0
+  siliconflow_qwen35_35b:
+    provider: openai
+    api_dialect: siliconflow
+    base_url: https://api.siliconflow.cn/v1
+    model: Qwen/Qwen3.5-35B-A3B
+    api_key_env: SILICONFLOW_API_KEY
+    max_tokens: 1024
+    reasoning_cot: false
+    reasoning_effort: null
+    chat_template_kwargs:
+      enable_thinking: false
+    max_retries: 5
+    retry_base_delay_s: 2.0
+    retry_max_delay_s: 30.0
+  gemini_flash:
+    provider: gemini
+    api_dialect: gemini
+    base_url: https://generativelanguage.googleapis.com/v1beta/openai
+    model: gemini-3.1-flash-lite
+    api_key_env: GEMINI_API_KEY
+    max_tokens: 1024
+    reasoning_cot: false
+    reasoning_effort: null
+    max_retries: 4
+    retry_base_delay_s: 2.0
+    retry_max_delay_s: 30.0

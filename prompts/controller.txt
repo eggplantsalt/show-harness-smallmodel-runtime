@@ -30,12 +30,31 @@ C) MV_UP when:
 
 ATTENTION:
 {mem_text_rules}
-- DONE only when "DONE WHEN" is already visible in the images
+- DONE only when "DONE WHEN" is already visible in the images. For MOVE/PLACE, do not
+  call a target aligned merely because the gripper is near its image edge: compare the
+  held object's body/lowest point with the full destination opening in AgentView.
+- Before every action, silently self-review three facts from the live images: (1) is the
+  requested object still held, and if so where is its visible body relative to the
+  destination; (2) is it centered and upright/seated or touching a rim/outside; (3) did
+  the previous action reduce that relation? Then choose the one action that follows from
+  that review. The host evidence is a cue, not a replacement for visual judgment.
+- If a placement or release failed, first classify the current visual situation yourself:
+  if the object is still in the fingers, lift/re-align/re-lower as the fresh views justify;
+  if it has fallen or is tilted on the table, use AgentView to reacquire its current
+  silhouette and guide a new approach/grasp. Do not assume the old grasp pose still holds.
 
 GRIPPER:
 - GRASP when BOTH AgentView and Wrist view confirm the {affordance} is clearly between the center of two grippers
 - RELEASE only when the held object is above its destination and lowered onto it
+- During LIFT, raise a visibly held object with MV_UP until clear of the table; its
+  lower image position is not a reason to descend or re-approach. If it is no longer
+  held, use the fresh recovery evidence to reacquire it before another GRASP.
+- GRASP is legal only in the GRASP stage with an OPEN gripper. If the gripper is CLOSED
+  or the stage is LIFT/MOVE/PLACE/RELEASE/RETREAT, never repeat GRASP; follow the current
+  stage or use fresh recovery evidence.
+- RELEASE is legal only after the placement stage has visibly settled and the RELEASE
+  stage is reached; do not release early because the object is merely near the opening.
 {variable_step}
 {action_chunk}
-Think one visual sentence, then commit.
+After the silent self-review, commit to one action and give one concise visual reason.
 {output_contract}

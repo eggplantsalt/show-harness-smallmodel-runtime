@@ -345,6 +345,8 @@ def make_vlm_client(args: argparse.Namespace, cfg: dict[str, Any]):
         max_retries=vlm_cfg.get("max_retries"),
         retry_base_delay_s=vlm_cfg.get("retry_base_delay_s"),
         retry_max_delay_s=vlm_cfg.get("retry_max_delay_s"),
+        vision_model=vlm_cfg.get("vision_model"),
+        vision_max_tokens=vlm_cfg.get("vision_max_tokens"),
         # On a 401 mid-rollout, re-read secrets.env (kept fresh by the stay-open
         # its refresher) and retry instead of crashing the episode.
         api_key_refresh=make_api_key_refresher(vlm_cfg),

@@ -136,7 +136,7 @@ class RobolabAtomicController:
         out[3:6] = hold_orientation_rotvec(self._quat_ref, quat_cur) / self.ik_scale
         return out
 
-    def action_for_atomic(self, token: str) -> np.ndarray:
+    def action_for_atomic(self, token: str, *, step_m: float | None = None) -> np.ndarray:
         """One MV_* token -> the per-control-step share of a ``step_m`` base-frame nudge.
 
         The returned action is meant to be re-sent for ``sim_steps_per_decision`` steps;
@@ -145,7 +145,10 @@ class RobolabAtomicController:
         if token not in self.move_vectors:
             raise ValueError(f"Unknown move token {token!r}; expected one of {MOVE_ATOMS}")
         self.state.last_atomic = token
-        return self._action(self.move_vectors[token] * self.per_step_m)
+        total_m = self.step_m if step_m is None else float(step_m)
+        if not np.isfinite(total_m) or total_m < 0:
+            raise ValueError(f"step_m must be finite and nonnegative, got {step_m!r}")
+        return self._action(self.move_vectors[token] * (total_m / self.sim_steps_per_decision))
 
     def hold_action(self) -> np.ndarray:
         """Zero displacement, current gripper command (used to settle / open / close)."""

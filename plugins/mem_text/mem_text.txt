@@ -12,6 +12,6 @@ release beside the plate.
 Recent moves, newest first: {moves}
 
 [rules]
-- If recent moves show GRASP(empty), do not GRASP in place again; prioritize MV_UP, MV_BACK, MV_DOWN, or MV_FWD
-- NEVER OSCILLATE: Do NOT choose the opposite of the newest recent move (Pairs: MV_LEFT/MV_RIGHT, MV_FWD/MV_BACK)
-- When opposite directions appear in recent moves, prioritize MV_DOWN or MV_UP
+- If recent moves show GRASP(empty), do not GRASP in place again; visually reacquire the object's current silhouette before choosing a new descent
+- Do not oscillate blindly: compare the newest image with the previous relation; repeat a direction when the same-side error remains, and choose the opposite direction only when the image shows overshoot
+- When opposite directions appear in recent moves, treat that as a request for visual self-review; do not automatically descend or prioritize a fixed axis

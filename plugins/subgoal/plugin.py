@@ -16,8 +16,9 @@ from core.v0_types import Subgoal
 
 
 class SubgoalPlanner:
-    def __init__(self, agent: Any) -> None:
+    def __init__(self, agent: Any, *, merge_pregrasp: bool = True) -> None:
         self.agent = agent
+        self.merge_pregrasp = bool(merge_pregrasp)
         self._last_diagnostics: dict[str, Any] = {}
         self._last_prompt = ""
 
@@ -47,7 +48,8 @@ class SubgoalPlanner:
         if not isinstance(items, list) or not items:
             raise RuntimeError(f"Planner JSON has no subgoals: {response.raw_text!r}")
         subgoals = [Subgoal.from_dict(item, index=i) for i, item in enumerate(items)]
-        subgoals = _merge_pregrasp_stages(subgoals)
+        if self.merge_pregrasp:
+            subgoals = _merge_pregrasp_stages(subgoals)
         return subgoals, response.raw_text
 
     def diagnostics(self) -> dict[str, Any]:

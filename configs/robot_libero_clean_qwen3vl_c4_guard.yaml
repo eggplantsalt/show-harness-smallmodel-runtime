@@ -1,0 +1,10 @@
+defaults:
+  - robot_libero_clean_qwen3vl.yaml
+
+# C4: same evidence stack with active physical commit authorization. Unsupported
+# GRASP/RELEASE/DONE requests become a host-owned STOP/hold and remain logged.
+research_profile: clean_qwen3vl_c4_guard
+log_dir: rollouts/libero_clean_qwen3vl_c4_guard
+capabilities:
+  commit_guard_enabled: true
+  commit_guard_mode: active

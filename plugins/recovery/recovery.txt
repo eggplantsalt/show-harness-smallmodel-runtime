@@ -10,10 +10,24 @@ Recovery: {note}
 Empty close; do not retry on an edge/corner. Recenter body and confirm depth.
 
 [note_unverified_grasp]
-Grasp not verified; continue GRASP until width and images show a real hold.
+Grasp occupancy is not decided by a universal width band; inspect AgentView/Wrist and
+continue only if the target is visibly held. A width near the open reference can be a
+thick held object.
 
 [note_lost_grasp]
-Grasp lost; return to GRASP, recenter the object body, then confirm depth.
+Grasp lost; the object may have moved, fallen, or come to rest tilted. Return to
+APPROACH and reacquire the object's current visual silhouette in AgentView before
+choosing another descent. Use fresh target evidence and the robot height to move
+horizontally until the open fingers are over the object; do not repeat MV_DOWN just
+because the object is lower in the image. Once the object is again centered at a
+safe pre-grasp height, decide GRASP from the two live views.
+
+[note_place_miss]
+Placement missed while the object is still held; keep the gripper closed and inspect a
+fresh AgentView/Wrist pair. Decide from the current image whether to lift clear of a rim,
+correct horizontally, or reacquire the object's relation before lowering again. Never
+release during this recovery.
 
 [note_unsettled]
-Closed width is unsettled; wait before moving.
+The width is near the commanded-open reference; treat occupancy as unknown and let the
+Agent use the live views rather than applying a scene-specific holding threshold.

@@ -1,0 +1,123 @@
+# Full Show-Harness zero-shot planner/controller on RoboLab.
+# Standalone config: no local experiments overlay can silently change the protocol.
+# These settings have been prepared by static review; the new experiment is not run.
+# This is deliberately a simple, lift-only task: success is any one fruit held
+# clear of the table.  It avoids the old GreenObject scene, whose front camera
+# is heavily occluded by a jug and whose old runs repeatedly made empty grasps.
+task: GrabAFruitTask
+instruction_type: default
+robot: franka
+gripper_color: yellow
+camera_preset: WRIST_LEFT
+device: cuda:0
+seed: 0
+episode_index: 0
+# Repeated episodes in one process retain the same configured scene seed.
+# This protocol measures fixed-scene repeats. Even a different seed does not
+# guarantee a different layout when the task uses authored USD object positions.
+episodes: 1
+headless: true
+renderer: realtime
+rendering_type: null
+enable_subtask: false
+
+# Real camera RGB only. Keep the calibrated axis mapping and wrist rotation.
+# The hosted VLM does not require the fine-tuned policy's 256px front-view reduction.
+agentview_camera: front_cam
+wrist_camera: wrist_cam
+agentview_rotation_degrees: 0
+agentview_flip: none
+wrist_rotation_degrees: 270
+wrist_flip: none
+use_wrist_image: true
+agentview_crop_aspect: null
+agentview_square_size: 640
+wrist_crop_aspect: null
+wrist_square_size: 256
+
+# Optional near-contact reference derived only from robot/camera geometry.
+# Keep disabled until visual calibration; it is not an object detector. The 0.130m
+# grasp-center reference differs from the 0.1323m lowest-fingertip clearance below.
+wrist_grasp_marker:
+  enabled: false
+  camera_position_m: [0.035, 0.0, 0.036]
+  camera_quaternion_wxyz: [1.0, 0.0, 0.0, 0.0]
+  grasp_point_m: [0.0, 0.0, 0.130]
+  horizontal_fov_degrees: 90.0
+  vertical_fov_degrees: 90.0
+  radius_px: 5
+  color: [0, 255, 255]
+
+# Command-space calibration: 0.072m total command gave about 0.020m measured travel
+# in the earlier axis probe. Recheck with your own simulator/robot before evaluation.
+step_m: 0.072
+fine_step_m: 0.02
+coarse_step_m: 0.04
+up_step_m: 0.04
+sim_steps_per_decision: 8
+settle_steps_per_decision: 0
+max_delta_m: 0.05
+gripper_hold_steps: 10
+move_vectors:
+  MV_FWD: [1.0, 0.0, 0.0]
+  MV_BACK: [-1.0, 0.0, 0.0]
+  MV_LEFT: [0.0, -1.0, 0.0]
+  MV_RIGHT: [0.0, 1.0, 0.0]
+  MV_UP: [0.0, 0.0, 1.0]
+  MV_DOWN: [0.0, 0.0, -1.0]
+
+# Robot-only geometric calibration. Finger height is derived from hand pose plus
+# local +Z offset; the simulator's object poses never enter the policy observation.
+fingertip_offset_m: 0.1323
+table_height_m: 0.003
+high_above_table_m: 0.08
+empty_width_m: 0.005
+open_width_m: 0.06
+gripper_close_threshold_m: 0.07
+
+plugins:
+  subgoal: true
+  auto_release: false
+  proprioception: true
+  recovery: true
+  variable_step: true
+  action_chunk: true
+  mem_text: true
+action_chunk_step_num: 3
+mem_text_len: 5
+
+# The task's standard simulator episode timeout is preserved.
+# Caps end an unsuccessful attempt; an unfinished stage is never skipped.
+num_steps_wait: 8
+max_steps: 80
+loop_period_s: 0.0
+planner_max_tokens: 4096
+log_dir: rollouts/robolab_deepseek
+v0:
+  max_subgoal_steps: 45
+  video_fps: 5.0
+
+vlm_backend: siliconflow_kimi_k27_code
+vlm:
+  timeout_s: 120
+  temperature: 0.0
+vlm_backends:
+  siliconflow_kimi_k27_code:
+    provider: openai
+    # SiliconFlow's official OpenAI-compatible endpoint and exact model id.
+    api_dialect: siliconflow
+    base_url: https://api.siliconflow.cn/v1
+    # This must remain a SiliconFlow model that accepts image_url content parts.
+    # model: moonshotai/Kimi-K2.6
+    model: moonshotai/Kimi-K2.6
+    api_key_env: SILICONFLOW_API_KEY
+    max_tokens: 1024
+    reasoning_cot: false
+    # The controller needs a parseable decision each turn; do not spend its
+    # response budget in a hidden chain of thought.
+    reasoning_effort: null
+    chat_template_kwargs:
+      enable_thinking: false
+    max_retries: 5
+    retry_base_delay_s: 2.0
+    retry_max_delay_s: 30.0

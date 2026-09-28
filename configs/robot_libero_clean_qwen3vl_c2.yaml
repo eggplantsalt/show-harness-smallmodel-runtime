@@ -1,0 +1,11 @@
+defaults:
+  - robot_libero_clean_qwen3vl.yaml
+
+# C2: SAM3 grounding plus bounded CPU tracking.  Episodic memory remains off
+# to isolate temporal tracking/progress evidence.
+research_profile: clean_qwen3vl_c2
+log_dir: rollouts/libero_clean_qwen3vl_c2
+capabilities:
+  tracker_enabled: true
+  memory_enabled: false
+  geometry_enabled: true

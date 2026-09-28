@@ -1,0 +1,10 @@
+defaults:
+  - robot_libero_clean_qwen3vl.yaml
+
+# Clean direct control uses the same model, prompt, camera, action budget, and
+# initial-state protocol as the harness profile.  It differs only by disabling
+# capability orchestration, so the comparison is attributable to the harness.
+research_profile: clean_qwen3vl_direct
+log_dir: rollouts/libero_clean_qwen3vl_direct
+capabilities:
+  enabled: false

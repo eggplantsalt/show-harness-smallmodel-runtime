@@ -2,16 +2,43 @@ from __future__ import annotations
 
 import re
 import json
+import copy
 import random
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any, Optional, Sequence
+from urllib.parse import urlparse
 
 import requests
 
 from core.record.images import image_to_data_url
+
+
+def _payload_has_images(payload: dict[str, Any]) -> bool:
+    """Return whether an OpenAI chat payload contains an image content part."""
+    for message in payload.get("messages", []):
+        content = message.get("content") if isinstance(message, dict) else None
+        if isinstance(content, list) and any(
+            isinstance(part, dict) and part.get("type") == "image_url"
+            for part in content
+        ):
+            return True
+    return False
+
+
+def _content_to_text(content: Any) -> str:
+    """Normalize OpenAI-compatible message content to plain text."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "\n".join(
+            str(part.get("text", ""))
+            for part in content
+            if isinstance(part, dict) and part.get("type") == "text"
+        )
+    return ""
 
 # Rate-limit / transient-error retry defaults (e.g. Gemini free-tier RPM 429s). The
 # client retries 429 and 5xx with exponential backoff, honouring a Retry-After header or
@@ -67,6 +94,8 @@ class VLMClient:
         retry_base_delay_s: Optional[float] = None,
         retry_max_delay_s: Optional[float] = None,
         api_key_refresh=None,
+        vision_model: Optional[str] = None,
+        vision_max_tokens: Optional[int] = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.model = model
@@ -102,8 +131,32 @@ class VLMClient:
         # keeps a fresh one in secrets.env, so on a 401/403 the client re-resolves the
         # key and retries instead of crashing.
         self.api_key_refresh = api_key_refresh
+        # Some fast reasoning models are text-only.  When configured, this companion
+        # VLM converts live RGB frames into an API-produced textual observation before
+        # the primary model plans or controls.  It never receives simulator state.
+        self.vision_model = str(vision_model or "").strip() or None
+        self.vision_max_tokens = int(vision_max_tokens or 512)
         self._api_key = api_key or "EMPTY"
         self.session = requests.Session()
+        # A local vLLM server must not inherit the machine's HTTP proxy.  In this
+        # environment the proxy can forward text requests but returns an empty 502
+        # for large base64 image bodies, making a healthy local multimodal server
+        # look broken.  Hosted endpoints intentionally keep requests' normal proxy
+        # behavior.
+        host = urlparse(self.base_url).hostname
+        if host in {"127.0.0.1", "localhost", "::1"}:
+            self.session.trust_env = False
+        # Runtime accounting is deliberately provider-agnostic.  Local vLLM reports
+        # zero monetary cost, while hosted backends can be priced offline from the
+        # recorded token totals without putting provider-specific prices in rollout code.
+        self.metrics: dict[str, float | int] = {
+            "model_calls": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+            "latency_s": 0.0,
+            "api_cost_usd": 0.0,
+        }
         # Trust the key the caller resolved (core.config.resolve_api_key reads it from
         # the environment / secrets.env). Do NOT re-read env here: secrets.env sets
         # VLLM_API_KEY='EMPTY', a truthy string that would otherwise clobber a hosted
@@ -121,12 +174,17 @@ class VLMClient:
     def _is_gemini(self) -> bool:
         return self.api_dialect == "gemini"
 
+    def _is_siliconflow(self) -> bool:
+        return self.api_dialect == "siliconflow"
+
     def _is_hosted(self) -> bool:
         """Hosted OpenAI-compatible APIs reject vLLM-only fields
         (chat_template_kwargs / guided_* / logprobs) and need a rewritten payload."""
         return self.provider in ("openai", "gemini") or self.api_dialect in (
             "openai",
             "gemini",
+            "deepseek",
+            "siliconflow",
         )
 
     def _finalize_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -154,7 +212,7 @@ class VLMClient:
             temperature = payload.get("temperature")
             if temperature is not None and float(temperature) == 1.0:
                 out["temperature"] = 1.0
-        else:  # gemini
+        else:  # Gemini / DeepSeek / SiliconFlow OpenAI-compatible APIs
             if "max_tokens" in payload:
                 out["max_tokens"] = payload["max_tokens"]
             temperature = payload.get("temperature")
@@ -162,7 +220,19 @@ class VLMClient:
                 out["temperature"] = float(temperature)
         # reasoning_effort applies to thinking models on both hosted providers; forward it
         # only when configured (chat / non-thinking models omit it).
-        if self.reasoning_effort:
+        if self.api_dialect == "deepseek":
+            # DeepSeek enables thinking by default. Its separate reasoning output can
+            # consume an atomic controller's entire decode budget without an action.
+            out["thinking"] = {"type": "enabled" if self.reasoning_enabled else "disabled"}
+        if self._is_siliconflow():
+            # SiliconFlow documents this flat field for DeepSeek-V4-Flash.
+            # Sending it explicitly prevents the service's default reasoning
+            # budget from consuming a one-step controller answer.
+            out["enable_thinking"] = bool(self.reasoning_enabled)
+        if self.reasoning_effort and not (
+            self.api_dialect == "deepseek"
+            and (not self.reasoning_enabled or self.reasoning_effort == "none")
+        ):
             out["reasoning_effort"] = self.reasoning_effort
         if "guided_json" in payload:
             out["response_format"] = {"type": "json_object"}
@@ -196,6 +266,9 @@ class VLMClient:
         Retry-After header or a provider 'retry in Xs' / 'retryDelay' body hint; otherwise
         exponential backoff with jitter. Raises RuntimeError on a non-retryable error
         (e.g. 400/401/404) or once ``max_retries`` is exhausted."""
+        if self.vision_model and _payload_has_images(payload):
+            payload = self._replace_images_with_vision_observation(payload)
+
         url = f"{self.base_url}/chat/completions"
         delay = self.retry_base_delay_s
         last = "unknown error"
@@ -203,7 +276,9 @@ class VLMClient:
         for attempt in range(self.max_retries + 1):
             # Default wait is exponential backoff, capped at retry_max_delay_s.
             wait = min(delay, self.retry_max_delay_s)
+            request_started = time.monotonic()
             try:
+                self.metrics["model_calls"] = int(self.metrics["model_calls"]) + 1
                 resp = self.session.post(url, json=payload, timeout=self.timeout_s)
             except requests.ConnectionError as exc:
                 last = f"request error: {exc}"  # network/tunnel hiccup -> retry
@@ -221,6 +296,15 @@ class VLMClient:
                 if resp.status_code < 400:
                     data, problem = _chat_completion_data(resp)
                     if data is not None:
+                        self.metrics["latency_s"] = float(self.metrics["latency_s"]) + (
+                            time.monotonic() - request_started
+                        )
+                        usage = data.get("usage")
+                        if isinstance(usage, dict):
+                            for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
+                                value = usage.get(key)
+                                if isinstance(value, (int, float)):
+                                    self.metrics[key] = int(self.metrics[key]) + int(value)
                         return data
                     last = f"bad completion body: {problem}"  # proxy glitch -> retry
                 else:
@@ -269,6 +353,54 @@ class VLMClient:
         raise RuntimeError(
             f"VLM chat completion failed after {self.max_retries} retries: {last}"
         )
+
+    def _replace_images_with_vision_observation(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Use the configured VLM only as an RGB-to-text sensor for a text model."""
+        images: list[dict[str, Any]] = []
+        for message in payload.get("messages", []):
+            content = message.get("content") if isinstance(message, dict) else None
+            if isinstance(content, list):
+                images.extend(part for part in content if isinstance(part, dict) and part.get("type") == "image_url")
+        if not images:
+            return payload
+
+        vision_prompt = (
+            "You are the visual sensor for a robot manipulation controller. Analyze the live RGB images only. "
+            "Describe visible target objects, gripper/fingers, their relative image positions, occlusion, and whether "
+            "the gripper is above/beside/on an object. Do not invent hidden objects or use external knowledge. "
+            "Give a compact factual observation for a separate text-only planner."
+        )
+        vision_payload = {
+            "model": self.vision_model,
+            "messages": [{"role": "user", "content": images + [{"type": "text", "text": vision_prompt}]}],
+            "max_tokens": self.vision_max_tokens,
+            "temperature": 0.0,
+        }
+        try:
+            response = self.session.post(
+                f"{self.base_url}/chat/completions", json=vision_payload, timeout=self.timeout_s
+            )
+        except requests.RequestException as exc:
+            raise RuntimeError(f"Vision companion request failed: {exc}") from exc
+        if response.status_code >= 400:
+            raise RuntimeError(
+                f"Vision companion chat completion failed: HTTP {response.status_code}: {response.text[:1000]}"
+            )
+        data, problem = _chat_completion_data(response)
+        if data is None:
+            raise RuntimeError(f"Vision companion returned an invalid completion: {problem}")
+        observation = _content_to_text(data["choices"][0]["message"].get("content")).strip()
+        if not observation:
+            raise RuntimeError("Vision companion returned an empty observation")
+
+        rewritten = copy.deepcopy(payload)
+        for message in rewritten.get("messages", []):
+            content = message.get("content") if isinstance(message, dict) else None
+            if not isinstance(content, list):
+                continue
+            text_parts = [str(part.get("text", "")) for part in content if isinstance(part, dict) and part.get("type") == "text"]
+            message["content"] = "\n".join(text_parts + ["LIVE RGB OBSERVATION (from visual sensor):\n" + observation])
+        return rewritten
 
     def health_check(self, wait_s: float = 0.0, poll_s: float = 5.0) -> None:
         url = f"{self.base_url}/models"
@@ -766,8 +898,14 @@ def _message_content(
             if image is None:
                 continue
             content.append(image_part(image))
-    # text_parts = [label for label in (agentview_label, wrist_label) if label]
+    # The images deliberately remain first in the wire order, but the model still needs a
+    # stable mapping from that order to the camera roles.  Without these labels the prompt
+    # can say "Wrist" while the model has to infer which unlabeled image is Image B.
     text_parts = []
+    if agentview_image is not None and agentview_label:
+        text_parts.append(str(agentview_label))
+    if wrist_image is not None and wrist_label:
+        text_parts.append(str(wrist_label))
     text_parts.append(prompt)
     # A text content part's "text" must be a STRING; passing the list straight through
     # makes hosted providers reject the whole request ("invalid_request_body"). Join the

@@ -982,8 +982,18 @@ class VisualHarness:
         secondary_confidence = 0.0
         secondary_source = "unknown"
         secondary_meta: dict[str, Any] = {}
+        # Preserve the current semantic instance across periodic detector refreshes.
+        # A periodic SAM3 query is evidence refresh, not permission to switch to a
+        # different same-category object. Reset the tracker only when the actual
+        # stage/target/camera identity changes.
+        previous_bbox_for_refresh = None
+        if not stage_changed and isinstance(self.last_evidence, dict):
+            previous_bbox_for_refresh = _box_tuple(
+                self.last_evidence.get("bbox_xyxy")
+            )
+
         if should_ground:
-            if self.tracker is not None:
+            if self.tracker is not None and stage_changed:
                 self.tracker.reset()
             probe_wrist = bool(
                 self.grasp_agentview_fallback_enabled
@@ -1049,6 +1059,145 @@ class VisualHarness:
                         confidence = fallback_confidence
                         source = fallback_source
                     tool_meta = combined_meta
+            # During APPROACH, periodic semantic refresh must remain attached to
+            # the already tracked physical instance. SAM3 may return several objects
+            # of the same category, or a fallback query such as "bottle" may rank a
+            # different object highest. Associate candidates to the previous live
+            # bbox instead of silently switching identity.
+            if (
+                not stage_changed
+                and str(stage).upper() == "APPROACH"
+                and camera == "agentview"
+                and previous_bbox_for_refresh is not None
+            ):
+                candidates = (
+                    tool_meta.get("candidates")
+                    if isinstance(tool_meta, dict)
+                    else None
+                )
+
+                if isinstance(candidates, list) and candidates:
+                    previous_center = np.asarray(
+                        [
+                            (
+                                float(previous_bbox_for_refresh[0])
+                                + float(previous_bbox_for_refresh[2])
+                            )
+                            / 2.0,
+                            (
+                                float(previous_bbox_for_refresh[1])
+                                + float(previous_bbox_for_refresh[3])
+                            )
+                            / 2.0,
+                        ],
+                        dtype=float,
+                    )
+
+                    associated = []
+                    for candidate in candidates:
+                        if not isinstance(candidate, dict):
+                            continue
+                        candidate_bbox = _box_tuple(candidate.get("bbox_xyxy"))
+                        if candidate_bbox is None:
+                            continue
+
+                        candidate_center = np.asarray(
+                            [
+                                (
+                                    float(candidate_bbox[0])
+                                    + float(candidate_bbox[2])
+                                )
+                                / 2.0,
+                                (
+                                    float(candidate_bbox[1])
+                                    + float(candidate_bbox[3])
+                                )
+                                / 2.0,
+                            ],
+                            dtype=float,
+                        )
+
+                        associated.append(
+                            (
+                                float(
+                                    np.linalg.norm(
+                                        candidate_center - previous_center
+                                    )
+                                ),
+                                candidate_bbox,
+                                float(candidate.get("score", 0.0) or 0.0),
+                            )
+                        )
+
+                    if associated:
+                        distance_px, associated_bbox, associated_confidence = min(
+                            associated, key=lambda item: item[0]
+                        )
+
+                        previous_diagonal = float(
+                            np.linalg.norm(
+                                [
+                                    previous_bbox_for_refresh[2]
+                                    - previous_bbox_for_refresh[0],
+                                    previous_bbox_for_refresh[3]
+                                    - previous_bbox_for_refresh[1],
+                                ]
+                            )
+                        )
+                        association_limit_px = max(
+                            8.0, 0.6 * previous_diagonal
+                        )
+
+                        tool_meta = dict(tool_meta)
+                        tool_meta["instance_association"] = {
+                            "reference_bbox_xyxy": list(
+                                previous_bbox_for_refresh
+                            ),
+                            "selected_bbox_xyxy": list(associated_bbox),
+                            "distance_px": round(distance_px, 2),
+                            "limit_px": round(association_limit_px, 2),
+                        }
+
+                        if distance_px <= association_limit_px:
+                            bbox = associated_bbox
+                            confidence = associated_confidence
+                            source = "sam3_instance_associated"
+                        else:
+                            # Detector wants to jump to another object. Keep the
+                            # existing temporal track when it is still valid.
+                            tracked_after_reject = (
+                                self.tracker.update(image)
+                                if self.tracker is not None
+                                else None
+                            )
+
+                            tool_meta["instance_association"][
+                                "semantic_jump_rejected"
+                            ] = True
+
+                            if tracked_after_reject is not None:
+                                bbox = _box_tuple(
+                                    tracked_after_reject.get("bbox_xyxy")
+                                )
+                                confidence = float(
+                                    tracked_after_reject.get(
+                                        "confidence", 0.0
+                                    )
+                                )
+                                source = (
+                                    "semantic_refresh_rejected_tracker"
+                                )
+                                tool_meta["instance_association"][
+                                    "tracker_fallback"
+                                ] = True
+                            else:
+                                bbox = None
+                                confidence = 0.0
+                                source = "instance_association_rejected"
+                                tool_meta["instance_association"][
+                                    "tracker_fallback"
+                                ] = False
+
             if bbox is not None and self.tracker is not None:
                 self.tracker.seed(image, bbox, confidence)
         elif self.tracker is not None:

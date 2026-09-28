@@ -1,0 +1,11 @@
+defaults:
+  - robot_libero_siliconflow_kimi26_c3_long.yaml
+
+# Diagnostic follow-up: keep the Kimi C3 long-pilot contract unchanged and only
+# lower the SAM3 acceptance threshold.  The cached rollout shows the target
+# scores are 0.42--0.46 after the first horizontal motion, so 0.50 removes a
+# visually correct low-score detection before the harness can use it.
+research_profile: siliconflow_kimi26_c3_threshold04
+log_dir: rollouts/libero_siliconflow_kimi26_c3_threshold04
+capabilities:
+  confidence_threshold: 0.4

@@ -1,0 +1,6 @@
+defaults:
+  - robot_libero_clean_qwen3vl.yaml
+
+# C3: the complete first capability slice.
+research_profile: clean_qwen3vl_c3
+log_dir: rollouts/libero_clean_qwen3vl_c3

@@ -1,0 +1,13 @@
+defaults:
+  - robot_libero_clean_qwen3vl_c3.yaml
+
+# Long pilot only: keep the formal C3 profile unchanged while allowing the
+# approach and later semantic stages enough atomic decisions to be observed.
+research_profile: clean_qwen3vl_c3_long
+log_dir: rollouts/libero_clean_qwen3vl_c3_long
+max_steps: 500
+v0:
+  # The pilot is explicitly testing whether the agent can complete the
+  # approach/grasp sequence with a 500-decision budget.  Keep the stage cap
+  # from truncating that experiment before the global max_steps is reached.
+  max_subgoal_steps: 500

@@ -1,0 +1,10 @@
+# Small Show-Harness client extras, installed INSIDE RoboLab's existing environment.
+# Isaac Sim / Isaac Lab / torch / numpy / OpenCV compatibility remains governed by
+# RoboLab's lockfile. Do not install the full real-robot requirements for simulation.
+requests
+Pillow
+numpy
+PyYAML
+imageio
+imageio-ffmpeg
+zerorpc

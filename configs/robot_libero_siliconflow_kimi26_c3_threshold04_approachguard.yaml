@@ -1,0 +1,13 @@
+defaults:
+  - robot_libero_siliconflow_kimi26_c3_threshold04.yaml
+
+# Controlled follow-up: end APPROACH only when fresh host-owned visual evidence
+# and calibrated EEF projection agree. GRASP remains Agent-controlled and is
+# still subject to the existing commit-guard experiment separately.
+research_profile: siliconflow_kimi26_c3_threshold04_approachguard
+log_dir: rollouts/libero_siliconflow_kimi26_c3_threshold04_approachguard
+capabilities:
+  approach_completion_guard_enabled: true
+  approach_completion_guard_mode: active
+  approach_completion_guard_freshness_frames: 1
+  grasp_agentview_fallback_enabled: true

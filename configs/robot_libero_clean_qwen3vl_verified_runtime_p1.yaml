@@ -1,0 +1,29 @@
+defaults:
+  - robot_libero_clean_qwen3vl_c3_threshold04_approachguard.yaml
+
+# Phase 1 of the capability-offloading runtime:
+# Qwen owns semantic goals/stages. Harness externalizes only bounded APPROACH
+# alignment and verifies every local action from the next fresh observation.
+research_profile: clean_qwen3vl_verified_runtime_p1
+log_dir: rollouts/libero_clean_qwen3vl_verified_runtime_p1
+
+verified_runtime:
+  enabled: true
+  mode: active
+
+  # These inherit the existing generic evidence scales rather than encoding
+  # any object/category/scene coordinate.
+  confidence_threshold: 0.4
+  alignment_px: 13.5
+
+  # Phase-1 safety: image vertical error is allowed to drive FWD/BACK only
+  # after the robot is already in the current final approach-height regime.
+  # This avoids treating high-pose camera parallax as depth error.
+  final_height_max_m: 0.14
+
+  # Online transition verification.
+  min_progress_px: 1.0
+  wrong_direction_px: 1.5
+  stall_limit: 3
+  max_option_steps: 40
+  effect_alpha: 0.5

@@ -1,0 +1,104 @@
+# Clean, no-LoRA Qwen3-VL-8B LIBERO research profile.
+research_profile: clean_qwen3vl
+model_revision: 0c351dd01ed87e9c1b53cbc748cba10e6187ff3b
+libero_dir: /root/autodl-tmp/OpenETA/vendor/LIBERO
+suite_name: LIBERO_OBJECT
+task_id: 2
+init_state_index: 0
+gripper_color: black
+seed: 0
+episode_index: 0
+episodes: 1
+
+camera_height: 256
+camera_width: 256
+agentview_camera: agentview
+wrist_camera: robot0_eye_in_hand
+agentview_rotation_degrees: 180
+wrist_rotation_degrees: 0
+agentview_flip: none
+wrist_flip: none
+agentview_crop_aspect: null
+wrist_crop_aspect: null
+agentview_square_size: 256
+wrist_square_size: 256
+use_wrist_image: true
+
+step_m: 0.02
+fine_step_m: 0.02
+coarse_step_m: 0.04
+up_step_m: 0.04
+sim_steps_per_decision: 4
+settle_steps_per_decision: 1
+gripper_hold_steps: 12
+position_scale_m: 0.05
+empty_width_m: 0.004
+gripper_close_threshold_m: 0.008
+table_height_m: 0.015
+high_above_table_m: 0.30
+fingertip_offset_m: 0.0
+move_vectors:
+  MV_FWD: [1.0, 0.0, 0.0]
+  MV_BACK: [-1.0, 0.0, 0.0]
+  MV_LEFT: [0.0, 1.0, 0.0]
+  MV_RIGHT: [0.0, -1.0, 0.0]
+  MV_UP: [0.0, 0.0, 1.0]
+  MV_DOWN: [0.0, 0.0, -1.0]
+
+plugins:
+  subgoal: true
+  auto_release: false
+  proprioception: false
+  recovery: true
+  variable_step: false
+  action_chunk: false
+  mem_text: true
+mem_text_len: 5
+
+num_steps_wait: 5
+max_steps: 100
+loop_period_s: 0.0
+planner_max_tokens: 1024
+log_dir: rollouts/libero_clean_qwen3vl
+legacy_stage_token_normalization: false
+v0:
+  max_subgoal_steps: 100
+  video_fps: 5.0
+
+capabilities:
+  enabled: true
+  sam3_enabled: true
+  tracker_enabled: true
+  memory_enabled: true
+  geometry_enabled: true
+  sam3_url: http://127.0.0.1:8773/sse
+  sam3_python: /root/autodl-tmp/openeta-services/sam3/.venv/bin/python
+  reacquire_every: 4
+  confidence_threshold: 0.5
+  commit_guard_enabled: false
+  commit_guard_mode: shadow
+  commit_guard_freshness_frames: 1
+  commit_guard_alignment_px: 24.0
+  alignment_ready_px: 16.0
+
+vlm_backend: qwen3vl_local
+vlm:
+  base_url: http://127.0.0.1:8001/v1
+  timeout_s: 180
+  startup_wait_s: 600
+  startup_poll_s: 5
+  temperature: 0.0
+  api_key: EMPTY
+vlm_backends:
+  qwen3vl_local:
+    provider: vllm
+    api_dialect: vllm
+    model: Qwen/Qwen3-VL-8B-Instruct
+    max_tokens: 1024
+    reasoning_cot: false
+    reasoning_effort: null
+    chat_template_kwargs:
+      enable_thinking: false
+    max_retries: 2
+    retry_base_delay_s: 1.0
+    retry_max_delay_s: 8.0

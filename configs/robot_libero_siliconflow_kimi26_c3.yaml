@@ -1,0 +1,29 @@
+defaults:
+  - robot_libero_clean_qwen3vl_c3.yaml
+
+# Hosted Kimi 2.6 LIBERO capability-harness pilot.
+# This inherits the clean LIBERO camera/action contract and C3 capability slice,
+# but replaces only the agent backend.  No local Qwen weights or LoRA are used by
+# this profile; credentials are resolved from SILICONFLOW_API_KEY at runtime.
+research_profile: siliconflow_kimi26_c3
+model_revision: hosted_api_Pro/moonshotai/Kimi-K2.6
+log_dir: rollouts/libero_siliconflow_kimi26_c3
+vlm_backend: siliconflow_kimi26
+vlm:
+  timeout_s: 180
+  temperature: 0.0
+vlm_backends:
+  siliconflow_kimi26:
+    provider: openai
+    api_dialect: siliconflow
+    base_url: https://api.siliconflow.cn/v1
+    model: Pro/moonshotai/Kimi-K2.6
+    api_key_env: SILICONFLOW_API_KEY
+    max_tokens: 1024
+    reasoning_cot: false
+    reasoning_effort: null
+    chat_template_kwargs:
+      enable_thinking: false
+    max_retries: 3
+    retry_base_delay_s: 2.0
+    retry_max_delay_s: 30.0

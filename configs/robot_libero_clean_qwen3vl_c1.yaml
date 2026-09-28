@@ -1,0 +1,11 @@
+defaults:
+  - robot_libero_clean_qwen3vl.yaml
+
+# C1: fresh SAM3 grounding only.  Tracking and episodic memory are disabled so
+# the first gain can be attributed to semantic visual evidence.
+research_profile: clean_qwen3vl_c1
+log_dir: rollouts/libero_clean_qwen3vl_c1
+capabilities:
+  tracker_enabled: false
+  memory_enabled: false
+  geometry_enabled: false

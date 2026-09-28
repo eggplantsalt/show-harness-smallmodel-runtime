@@ -286,6 +286,7 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
         variable_step_plugin: Any = None,
         visual_harness: Any = None,
         visual_route_plugin: Any = None,
+        verified_runtime: Any = None,
         table_height_m: float,
         fingertip_offset_m: float = 0.1323,
         wrist_grasp_marker: Optional[dict] = None,
@@ -313,6 +314,7 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
         self.variable_step_plugin = variable_step_plugin
         self.visual_harness = visual_harness
         self.visual_route_plugin = visual_route_plugin
+        self.verified_runtime = verified_runtime
 
         self.table_height_m = float(table_height_m)
         # Robot geometry only: panda_hand local +Z points toward the fingertips.
@@ -922,6 +924,10 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                 reset_recovery()
         if self.visual_harness is not None:
             self.visual_harness.reset()
+        if self.verified_runtime is not None:
+            reset_runtime = getattr(self.verified_runtime, "reset", None)
+            if callable(reset_runtime):
+                reset_runtime()
 
         try:
             agentview, wrist = self._images(obs)
@@ -1067,6 +1073,7 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
 
                 capability_evidence = {}
                 capability_context = ""
+                verified_runtime_decision: dict[str, Any] = {}
                 visual_route_output: dict[str, Any] = {}
                 visual_route_gate: Any = None
                 transport_hold_lost = False
@@ -1100,6 +1107,28 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                         held_affordance=held_affordance,
                     )
                     capability_context = self.visual_harness.prompt_context()
+
+                # Phase-1 capability offloading.  The runtime sees only the
+                # same perception/proprioception evidence already exposed by
+                # VisualHarness.  It cannot change the semantic task/stage.
+                if self.verified_runtime is not None:
+                    verified_runtime_decision = self.verified_runtime.observe(
+                        stage=str(subgoal.motion),
+                        evidence=(
+                            capability_evidence
+                            if isinstance(capability_evidence, dict)
+                            else {}
+                        ),
+                        previous_action=(
+                            self.visual_harness.last_action
+                            if self.visual_harness is not None
+                            else None
+                        ),
+                    )
+                    if isinstance(capability_evidence, dict):
+                        capability_evidence["verified_runtime"] = dict(
+                            verified_runtime_decision
+                        )
 
                 if bool(
                     self.visual_route_plugin is not None
@@ -1277,6 +1306,18 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                     chunk_queue = []
 
                 elif (
+                    isinstance(verified_runtime_decision, dict)
+                    and verified_runtime_decision.get("takeover", False)
+                    and verified_runtime_decision.get("action_token")
+                ):
+                    # The Agent already chose the APPROACH semantic stage.
+                    # The runtime owns only this bounded local option.
+                    token = str(
+                        verified_runtime_decision["action_token"]
+                    ).strip().upper()
+                    chunk_queue = []
+
+                elif (
                     recovery_decision is not None
                     and recovery_decision.token
                 ):
@@ -1427,6 +1468,15 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                 if response is not None:
                     reason = self._reasoning(
                         response
+                    )
+                elif (
+                    isinstance(verified_runtime_decision, dict)
+                    and verified_runtime_decision.get("takeover", False)
+                    and verified_runtime_decision.get("action_token")
+                ):
+                    reason = (
+                        "verified_runtime ALIGN: "
+                        + str(verified_runtime_decision.get("reason", ""))
                     )
                 elif recovery_decision is not None:
                     reason = (
