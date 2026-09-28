@@ -30,6 +30,11 @@ Return an ordered JSON plan:
 
 -ONE specific part -- never alternatives like "left end or middle"
 -Must be visible in AgentView & bracketable by open fingers
+-For a pick-and-carry grasp, prefer a broad, load-bearing part near the object's
+ center of mass that can remain enclosed during a long transport. Do not select a
+ small cap, tip, decorative feature, thin edge, or loose appendage merely because
+ it is visually distinctive. Select such a feature only when the task explicitly
+ requires manipulating that feature or the main body is not graspable.
 -Containers/Hollow objects (cups, bowls): Target left/right rim or edge.
 -Simple Solid objects (blocks): main body
 

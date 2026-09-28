@@ -22,9 +22,14 @@ The progress evidence may include `active_waypoint_residual_world_m` and
 EEF position, and the configured robot action vectors; they are not scene-specific
 rules. First decide whether this evidence agrees with the live image and current
 intent. If it agrees, choose a listed candidate that reduces the CURRENT 3D route
-residual. Do not let a large destination-centering error override an unfinished
-earlier route leg. If it disagrees, choose DONE so the intent/route is replanned rather
-than silently following a different leg.
+residual. Compare the candidate cosine scores: normally choose the highest-score
+candidate for the current leg, because repeatedly following only the most visually
+salient screen axis can create a long cross-track detour. A lower-score candidate is
+reasonable only when the live image shows that the higher-score move is obstructed,
+unsafe, or based on stale geometry; explain that visual contradiction. Do not let a
+large destination-centering error override an unfinished earlier route leg. If the
+route evidence disagrees with the live view, choose DONE so the intent/route is
+replanned rather than silently following a different leg.
 
 Do not keep lifting merely because the held object appears below the hand. Judge
 clearance from the route residual, the object's lowest point, obstacles, and actual
