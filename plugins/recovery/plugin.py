@@ -96,7 +96,7 @@ class RecoveryPlugin:
         stage: str,
         visual_holding_state: str,
     ) -> tuple[RecoveryDecision | None, dict[str, Any] | None]:
-        """Reject a width-only lost-hold claim when temporal vision says HELD.
+        """Reject a width-only lost-hold claim until temporal vision confirms LOST.
 
         Finger aperture is an auxiliary robot signal, not an object occupancy
         classifier.  During the route-aware TRANSPORT loop the visual holding
@@ -108,14 +108,14 @@ class RecoveryPlugin:
             decision is not None
             and str(stage or "").upper() == "TRANSPORT"
             and str(decision.event or "").lower() == "lost_grasp"
-            and str(visual_holding_state or "").upper() == "HELD"
+            and str(visual_holding_state or "").upper() != "LOST"
         ):
             return None, {
                 "mechanical_event": decision.event,
                 "mechanical_reason": decision.reason,
-                "visual_holding_state": "HELD",
+                "visual_holding_state": str(visual_holding_state or "UNKNOWN").upper(),
                 "accepted": False,
-                "reason": "width_only_loss_rejected_by_temporal_visual_holding",
+                "reason": "width_only_loss_waiting_for_temporal_visual_confirmation",
             }
         return decision, None
 

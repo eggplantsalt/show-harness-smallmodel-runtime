@@ -282,6 +282,8 @@ class VisualRoutePlugin:
         self._previous_eef = self._previous_eef_px = self._previous_held_center = None
         self._current_eef_px: Optional[list[float]] = None
         self._descent_stall_count = self._hold_missing_count = 0
+        self._hold_separation_count = 0
+        self._hold_reference_offset_px: Optional[np.ndarray] = None
         self._held_latched = False
         self._holding_arbiter: dict[str, Any] = {"state": "UNKNOWN", "reason": "transport_not_started", "rejected_qwen_assessment": None}
         self._goal_context: dict[str, str] = {}
@@ -528,8 +530,42 @@ class VisualRoutePlugin:
         try: confidence = float((held or {}).get("confidence", 0) or 0)
         except (TypeError, ValueError): confidence = 0.0
         present = box is not None and confidence >= .35
-        if self._held_latched and gripper_closed and present:
-            self._hold_missing_count = 0; self._holding_arbiter = {"state": "HELD", "reason": "latched_closed_with_visual_track", "visual_track_confidence": round(confidence, 4), "hold_comotion_score": comotion, "rejected_qwen_assessment": None}
+        relation_deviation = relation_limit = None
+        if present and self._current_eef_px is not None:
+            held_center = np.asarray(_center(box), dtype=float)
+            current_offset = held_center - np.asarray(self._current_eef_px, dtype=float)
+            if self._hold_reference_offset_px is None:
+                self._hold_reference_offset_px = current_offset.copy()
+            relation_deviation = float(
+                np.linalg.norm(current_offset - self._hold_reference_offset_px)
+            )
+            diagonal = math.hypot(float(box[2] - box[0]), float(box[3] - box[1]))
+            relation_limit = max(8.0, 0.45 * diagonal)
+            if relation_deviation > relation_limit:
+                self._hold_separation_count += 1
+            else:
+                self._hold_separation_count = 0
+        elif not present:
+            self._hold_separation_count = 0
+        if (
+            self._held_latched
+            and gripper_closed
+            and present
+            and self._hold_separation_count >= 2
+        ):
+            self._hold_missing_count = 0
+            self._holding_arbiter = {
+                "state": "SUSPECTED_LOST",
+                "reason": "object_eef_relation_diverged_consecutive_frames",
+                "visual_track_confidence": round(confidence, 4),
+                "hold_comotion_score": comotion,
+                "relative_offset_deviation_px": round(float(relation_deviation), 3),
+                "relative_offset_limit_px": round(float(relation_limit), 3),
+                "separation_frames": self._hold_separation_count,
+                "rejected_qwen_assessment": None,
+            }
+        elif self._held_latched and gripper_closed and present:
+            self._hold_missing_count = 0; self._holding_arbiter = {"state": "HELD", "reason": "latched_closed_with_instance_track", "visual_track_confidence": round(confidence, 4), "hold_comotion_score": comotion, "relative_offset_deviation_px": _rounded(relation_deviation, 3), "relative_offset_limit_px": _rounded(relation_limit, 3), "separation_frames": self._hold_separation_count, "rejected_qwen_assessment": None}
         elif self._held_latched and gripper_closed:
             self._hold_missing_count += 1; self._holding_arbiter = {"state": "SUSPECTED_LOST" if self._hold_missing_count >= 2 else "UNKNOWN", "reason": "visual_track_missing_consecutive_frames", "missing_frames": self._hold_missing_count, "hold_comotion_score": comotion, "rejected_qwen_assessment": None}
         else:
@@ -620,6 +656,7 @@ class VisualRoutePlugin:
         if entering:
             self._grasp_epoch_counter += 1; self._active_grasp_epoch = self._grasp_epoch_counter; self._held_latched = bool(gripper_closed)
             self._geometry_samples = []; self._previous_metrics = {}; self._previous_eef = self._previous_eef_px = self._previous_held_center = None
+            self._hold_reference_offset_px = None; self._hold_separation_count = 0; self._hold_missing_count = 0
             self._frames_since_intent = self._frames_since_geometry_refresh = 0; self._forced_intent_event = "transport_entry"; self._forced_intent_critical = True
         self._last_stage = stage_name; self._update_eef_px(geometry, eef_world)
         self._geometry_samples.append({"eef_world": np.asarray(eef_world, dtype=float).reshape(-1).tolist() if eef_world is not None else None, "held_bbox_xyxy": (held_evidence or {}).get("bbox_xyxy"), "destination_bbox_xyxy": (destination_evidence or {}).get("bbox_xyxy"), "opening_bbox_xyxy": (destination_evidence or {}).get("opening_bbox_xyxy")})
@@ -651,11 +688,14 @@ class VisualRoutePlugin:
             if (
                 self.last_intent.held_assessment == "LOST"
                 and self.last_intent.held_assessment_accepted
-                and self._hold_missing_count >= 2
+                and (
+                    self._hold_missing_count >= 2
+                    or self._hold_separation_count >= 2
+                )
             ):
                 self._holding_arbiter["state"] = "LOST"
                 self._holding_arbiter["reason"] = (
-                    "two_frame_visual_loss_confirmed_by_qwen_temporal_review"
+                    "multi_frame_visual_loss_confirmed_by_qwen_review"
                 )
             self._intent_refresh_count += 1; self._last_intent_frame = int(frame_id); self._last_intent_trigger = trigger; self._frames_since_intent = self._prediction_miss_count = 0; self._forced_intent_event = ""; self._forced_intent_critical = False
             disagreement = ""

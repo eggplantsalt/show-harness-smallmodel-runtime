@@ -366,6 +366,26 @@ def test_qwen_not_held_is_rejected_by_latched_visual_evidence():
     assert not output["evidence"]["intent"]["held_assessment_accepted"]
 
 
+def test_object_eef_separation_triggers_qwen_loss_review():
+    client = _IntentClient(held="LOST", intent="REACQUIRE")
+    plugin = VisualRoutePlugin(enabled=True, mode="active", client=client)
+    plugin._held_latched = True
+    plugin._current_eef_px = [100.0, 100.0]
+    held = {"bbox_xyxy": [90, 105, 110, 145], "confidence": 0.9}
+    plugin._update_holding(held, True, 1.0)
+    assert plugin._holding_arbiter["state"] == "HELD"
+
+    # The tracked object remains behind while the hand moves. One frame is only
+    # suspicion; two consecutive relation violations are review evidence.
+    plugin._current_eef_px = [125.0, 100.0]
+    plugin._update_holding(held, True, 0.2)
+    assert plugin._holding_arbiter["state"] == "HELD"
+    plugin._current_eef_px = [130.0, 100.0]
+    plugin._update_holding(held, True, 0.2)
+    assert plugin._holding_arbiter["state"] == "SUSPECTED_LOST"
+    assert plugin._holding_arbiter["separation_frames"] == 2
+
+
 def test_geometry_and_qwen_intent_refresh_counters_are_independent():
     client = _IntentClient()
     plugin = VisualRoutePlugin(

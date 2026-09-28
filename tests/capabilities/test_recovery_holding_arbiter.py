@@ -36,6 +36,26 @@ def test_transport_visual_lost_keeps_mechanical_recovery():
     assert telemetry is None
 
 
+def test_transport_suspected_loss_waits_for_qwen_visual_confirmation():
+    plugin = RecoveryPlugin(enabled=True)
+    mechanical = RecoveryDecision(
+        event="lost_grasp",
+        reason="closed gripper width is near zero",
+        release=True,
+        rollback_index=0,
+    )
+    accepted, telemetry = plugin.arbitrate_transport_holding(
+        mechanical,
+        stage="TRANSPORT",
+        visual_holding_state="SUSPECTED_LOST",
+    )
+    assert accepted is None
+    assert telemetry["visual_holding_state"] == "SUSPECTED_LOST"
+    assert telemetry["reason"] == (
+        "width_only_loss_waiting_for_temporal_visual_confirmation"
+    )
+
+
 def test_grasp_empty_close_is_never_suppressed_by_transport_arbiter():
     plugin = RecoveryPlugin(enabled=True)
     mechanical = RecoveryDecision(

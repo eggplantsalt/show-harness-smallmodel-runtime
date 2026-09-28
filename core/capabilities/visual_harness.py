@@ -578,6 +578,7 @@ class VisualHarness:
         held_affordance: Optional[str],
         frame_id: int,
         previous_action: Optional[str] = None,
+        handoff_evidence: Optional[dict[str, Any]] = None,
     ) -> Optional[dict[str, Any]]:
         """Ground the carried object independently of the receptacle.
 
@@ -608,6 +609,27 @@ class VisualHarness:
             self.held_horizontal_stall = False
             if self.held_tracker is not None:
                 self.held_tracker.reset()
+            # Bind TRANSPORT to the exact AgentView instance that converged in
+            # GRASP.  A new semantic query may contain several same-category
+            # objects and cannot by itself identify which one entered the hand.
+            handoff_bbox = _box_tuple(
+                (handoff_evidence or {}).get("bbox_xyxy")
+                if isinstance(handoff_evidence, dict)
+                else None
+            )
+            if stage_name == "TRANSPORT" and handoff_bbox is not None:
+                self.last_held_evidence = {
+                    "bbox_xyxy": list(handoff_bbox),
+                    "confidence": float((handoff_evidence or {}).get("confidence", 0.0) or 0.0),
+                    "source": "grasp_agentview_handoff",
+                    "visible": True,
+                }
+                if self.held_tracker is not None:
+                    self.held_tracker.seed(
+                        agentview,
+                        handoff_bbox,
+                        float((handoff_evidence or {}).get("confidence", 0.0) or 0.0),
+                    )
 
         should_ground = (
             self.held_last_grounding_frame is None
@@ -635,6 +657,66 @@ class VisualHarness:
                 if isinstance(self.last_held_evidence, dict)
                 else None
             )
+            # Associate all semantic candidates to the live instance track,
+            # rather than accepting the detector's highest-confidence object.
+            # This is category-agnostic and prevents a periodic refresh from
+            # jumping to a visually similar object elsewhere in the scene.
+            candidates = tool.get("candidates") if isinstance(tool, dict) else None
+            if previous_bbox is not None and isinstance(candidates, list):
+                previous_center = np.asarray(
+                    [
+                        (float(previous_bbox[0]) + float(previous_bbox[2])) / 2.0,
+                        (float(previous_bbox[1]) + float(previous_bbox[3])) / 2.0,
+                    ]
+                )
+                associated: list[tuple[float, tuple[int, int, int, int], float]] = []
+                for candidate in candidates:
+                    candidate_bbox = _box_tuple(
+                        candidate.get("bbox_xyxy") if isinstance(candidate, dict) else None
+                    )
+                    if candidate_bbox is None:
+                        continue
+                    candidate_center = np.asarray(
+                        [
+                            (float(candidate_bbox[0]) + float(candidate_bbox[2])) / 2.0,
+                            (float(candidate_bbox[1]) + float(candidate_bbox[3])) / 2.0,
+                        ]
+                    )
+                    associated.append(
+                        (
+                            float(np.linalg.norm(candidate_center - previous_center)),
+                            candidate_bbox,
+                            float(candidate.get("score", 0.0) or 0.0),
+                        )
+                    )
+                if associated:
+                    distance_px, associated_bbox, associated_confidence = min(
+                        associated, key=lambda item: item[0]
+                    )
+                    previous_diagonal = float(
+                        np.linalg.norm(
+                            [
+                                previous_bbox[2] - previous_bbox[0],
+                                previous_bbox[3] - previous_bbox[1],
+                            ]
+                        )
+                    )
+                    association_limit_px = max(8.0, 0.6 * previous_diagonal)
+                    tool = dict(tool)
+                    tool["instance_association"] = {
+                        "reference_bbox_xyxy": list(previous_bbox),
+                        "selected_bbox_xyxy": list(associated_bbox),
+                        "distance_px": round(distance_px, 2),
+                        "limit_px": round(association_limit_px, 2),
+                    }
+                    if distance_px <= association_limit_px:
+                        bbox = associated_bbox
+                        confidence = associated_confidence
+                        source = "sam3_instance_associated"
+                    else:
+                        bbox = None
+                        confidence = 0.0
+                        source = "instance_association_rejected"
             if bbox is not None and previous_bbox is not None:
                 previous_center = (
                     (float(previous_bbox[0]) + float(previous_bbox[2])) / 2.0,
@@ -1113,6 +1195,12 @@ class VisualHarness:
             held_affordance=held_affordance,
             frame_id=int(frame_id),
             previous_action=previous_action,
+            handoff_evidence=(
+                previous_secondary_view
+                if isinstance(previous_secondary_view, dict)
+                and previous_secondary_view.get("camera") == "agentview"
+                else None
+            ),
         )
         geometry_evidence = {}
         if self.geometry_enabled and isinstance(geometry, dict):
