@@ -390,11 +390,38 @@ def test_geometry_and_qwen_intent_refresh_counters_are_independent():
     )
     first = plugin.update(frame_id=0, **kwargs)
     assert first["evidence"]["geometry_refresh_count"] == 1
-    assert first["evidence"]["intent_refresh_count"] == 1
+    # The fixed mock proposes TRANSFER while calibrated clearance is still
+    # positive, so the prediction-error loop performs one immediate rethink.
+    # That extra semantic call must not refresh CPU geometry.
+    assert first["evidence"]["intent_refresh_count"] == 2
+    assert client.calls == 2
     for frame_id in range(1, 7):
         output = plugin.update(frame_id=frame_id, previous_action="MV_UP", **kwargs)
     assert output["evidence"]["intent_refresh_count"] >= 2
     assert output["evidence"]["geometry_refresh_count"] == 1
+
+
+def test_clearance_route_candidate_comes_from_configured_action_vectors():
+    plugin = VisualRoutePlugin(
+        enabled=True,
+        mode="active",
+        move_vectors={
+            "MV_UP": [0.0, 0.0, 1.0],
+            "MV_DOWN": [0.0, 0.0, -1.0],
+            "MV_LEFT": [0.0, 1.0, 0.0],
+        },
+    )
+    plugin.route = _route(RoutePhase.CLEARANCE)
+    progress = plugin._compute_progress(
+        eef_world=[0.0, 0.0, 0.20],
+        held={"bbox_xyxy": [40, 40, 60, 80]},
+        destination={"opening_bbox_xyxy": [100, 100, 140, 130]},
+        previous_action=None,
+    )
+    assert progress.active_waypoint_residual_world_m == [0.0, 0.0, 0.1]
+    assert [item["token"] for item in progress.route_direction_candidates] == [
+        "MV_UP"
+    ]
 
 
 def test_disabled_plugin_is_identity():

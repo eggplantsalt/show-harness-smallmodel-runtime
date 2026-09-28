@@ -807,9 +807,7 @@ class ControllerAgent:
             if stage_name == "TRANSPORT" and self.transport_prompt_template
             else self.prompt_template
         )
-        prompt = _join_prompt_parts(
-            self.common_context,
-            prompt_template.format(
+        formatted_prompt = prompt_template.format(
                 task=task,
                 subgoal_json=json.dumps(subgoal, sort_keys=True),
                 stage=str(subgoal.get("motion", "")),
@@ -834,10 +832,25 @@ class ControllerAgent:
                 recovery=str(recovery_context or ""),
                 proprio=proprio_block,
                 gripper_proprio=gripper_proprio,
-                output_contract=output_contract,
-            ),
-            str(capability_context or "").strip(),
-        )
+                output_contract=("" if stage_name == "TRANSPORT" else output_contract),
+            )
+        if stage_name == "TRANSPORT":
+            # Keep live route/intent evidence immediately before the answer
+            # contract.  Appending evidence after "Return JSON only" made the
+            # 8B controller attend to destination pixels while overlooking the
+            # current route leg and its residual.
+            prompt = _join_prompt_parts(
+                self.common_context,
+                formatted_prompt,
+                str(capability_context or "").strip(),
+                output_contract,
+            )
+        else:
+            prompt = _join_prompt_parts(
+                self.common_context,
+                formatted_prompt,
+                str(capability_context or "").strip(),
+            )
         ablation = self.action_ablation_plugin
         ablation_on = ablation is not None and getattr(ablation, "enabled", False)
         # Blind mode's two-frame review: when the runner supplies the frame captured

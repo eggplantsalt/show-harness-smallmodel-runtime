@@ -10,6 +10,7 @@ step_m: 0.02
 fine_step_m: 0.02
 up_step_m: 0.04
 coarse_step_m: 0.04
+variable_step: false
 # Shared CPU route for LIFT -> MOVE -> PLACE.  In route mode this replaces the
 # old single-height LIFT completion cue with camera-calibrated transport clearance.
 plugins:

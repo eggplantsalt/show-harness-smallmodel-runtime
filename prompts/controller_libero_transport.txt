@@ -17,6 +17,15 @@ contradicts the old route/intent, choose DONE to request an immediate intent ref
 DONE does not finish TRANSPORT. TRANSPORT ends only after a READY_TO_RELEASE intent
 and a separate live visual placement verification.
 
+The progress evidence may include `active_waypoint_residual_world_m` and
+`route_direction_candidates`. These are computed from camera calibration, the current
+EEF position, and the configured robot action vectors; they are not scene-specific
+rules. First decide whether this evidence agrees with the live image and current
+intent. If it agrees, choose a listed candidate that reduces the CURRENT 3D route
+residual. Do not let a large destination-centering error override an unfinished
+earlier route leg. If it disagrees, choose DONE so the intent/route is replanned rather
+than silently following a different leg.
+
 Do not keep lifting merely because the held object appears below the hand. Judge
 clearance from the route residual, the object's lowest point, obstacles, and actual
 change after the previous action. During recovery, inspect a fresh frame after every

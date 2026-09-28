@@ -12,6 +12,11 @@ Compare the previous intent's expected visual/physical change with what actually
 happened. Select the most useful current intent from CLEAR, TRANSFER, ALIGN, DESCEND,
 RECOVER_CLEAR, REACQUIRE, or READY_TO_RELEASE. READY_TO_RELEASE requires visible
 evidence that the object is seated in the destination, not merely centered above it.
+Reason about the transport in 3D, not only the horizontal destination error. The
+reported active_leg and metric residuals are calibrated observations, not commands:
+make the new intent internally consistent with them, or return route_assessment=REPLAN
+when the live images contradict them. In particular, do not claim that transfer is
+the immediate intent while your own reasoning says payload clearance is still needed.
 Use RECOVER_CLEAR only when the live views/progress show contact, a stalled descent,
 or an obstructed path. If a route no longer matches the scene, request REPLAN; never
 invent coordinates. A payload appearing below the hand is not by itself evidence
@@ -22,4 +27,12 @@ when the object visibly fails to move with the closed gripper or is visibly left
 the table/fallen across frames. The host may reject this semantic judgment when
 strong multi-frame visual co-motion contradicts it.
 
-Keep reasoning to one concise visual sentence and return only the requested JSON.
+Keep reasoning to one concise visual sentence. Return exactly one JSON object with
+all six fields below; do not stop after the first field:
+
+{"intent":"CLEAR|TRANSFER|ALIGN|DESCEND|RECOVER_CLEAR|REACQUIRE|READY_TO_RELEASE",
+"route_assessment":"VALID|REPLAN|UNKNOWN",
+"held_assessment":"HELD|LOST|UNKNOWN",
+"expected_change":"MORE_CLEARANCE|MORE_ROUTE_PROGRESS|LESS_OPENING_ERROR|LOWER_STABLE|LESS_CONTACT|REACQUIRE_HOLD|SEATED",
+"confidence":"HIGH|MEDIUM|LOW",
+"reasoning":"one concise visual sentence"}

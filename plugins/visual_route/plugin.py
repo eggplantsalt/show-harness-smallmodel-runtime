@@ -115,6 +115,8 @@ class TransportProgress:
     contact_or_stall: bool = False
     expected_change_satisfied: Optional[bool] = None
     expected_change: str = ""
+    active_waypoint_residual_world_m: Optional[list[float]] = None
+    route_direction_candidates: Optional[list[dict[str, Any]]] = None
 
     def to_dict(self) -> dict[str, Any]:
         return dict(self.__dict__)
@@ -198,6 +200,7 @@ class VisualRoutePlugin:
         intent_cooldown: int = 2, alignment_px: float = 13.5,
         alignment_fraction: float = 0.30, alignment_min_px: float = 4.0,
         ray_residual_max_m: float = 0.08, transport_loop_enabled: bool = True,
+        move_vectors: Optional[dict[str, Any]] = None,
     ) -> None:
         self.enabled = bool(enabled)
         self.mode = str(mode).lower()
@@ -218,6 +221,14 @@ class VisualRoutePlugin:
         self.alignment_min_px = max(1.0, float(alignment_min_px))
         self.ray_residual_max_m = max(0.001, float(ray_residual_max_m))
         self.transport_loop_enabled = bool(transport_loop_enabled)
+        self.move_vectors: dict[str, np.ndarray] = {}
+        for token, vector in (move_vectors or {}).items():
+            try:
+                value = np.asarray(vector, dtype=float).reshape(-1)
+            except (TypeError, ValueError):
+                continue
+            if value.size >= 3 and np.isfinite(value[:3]).all() and np.linalg.norm(value[:3]) > 1e-9:
+                self.move_vectors[str(token).upper()] = value[:3] / np.linalg.norm(value[:3])
         self.reset()
 
     @classmethod
@@ -244,6 +255,7 @@ class VisualRoutePlugin:
             alignment_min_px=float(get("alignment_min_px", cfg.get("route_alignment_min_px", 4.0))),
             ray_residual_max_m=float(get("ray_residual_max_m", 0.08)),
             transport_loop_enabled=bool(get("transport_loop_enabled", True)),
+            move_vectors=cfg.get("move_vectors") if isinstance(cfg.get("move_vectors"), dict) else None,
         )
 
     def reset(self) -> None:
@@ -473,7 +485,43 @@ class VisualRoutePlugin:
             elif expected == "SEATED": satisfied = bool(alignment.get("aligned") and dz is not None and dz >= 0)
         self._previous_metrics = {"clearance": residual, "along": along, "opening_error": new_error}
         self._previous_eef, self._previous_eef_px, self._previous_held_center = eef.copy(), eef_px.copy() if eef_px is not None else None, held_center.copy() if held_center is not None else None
-        return TransportProgress(round(residual, 5), self.route.active_leg, round(along, 4), _rounded(cross), [round(float(v), 4) for v in opening_error] if opening_error is not None else None, _rounded(dz), _rounded(comotion, 4), contact, satisfied, expected)
+        route_residual = np.zeros(3, dtype=float)
+        if self.route.phase == RoutePhase.CLEARANCE:
+            route_residual[2] = max(0.0, safe - float(eef[2]))
+        elif self.route.phase == RoutePhase.TRANSFER:
+            route_residual[:2] = goal - eef[:2]
+            route_residual[2] = max(0.0, safe - float(eef[2]))
+        elif self.route.phase == RoutePhase.PRE_DESCENT:
+            route_residual[:2] = goal - eef[:2]
+        candidates: list[dict[str, Any]] = []
+        norm = float(np.linalg.norm(route_residual))
+        if norm > 1e-6:
+            direction = route_residual / norm
+            for token, vector in self.move_vectors.items():
+                score = float(np.dot(direction, vector))
+                if score > 0.25:
+                    candidates.append(
+                        {
+                            "token": token,
+                            "cosine": round(score, 4),
+                            "effect": "reduces_current_3d_route_residual",
+                        }
+                    )
+            candidates.sort(key=lambda item: float(item["cosine"]), reverse=True)
+        return TransportProgress(
+            round(residual, 5),
+            self.route.active_leg,
+            round(along, 4),
+            _rounded(cross),
+            [round(float(v), 4) for v in opening_error] if opening_error is not None else None,
+            _rounded(dz),
+            _rounded(comotion, 4),
+            contact,
+            satisfied,
+            expected,
+            [round(float(v), 5) for v in route_residual],
+            candidates,
+        )
 
     def _update_holding(self, held: Optional[dict[str, Any]], gripper_closed: bool, comotion: Optional[float]) -> None:
         box = _box((held or {}).get("bbox_xyxy"))
@@ -516,7 +564,7 @@ class VisualRoutePlugin:
     def _plan_intent(self, *, image: np.ndarray, wrist: Any, frame_id: int, trigger: str, held: Optional[dict[str, Any]], destination: Optional[dict[str, Any]], previous_action: Optional[str], debug: bool) -> TransportIntent:
         self._intent_counter += 1; intent_id = f"intent-{self._intent_counter:04d}"; route_id = self.route.route_id if self.route else ""
         if self.client is None:
-            return TransportIntent(intent_id, "REACQUIRE", "UNKNOWN", "UNKNOWN", "REACQUIRE_HOLD", "LOW", "intent planner unavailable", route_id, int(frame_id), trigger)
+            return TransportIntent(intent_id, "UNKNOWN", "UNKNOWN", "UNKNOWN", "", "LOW", "intent planner unavailable; no intent was fabricated", route_id, int(frame_id), trigger)
         evidence = {"goal": self._goal_context, "trigger": trigger, "previous_intent": self.last_intent.to_dict() if self.last_intent else None, "previous_action": previous_action, "observed_progress": self.last_progress.to_dict() if self.last_progress else None, "route": {key: self.route.to_dict().get(key) for key in ("route_id", "valid", "active_leg", "confidence", "safe_transport_z_m", "last_reason")} if self.route else None, "holding_arbiter": self._holding_arbiter, "opening_alignment": self._alignment_signal(held, destination)}
         prompt = ROUTE_PROMPT_PATH.read_text(encoding="utf-8").strip() + "\n\nCURRENT CLOSED-LOOP EVIDENCE:\n" + json.dumps(evidence, ensure_ascii=False, separators=(",", ":"))
         schema = {"type": "object", "properties": {"intent": {"type": "string", "enum": sorted(INTENTS)}, "route_assessment": {"type": "string", "enum": ["VALID", "REPLAN", "UNKNOWN"]}, "held_assessment": {"type": "string", "enum": ["HELD", "LOST", "UNKNOWN"]}, "expected_change": {"type": "string", "enum": sorted(EXPECTED_CHANGES)}, "confidence": {"type": "string", "enum": ["HIGH", "MEDIUM", "LOW"]}, "reasoning": {"type": "string"}}, "required": ["intent", "route_assessment", "held_assessment", "expected_change", "confidence", "reasoning"], "additionalProperties": False}
@@ -526,6 +574,12 @@ class VisualRoutePlugin:
             response = self.client.complete_json(prompt, image, wrist_image=wrist, schema=schema, max_tokens=self.review_max_tokens, temperature=0.0, chat_template_kwargs={"enable_thinking": False, "thinking": False}, debug=debug, agentview_label="AgentView with thin CPU route", wrist_label="Wrist live holding evidence")
             payload = response.payload.get("json")
             if not isinstance(payload, dict): raise RuntimeError("transport intent planner returned no JSON")
+            missing = [key for key in schema["required"] if key not in payload]
+            if missing:
+                raise RuntimeError(
+                    "transport intent omitted required fields "
+                    f"{missing}; partial={payload!r}"
+                )
             held_assessment = str(payload.get("held_assessment", "UNKNOWN")).upper(); accepted = not (held_assessment == "LOST" and self._holding_arbiter.get("state") == "HELD")
             if not accepted: self._holding_arbiter["rejected_qwen_assessment"] = "LOST"
             after_metrics = dict(getattr(self.client, "metrics", {}) or {})
@@ -535,7 +589,7 @@ class VisualRoutePlugin:
             if result.route_assessment == "REPLAN": self._geometry_replan_requested = "qwen_route_assessment_replan"
             return result
         except Exception as exc:
-            return TransportIntent(intent_id, self.last_intent.intent if self.last_intent else "REACQUIRE", "UNKNOWN", "UNKNOWN", self.last_intent.expected_change if self.last_intent else "REACQUIRE_HOLD", "LOW", f"intent planner unavailable: {type(exc).__name__}: {exc}", route_id, int(frame_id), trigger, latency_s=time.monotonic() - started)
+            return TransportIntent(intent_id, self.last_intent.intent if self.last_intent else "UNKNOWN", "UNKNOWN", "UNKNOWN", self.last_intent.expected_change if self.last_intent else "", "LOW", f"intent planner unavailable: {type(exc).__name__}: {exc}", route_id, int(frame_id), trigger, latency_s=time.monotonic() - started)
 
     def update(self, *, agentview: np.ndarray, wrist: Any, stage: str, subgoals: Any, current_index: int, frame_id: int, eef_world: Any, geometry: dict[str, Any], held_evidence: Optional[dict[str, Any]], destination_evidence: Optional[dict[str, Any]], gripper_closed: bool, previous_action: Optional[str] = None, debug: bool = False) -> dict[str, Any]:
         if not self.enabled: return {"agentview": agentview, "context": "", "evidence": {}, "route_gate": None}
@@ -604,7 +658,43 @@ class VisualRoutePlugin:
                     "two_frame_visual_loss_confirmed_by_qwen_temporal_review"
                 )
             self._intent_refresh_count += 1; self._last_intent_frame = int(frame_id); self._last_intent_trigger = trigger; self._frames_since_intent = self._prediction_miss_count = 0; self._forced_intent_event = ""; self._forced_intent_critical = False
-            if self.last_intent.intent == "CLEAR" and self.last_progress.clearance_residual_m == 0.0 and not self.last_progress.contact_or_stall: self.request_intent_refresh("intent_disagreement_clearance_complete")
+            disagreement = ""
+            clearance = self.last_progress.clearance_residual_m
+            if (
+                clearance is not None
+                and clearance > 0.005
+                and self.last_intent.intent
+                in {"TRANSFER", "ALIGN", "DESCEND", "READY_TO_RELEASE"}
+            ):
+                disagreement = (
+                    "intent_disagreement: selected a later route-leg intent while "
+                    f"calibrated clearance_residual_m={clearance:.4f} and "
+                    "active_leg=CLEARANCE; reassess the 3D ordering or mark route REPLAN"
+                )
+            elif (
+                self.last_intent.intent == "CLEAR"
+                and clearance == 0.0
+                and not self.last_progress.contact_or_stall
+            ):
+                disagreement = (
+                    "intent_disagreement: selected CLEAR after calibrated clearance "
+                    "residual reached zero; reassess the current route leg"
+                )
+            if disagreement:
+                # One immediate Qwen rethink points out the measured prediction
+                # contradiction.  The host still does not choose an intent/action.
+                self.last_intent = self._plan_intent(
+                    image=rendered,
+                    wrist=wrist,
+                    frame_id=frame_id,
+                    trigger=disagreement,
+                    held=held_evidence,
+                    destination=destination_evidence,
+                    previous_action=previous_action,
+                    debug=debug,
+                )
+                self._intent_refresh_count += 1
+                self._last_intent_trigger = disagreement
         self._last_route_phase = self.route.phase.value if self.route else ""
         context = self.prompt_context(held_evidence=held_evidence, destination_evidence=destination_evidence, gripper_closed=gripper_closed, eef_world=eef_world, stage=stage_name)
         evidence = {"enabled": True, "mode": self.mode, "stage": stage_name, "frame_id": int(frame_id), "grasp_epoch": self._active_grasp_epoch, "route": self.route.to_dict() if self.route else None, "intent": self.last_intent.to_dict() if self.last_intent else None, "progress": self.last_progress.to_dict(), "holding_arbiter": dict(self._holding_arbiter), "geometry_refresh_count": self._geometry_refresh_count, "last_geometry_refresh_frame": self._last_geometry_refresh_frame, "last_geometry_refresh_reason": self._last_geometry_refresh_reason, "frames_since_geometry_refresh": self._frames_since_geometry_refresh, "intent_refresh_count": self._intent_refresh_count, "last_intent_frame": self._last_intent_frame, "last_intent_trigger": self._last_intent_trigger, "intent_age": self._frames_since_intent, "prediction_miss_count": self._prediction_miss_count, "previous_action": previous_action}
