@@ -1071,6 +1071,8 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                 visual_route_gate: Any = None
                 transport_hold_lost = False
                 transport_rollback_index = None
+                route_holding_arbiter: dict[str, Any] = {}
+                holding_recovery_arbiter: list[dict[str, Any]] = []
                 route_held_evidence: Optional[dict[str, Any]] = None
                 route_destination_evidence: Optional[dict[str, Any]] = None
                 held_target, held_affordance = self._held_target_for(
@@ -1149,6 +1151,8 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                         if isinstance(route_evidence, dict):
                             capability_evidence["visual_route"] = route_evidence
                             holding_arbiter = route_evidence.get("holding_arbiter")
+                            if isinstance(holding_arbiter, dict):
+                                route_holding_arbiter = dict(holding_arbiter)
                             transport_hold_lost = bool(
                                 str(getattr(subgoal, "motion", "")).upper()
                                 == "TRANSPORT"
@@ -1219,6 +1223,19 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                         subgoals=subgoals,
                     )
                 )
+                if self.recovery_plugin is not None:
+                    recovery_decision, arbitration = (
+                        self.recovery_plugin.arbitrate_transport_holding(
+                            recovery_decision,
+                            stage=str(getattr(subgoal, "motion", "")),
+                            visual_holding_state=str(
+                                route_holding_arbiter.get("state", "")
+                            ),
+                        )
+                    )
+                    if arbitration is not None:
+                        arbitration["timing"] = "before_decision"
+                        holding_recovery_arbiter.append(arbitration)
 
                 stage_completion_guard = None
                 if self.visual_harness is not None:
@@ -2260,6 +2277,20 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                             subgoal_done=subgoal_done,
                         )
 
+                if self.recovery_plugin is not None:
+                    post_recovery, arbitration = (
+                        self.recovery_plugin.arbitrate_transport_holding(
+                            post_recovery,
+                            stage=stage_name_for_guard,
+                            visual_holding_state=str(
+                                route_holding_arbiter.get("state", "")
+                            ),
+                        )
+                    )
+                    if arbitration is not None:
+                        arbitration["timing"] = "after_step"
+                        holding_recovery_arbiter.append(arbitration)
+
                 if post_recovery is not None:
                     recovery_decision = (
                         post_recovery
@@ -2413,6 +2444,10 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                     route_evidence = visual_route_output.get("evidence")
                     if isinstance(route_evidence, dict):
                         step_record["visual_route"] = route_evidence
+                if holding_recovery_arbiter:
+                    step_record["holding_recovery_arbiter"] = (
+                        holding_recovery_arbiter
+                    )
                 if final_check is not None:
                     step_record["final_task_check"] = final_check
                 if capability_evidence:
