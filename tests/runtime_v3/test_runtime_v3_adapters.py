@@ -83,6 +83,7 @@ class FakeQwenClient:
         else:
             content = json.dumps(self.parsed_payload)
         payload = {"raw": {"choices": [{"message": {"content": self.raw_output}}]},
+                   "usage": {"prompt_tokens": 91, "completion_tokens": 8},
                    "latency_s": 0.01}
         return VLMResponse("", content, payload)
 
@@ -115,6 +116,23 @@ def test_qwen_valid_structured_output_matches_exact_bounded_schema():
     assert selection.option_id == "OPTION_X"
     assert client.kwargs["schema"]["additionalProperties"] is False
     assert client.kwargs["schema"]["required"] == ["selection"]
+
+
+def test_instruct_selector_parses_structured_choice_and_records_output_tokens():
+    client = FakeQwenClient('{"selection":"OPTION_X"}')
+    state = _state()
+    state = BeliefState(**{
+        **state.__dict__,
+        "relevant_geometry": {"target_offset_xyz_m": [0.02, 0.0, 0.0], "target_visible": True},
+    })
+    selector = QwenSelectorAdapter(client, "align to the target", max_tokens=64)
+    selection = selector.select(state, [_option()])
+    assert selection.status == "SELECTED"
+    assert client.kwargs["max_tokens"] == 64
+    assert client.kwargs["schema"]["additionalProperties"] is False
+    assert selector.last_record["output_tokens"] == 8
+    assert selector.last_record["prompt_tokens"] == 91
+    assert "target_offset_xyz_m" in client.kwargs["prompt"]
 
 
 @pytest.mark.parametrize("raw", ["MV_LEFT", "move left"])
@@ -193,3 +211,21 @@ def test_i_qwen_adapter_holds_no_environment_or_controller_reference():
     selector = QwenSelectorAdapter(FakeQwenClient('{"selection":"REOBSERVE"}'), "instruction")
     forbidden = {"env", "environment", "controller", "backend", "executor"}
     assert not forbidden.intersection(vars(selector))
+
+
+def test_selector_evaluation_script_has_no_executor_construction_or_import():
+    source = (ROOT / "scripts/runtime_v3_qwen_selector_eval.py").read_text()
+    assert "from core.runtime_v3.executor" not in source
+    assert "Executor(" not in source
+    assert "LiberoEnvironmentAdapter" not in source
+
+
+def test_task_conditioned_selector_cases_reuse_same_state_and_options_with_different_answers():
+    from scripts.runtime_v3_qwen_selector_eval import _choices_for_case
+
+    first = _choices_for_case(8)
+    second = _choices_for_case(9)
+    assert first[1] == second[1]
+    assert first[2] == second[2]
+    assert first[3] != second[3]
+    assert first[5] == second[5] == "PAIR_1"

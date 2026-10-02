@@ -50,6 +50,12 @@ sealed `ApprovedAction`. `Executor` checks that approval and is the only module
 that calls the atomic controller. Each execution is followed by a new
 observation before another selection.
 
+The temporal calibration procedure can repeat the same bounded token across
+multiple control ticks to measure its response. Each tick still runs a fresh
+observe → option → selector → Arbiter → Executor cycle, and each Executor call
+remains one tick. The experiment does not change the production option or
+execution bound.
+
 Memory currently defines only `ExperienceRecord` and `ExperienceStore`. It
 does not learn, alter policy, or inject legacy RSI/textual lessons.
 

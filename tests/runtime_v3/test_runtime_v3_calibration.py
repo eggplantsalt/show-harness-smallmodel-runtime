@@ -5,6 +5,13 @@ from pathlib import Path
 import pytest
 
 from core.runtime_v3.calibration import compute_contract_metrics, run_calibration_trial
+from core.runtime_v3.temporal_calibration import (
+    aggregate_temporal_response,
+    baseline_corrected_effect,
+    opposite_pair_metric,
+    settling_curve,
+)
+from interpreters.libero_atomic_controller import LiberoAtomicController
 from core.runtime_v3.observer import RobotObservation
 
 
@@ -49,6 +56,58 @@ def test_calibration_direction_cosine_uses_projection_over_total_motion():
     )
     assert metrics["direction_cosine"] == pytest.approx(0.8)
     assert metrics["observed_norm_m"] == pytest.approx(0.005)
+
+
+def test_hold_action_is_zero_translation_and_rotation_while_preserving_gripper():
+    vectors = {
+        "MV_FWD": [1, 0, 0], "MV_BACK": [-1, 0, 0],
+        "MV_LEFT": [0, 1, 0], "MV_RIGHT": [0, -1, 0],
+        "MV_UP": [0, 0, 1], "MV_DOWN": [0, 0, -1],
+    }
+    controller = LiberoAtomicController(vectors, sim_steps_per_decision=1)
+    action = controller.hold_action()
+    assert action.tolist() == pytest.approx([0, 0, 0, 0, 0, 0, -1])
+    assert controller.state.gripper_command == -1.0
+    assert controller.state.gripper_name == "OPEN"
+
+
+def test_baseline_correction_subtracts_matched_hold_vector_before_metrics():
+    corrected = baseline_corrected_effect(
+        [0.004, -0.002, 0.001], [0.001, -0.001, 0.003], [1, 0, 0], 0.005
+    )
+    assert corrected["delta_xyz_m"] == pytest.approx([0.003, -0.001, -0.002])
+    assert corrected["metrics"]["projection_mm"] == pytest.approx(3.0)
+    assert corrected["metrics"]["off_axis_magnitude_mm"] == pytest.approx((5.0 ** 0.5))
+
+
+def test_hold_settling_curve_aggregates_each_observed_control_tick():
+    curve = settling_curve([
+        {"points_xyz_m": [[0, 0, 0], [0.002, 0, 0], [0.003, 0, 0]]},
+        {"points_xyz_m": [[0, 0, 0], [0.004, 0, 0], [0.006, 0, 0]]},
+    ])
+    assert curve[0]["n"] == 2
+    assert curve[0]["mean_delta_xyz_mm"] == pytest.approx([3.0, 0, 0])
+    assert curve[0]["mean_delta_norm_mm"] == pytest.approx(3.0)
+    assert curve[1]["mean_delta_norm_mm"] == pytest.approx(1.5)
+
+
+def test_opposite_pair_metric_reports_vector_sum_and_norm_without_threshold():
+    residual = opposite_pair_metric([0.004, 0.001, 0.0], [-0.003, -0.002, 0.0])
+    assert residual["residual_xyz_mm"] == pytest.approx([1.0, -1.0, 0.0])
+    assert residual["residual_norm_mm"] == pytest.approx(2.0 ** 0.5)
+
+
+def test_temporal_response_aggregation_keeps_raw_and_tick_matched_corrected_curves():
+    curve = aggregate_temporal_response(
+        [[0.003, 0.001, 0.0], [0.005, 0.002, 0.0]],
+        [[0.001, 0.001, 0.0], [0.001, 0.003, 0.0]],
+        [1, 0, 0],
+        0.005,
+    )
+    assert len(curve) == 2
+    assert curve[0]["raw_metrics"]["projection_mm"] == pytest.approx(3.0)
+    assert curve[0]["baseline_corrected_delta_xyz_mm"] == pytest.approx([2.0, 0.0, 0.0])
+    assert curve[1]["baseline_corrected_delta_xyz_mm"] == pytest.approx([4.0, -1.0, 0.0])
 
 
 def test_calibration_requires_a_unit_command_direction():
@@ -186,3 +245,13 @@ def test_calibration_runner_routes_action_through_runtime_executor():
     assert "env.step(" not in script_source
     assert "environment.step(" not in script_source
     assert "run_calibration_trial(" in script_source
+
+
+def test_temporal_calibration_script_routes_each_tick_through_v3_runner():
+    module_source = (ROOT / "core/runtime_v3/temporal_calibration.py").read_text()
+    script_source = (ROOT / "scripts/runtime_v3_temporal_response.py").read_text()
+    assert "Executor(backend, arbiter)" in module_source
+    assert "RuntimeV3Runner(" in module_source
+    assert "run_v3_tick(" in script_source
+    assert "environment.step(" not in script_source
+    assert "env.step(" not in script_source
