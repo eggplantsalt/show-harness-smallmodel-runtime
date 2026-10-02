@@ -93,9 +93,14 @@ On the same 768×768 scene and identical one-word question, Qwen3-VL answered
 `MILK` for the raw orientation and `Milk` for the canonical orientation. Both
 responses identify the word; this is orientation sanity evidence, not action
 selection. Robot actions from Qwen: 0. Ground-truth/oracle diagnostics were not
-used. Runtime geometry selected the physical direction, the deterministic
-selector exposed the one semantic option, Arbiter approved once, and Executor
-ran the bounded motion.
+used by Runtime. A separate diagnostic-only probe found the simulator body
+`salad_dressing_1_main`; its projected body origin was at (196.79, 300.02) px,
+about 4 px below the initial anchor-mask bounding box in each state. This is the
+body origin at the object base, not the visible bottle center. The diagnostic
+was written outside Runtime state and was not supplied to the option generator,
+Arbiter, Executor, or Qwen. Runtime geometry selected the physical direction,
+the deterministic selector exposed the one semantic option, Arbiter approved
+once, and Executor ran the bounded motion.
 
 ## Artifacts and commands
 
@@ -106,6 +111,8 @@ before/after overlays are under
 `rollouts/runtime_v3_object_relative_alignment/run_20261002T095805Z_f05c03ac`.
 The audit script is `scripts/runtime_v3_perception_audit.py`; the bounded
 experiment is `scripts/runtime_v3_object_relative_alignment.py`.
+The separate diagnostic-only record is
+`rollouts/runtime_v3_object_relative_alignment/run_20261002T095805Z_f05c03ac/oracle_diagnostic.json`.
 
 An earlier trial attempt at
 `rollouts/runtime_v3_object_relative_alignment/run_20261002T095705Z_bb1ef022`
