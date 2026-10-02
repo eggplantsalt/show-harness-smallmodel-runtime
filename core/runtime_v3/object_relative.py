@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import io
+import json
 import math
 import time
 from dataclasses import dataclass
@@ -17,6 +18,7 @@ from core.capabilities.camera_geometry import (
     make_mujoco_calibrations,
     project_point,
 )
+from .canonical_image import CanonicalImageAdapter
 from .observer import RobotObservation
 from .options import BoundedMicroMotionSpec, PrimitiveCommand, RuntimeOption
 from .state import BeliefState, ObjectRelativeState
@@ -27,6 +29,41 @@ REQUESTED_ALIGNMENT_M = 0.003
 CONTROL_TICK_STEP_M = 0.005
 MAX_ALIGNMENT_TICKS = 5
 SAM3_CONFIDENCE_THRESHOLD = 0.05
+TARGET_MASK_IOU_MIN = 0.25
+TARGET_CENTROID_DISPLACEMENT_DIAGONAL_MAX = 0.50
+TARGET_CENTROID_DISPLACEMENT_FLOOR_PX = 12.0
+
+
+@dataclass(frozen=True)
+class TargetCandidate:
+    candidate_id: str
+    rank: int | None
+    backend_index: int | None
+    mask: np.ndarray | None
+    centroid_px: tuple[float, float] | None
+    bbox_xyxy: tuple[int, int, int, int] | None
+    area_px: int | None
+    score: float | None
+
+
+@dataclass(frozen=True)
+class TargetIdentityAnchor:
+    """One-trial pixel evidence used only to verify the same target instance."""
+
+    target_phrase: str
+    initial_mask: np.ndarray
+    centroid_px: tuple[float, float]
+    bbox_xyxy: tuple[int, int, int, int]
+    mask_area: int
+    candidate_id: str
+    frame_id: int | None
+
+
+@dataclass(frozen=True)
+class TargetAssociation:
+    status: str
+    candidate: TargetCandidate | None
+    candidate_metrics: tuple[Mapping[str, Any], ...]
 
 
 @dataclass(frozen=True)
@@ -38,6 +75,10 @@ class TargetSegmentation:
     area_px: int | None
     quality_score: float | None
     response: Mapping[str, Any]
+    candidates: tuple[TargetCandidate, ...] = ()
+    selected_candidate_id: str | None = None
+    identity_status: str = "UNANCHORED"
+    association_metrics: Mapping[str, Any] | None = None
 
 
 def decode_sam3_mask(value: Any, expected_shape: tuple[int, int]) -> np.ndarray | None:
@@ -64,29 +105,164 @@ def segmentation_from_response(
     detections = details.get("detections") if isinstance(details, Mapping) else None
     if not bool(response.get("success")) or not isinstance(detections, list):
         return TargetSegmentation(False, None, None, None, None, None, response)
-    detection = next((item for item in detections if isinstance(item, Mapping)), None)
-    if detection is None:
-        return TargetSegmentation(False, None, None, None, None, None, response)
-    mask = decode_sam3_mask(detection.get("mask"), image_shape)
-    if mask is None or not bool(mask.any()):
-        return TargetSegmentation(False, None, None, None, None, None, response)
-    ys, xs = np.nonzero(mask)
-    score_raw = detection.get("score")
-    try:
-        quality_score = float(score_raw) if score_raw is not None else None
-    except (TypeError, ValueError):
-        quality_score = None
-    if quality_score is not None and not math.isfinite(quality_score):
-        quality_score = None
+    candidates = tuple(
+        _candidate_from_detection(item, index=index, image_shape=image_shape)
+        for index, item in enumerate(detections)
+        if isinstance(item, Mapping)
+    )
+    candidate = next((item for item in candidates if item.mask is not None and item.area_px), None)
+    if candidate is None:
+        return TargetSegmentation(False, None, None, None, None, None, response,
+                                  candidates=candidates)
     return TargetSegmentation(
         visible=True,
-        mask=mask,
-        centroid_px=(float(xs.mean()), float(ys.mean())),
-        bbox_xyxy=(int(xs.min()), int(ys.min()), int(xs.max() + 1), int(ys.max() + 1)),
-        area_px=int(mask.sum()),
-        quality_score=quality_score,
+        mask=candidate.mask,
+        centroid_px=candidate.centroid_px,
+        bbox_xyxy=candidate.bbox_xyxy,
+        area_px=candidate.area_px,
+        quality_score=candidate.score,
         response=response,
+        candidates=candidates,
+        selected_candidate_id=candidate.candidate_id,
     )
+
+
+def _candidate_from_detection(
+    detection: Mapping[str, Any], *, index: int, image_shape: tuple[int, int]
+) -> TargetCandidate:
+    mask = decode_sam3_mask(detection.get("mask"), image_shape)
+    centroid = None
+    bbox = None
+    area = None
+    if mask is not None and bool(mask.any()):
+        ys, xs = np.nonzero(mask)
+        centroid = (float(xs.mean()), float(ys.mean()))
+        bbox = (int(xs.min()), int(ys.min()), int(xs.max() + 1), int(ys.max() + 1))
+        area = int(mask.sum())
+    else:
+        raw_bbox = detection.get("bbox_xyxy")
+        if isinstance(raw_bbox, (list, tuple)) and len(raw_bbox) == 4:
+            try:
+                bbox = tuple(int(round(float(value))) for value in raw_bbox)
+            except (TypeError, ValueError):
+                bbox = None
+        try:
+            area = int(detection["area_px"]) if detection.get("area_px") is not None else None
+        except (TypeError, ValueError):
+            area = None
+    try:
+        score = float(detection["score"]) if detection.get("score") is not None else None
+    except (TypeError, ValueError):
+        score = None
+    if score is not None and not math.isfinite(score):
+        score = None
+    try:
+        rank = int(detection["rank"]) if detection.get("rank") is not None else index
+    except (TypeError, ValueError):
+        rank = index
+    try:
+        backend_index = (int(detection["backend_index"])
+                         if detection.get("backend_index") is not None else None)
+    except (TypeError, ValueError):
+        backend_index = None
+    candidate_id = str(backend_index if backend_index is not None else rank)
+    return TargetCandidate(candidate_id, rank, backend_index, mask, centroid, bbox, area, score)
+
+
+def make_target_identity_anchor(
+    segmentation: TargetSegmentation, *, target_phrase: str, frame_id: int | None
+) -> TargetIdentityAnchor | None:
+    candidate = next(
+        (item for item in segmentation.candidates
+         if item.candidate_id == segmentation.selected_candidate_id), None
+    )
+    if (candidate is None or candidate.mask is None or candidate.centroid_px is None
+            or candidate.bbox_xyxy is None or not candidate.area_px):
+        return None
+    return TargetIdentityAnchor(
+        target_phrase=str(target_phrase),
+        initial_mask=candidate.mask.copy(),
+        centroid_px=candidate.centroid_px,
+        bbox_xyxy=candidate.bbox_xyxy,
+        mask_area=int(candidate.area_px),
+        candidate_id=candidate.candidate_id,
+        frame_id=frame_id,
+    )
+
+
+def associate_target_candidate(
+    anchor: TargetIdentityAnchor,
+    candidates: Sequence[TargetCandidate],
+) -> TargetAssociation:
+    """Match by overlap and local centroid continuity; never force a weak match."""
+    ax0, ay0, ax1, ay1 = anchor.bbox_xyxy
+    diagonal = math.hypot(ax1 - ax0, ay1 - ay0)
+    max_displacement = max(
+        TARGET_CENTROID_DISPLACEMENT_FLOOR_PX,
+        TARGET_CENTROID_DISPLACEMENT_DIAGONAL_MAX * diagonal,
+    )
+    metrics: list[dict[str, Any]] = []
+    eligible: list[tuple[TargetCandidate, dict[str, Any]]] = []
+    for candidate in candidates:
+        if (candidate.mask is None or candidate.mask.shape != anchor.initial_mask.shape
+                or candidate.centroid_px is None or candidate.bbox_xyxy is None
+                or not candidate.area_px):
+            metrics.append({"candidate_id": candidate.candidate_id, "eligible": False,
+                            "reason": "candidate_mask_or_geometry_unavailable"})
+            continue
+        intersection = int(np.logical_and(anchor.initial_mask, candidate.mask).sum())
+        union = int(np.logical_or(anchor.initial_mask, candidate.mask).sum())
+        mask_iou = float(intersection / union) if union else 0.0
+        bx0, by0, bx1, by1 = candidate.bbox_xyxy
+        ix0, iy0, ix1, iy1 = max(ax0, bx0), max(ay0, by0), min(ax1, bx1), min(ay1, by1)
+        bbox_intersection = max(0, ix1 - ix0) * max(0, iy1 - iy0)
+        anchor_box_area = max(0, ax1 - ax0) * max(0, ay1 - ay0)
+        candidate_box_area = max(0, bx1 - bx0) * max(0, by1 - by0)
+        bbox_union = anchor_box_area + candidate_box_area - bbox_intersection
+        bbox_iou = float(bbox_intersection / bbox_union) if bbox_union else 0.0
+        displacement = float(np.linalg.norm(
+            np.asarray(candidate.centroid_px, dtype=float) - np.asarray(anchor.centroid_px, dtype=float)
+        ))
+        area_ratio = float(candidate.area_px / anchor.mask_area)
+        is_eligible = mask_iou >= TARGET_MASK_IOU_MIN and displacement <= max_displacement
+        item = {
+            "candidate_id": candidate.candidate_id,
+            "rank": candidate.rank,
+            "backend_index": candidate.backend_index,
+            "sam_score": candidate.score,
+            "mask_iou": mask_iou,
+            "bbox_iou": bbox_iou,
+            "centroid_displacement_px": displacement,
+            "centroid_displacement_limit_px": max_displacement,
+            "area_ratio": area_ratio,
+            "eligible": bool(is_eligible),
+            "reason": "continuity_gates_passed" if is_eligible else "continuity_gate_failed",
+        }
+        metrics.append(item)
+        if is_eligible:
+            eligible.append((candidate, item))
+    if not eligible:
+        return TargetAssociation("TARGET_IDENTITY_LOST", None, tuple(metrics))
+    candidate, _ = max(
+        eligible,
+        key=lambda pair: (float(pair[1]["mask_iou"]),
+                          -float(pair[1]["centroid_displacement_px"])),
+    )
+    return TargetAssociation("SAME_TARGET", candidate, tuple(metrics))
+
+
+def alignment_verification_metrics(
+    error_before_px: float | None,
+    error_after_px: float | None,
+    *,
+    identity_status: str,
+) -> dict[str, Any]:
+    if identity_status != "SAME_TARGET" or error_before_px is None or error_after_px is None:
+        return {"verification_status": "TARGET_IDENTITY_LOST", "error_after_px": None,
+                "actual_improvement_px": None, "alignment_improved": None}
+    before, after = float(error_before_px), float(error_after_px)
+    return {"verification_status": "SAME_TARGET", "error_after_px": after,
+            "actual_improvement_px": before - after, "alignment_improved": bool(after < before)}
 
 
 def resolve_object_relative_geometry(
@@ -97,6 +273,7 @@ def resolve_object_relative_geometry(
     move_vectors: Mapping[str, Sequence[float]],
     workspace_z_bounds_m: Sequence[float] | None,
     requested_displacement_m: float = REQUESTED_ALIGNMENT_M,
+    canonical_image_adapter: CanonicalImageAdapter | None = None,
 ) -> dict[str, Any]:
     """Project six physical hypotheses and rank them by predicted image error."""
     invalid = {
@@ -129,7 +306,14 @@ def resolve_object_relative_geometry(
     if current is None or not current["in_frame"]:
         invalid["reason"] = "eef_projection_invalid"
         return invalid
-    current_pixel = np.asarray(current["pixel_xy"], dtype=float)
+    def project_to_observation(point_xy: Sequence[float]) -> tuple[float, float]:
+        if canonical_image_adapter is None:
+            # Preserve the camera_geometry row-down convention for standalone callers.
+            return float(point_xy[0]), float(point_xy[1])
+        return canonical_image_adapter.transform_projected_point(
+            point_xy, width=calibration.width, height=calibration.height)
+
+    current_pixel = np.asarray(project_to_observation(current["pixel_xy"]), dtype=float)
     before_error = float(np.linalg.norm(target - current_pixel))
     candidates: list[dict[str, Any]] = []
     for direction in DIRECTION_ORDER:
@@ -156,13 +340,15 @@ def resolve_object_relative_geometry(
                                "hypothetical_eef_xyz_m": hypothetical.tolist(), "valid": False,
                                "reason": "hypothetical_projection_invalid"})
             continue
-        after_error = float(np.linalg.norm(target - np.asarray(projected["pixel_xy"], dtype=float)))
+        projected_canonical = project_to_observation(projected["pixel_xy"])
+        after_error = float(np.linalg.norm(target - np.asarray(projected_canonical, dtype=float)))
         candidates.append({
             "direction": direction,
             "physical_vector_xyz": unit.tolist(),
             "direction_unit": unit.tolist(),
             "hypothetical_eef_xyz_m": hypothetical.tolist(),
-            "hypothetical_projection_px": projected["pixel_xy"],
+            "hypothetical_projection_px": list(projected_canonical),
+            "hypothetical_projection_raw_px": projected["pixel_xy"],
             "predicted_error_after_px": after_error,
             "predicted_improvement_px": before_error - after_error,
             "valid": True,
@@ -176,7 +362,8 @@ def resolve_object_relative_geometry(
     result = {
         "camera_projection_valid": True,
         "object_relative_alignment_valid": bool(best["predicted_improvement_px"] > 0.0),
-        "eef_projection_px": current["pixel_xy"],
+        "eef_projection_px": current_pixel.tolist(),
+        "eef_projection_raw_px": current["pixel_xy"],
         "pixel_error_before_px": before_error,
         "candidate_directions": candidates,
         "chosen_candidate": best if best["predicted_improvement_px"] > 0.0 else None,
@@ -194,6 +381,7 @@ def make_alignment_option(state: BeliefState) -> RuntimeOption | None:
     choice = geometry.get("chosen_candidate")
     if (relative is None or not relative.target_visible or relative.eef_projection_px is None
             or relative.target_centroid_px is None or not isinstance(choice, Mapping)
+            or relative.target_identity_status not in {"ANCHORED", "SAME_TARGET"}
             or not bool(geometry.get("camera_projection_valid"))
             or not bool(geometry.get("workspace_valid"))
             or not bool(geometry.get("object_relative_alignment_valid"))):
@@ -265,6 +453,7 @@ class ObjectRelativePerceptionObserver:
         target_phrase: str,
         move_vectors: Mapping[str, Sequence[float]],
         confidence_threshold: float = SAM3_CONFIDENCE_THRESHOLD,
+        canonical_image_adapter: CanonicalImageAdapter | None = None,
     ) -> None:
         self.base_observer = base_observer
         self.sam3 = sam3
@@ -272,6 +461,8 @@ class ObjectRelativePerceptionObserver:
         self.confidence_threshold = float(confidence_threshold)
         self.move_vectors = {str(key): tuple(float(v) for v in value)
                              for key, value in move_vectors.items()}
+        self.canonical_image_adapter = canonical_image_adapter or CanonicalImageAdapter()
+        self.identity_anchor: TargetIdentityAnchor | None = None
         self.last_segmentation: TargetSegmentation | None = None
         self.last_calibration: CameraCalibration | None = None
         self.last_resolution: dict[str, Any] = {}
@@ -283,24 +474,72 @@ class ObjectRelativePerceptionObserver:
 
     def observe(self, environment: Any) -> RobotObservation:
         base = self.base_observer.observe(environment)
-        image = np.asarray(base.images.get("agentview"))
-        if image.ndim != 3 or image.shape[2] != 3:
+        raw_image = np.asarray(base.images.get("agentview"))
+        if raw_image.ndim != 3 or raw_image.shape[2] != 3:
             raise ValueError("agentview source must be an HxWx3 RGB array")
+        image = self.canonical_image_adapter.transform_image(raw_image)
         height, width = image.shape[:2]
         response = self.sam3.segment(
             image, self.target_phrase, confidence_threshold=self.confidence_threshold
         )
-        segmentation = segmentation_from_response(response, (height, width))
+        candidate_segmentation = segmentation_from_response(response, (height, width))
         details = response.get("details") if isinstance(response, Mapping) else None
         metadata = details.get("metadata") if isinstance(details, Mapping) else None
         reported_size = metadata.get("image_size") if isinstance(metadata, Mapping) else None
         if reported_size is not None and reported_size != [width, height]:
-            segmentation = TargetSegmentation(
+            candidate_segmentation = TargetSegmentation(
                 False, None, None, None, None, None,
                 {**dict(response), "resolution_mismatch": {
                     "expected_width_height": [width, height],
                     "reported_width_height": reported_size,
                 }},
+                candidates=candidate_segmentation.candidates,
+            )
+        if self.identity_anchor is None:
+            self.identity_anchor = make_target_identity_anchor(
+                candidate_segmentation,
+                target_phrase=self.target_phrase,
+                frame_id=base.frame_id,
+            )
+            if self.identity_anchor is not None:
+                segmentation = TargetSegmentation(
+                    candidate_segmentation.visible,
+                    candidate_segmentation.mask,
+                    candidate_segmentation.centroid_px,
+                    candidate_segmentation.bbox_xyxy,
+                    candidate_segmentation.area_px,
+                    candidate_segmentation.quality_score,
+                    candidate_segmentation.response,
+                    candidates=candidate_segmentation.candidates,
+                    selected_candidate_id=candidate_segmentation.selected_candidate_id,
+                    identity_status="ANCHORED",
+                )
+            else:
+                segmentation = TargetSegmentation(
+                    False, None, None, None, None, None, candidate_segmentation.response,
+                    candidates=candidate_segmentation.candidates,
+                    identity_status="ANCHOR_UNAVAILABLE",
+                )
+        else:
+            association = associate_target_candidate(
+                self.identity_anchor, candidate_segmentation.candidates,
+            )
+            associated = association.candidate
+            segmentation = TargetSegmentation(
+                visible=associated is not None,
+                mask=associated.mask if associated is not None else None,
+                centroid_px=associated.centroid_px if associated is not None else None,
+                bbox_xyxy=associated.bbox_xyxy if associated is not None else None,
+                area_px=associated.area_px if associated is not None else None,
+                quality_score=associated.score if associated is not None else None,
+                response=candidate_segmentation.response,
+                candidates=candidate_segmentation.candidates,
+                selected_candidate_id=associated.candidate_id if associated is not None else None,
+                identity_status=association.status,
+                association_metrics={
+                    "selected_candidate_id": associated.candidate_id if associated is not None else None,
+                    "candidates": list(association.candidate_metrics),
+                },
             )
         self.last_segmentation = segmentation
         raw = getattr(self.base_observer, "last_raw", None)
@@ -315,9 +554,9 @@ class ObjectRelativePerceptionObserver:
                 env if hasattr(env, "sim") else getattr(env, "env", env),
                 {"agentview": "agentview"},
                 image_shapes={"agentview": (height, width)},
-                # Existing LIBERO policy frames use this orientation transform;
-                # preserve raw pixels while projecting into their image axes.
-                rotations={"agentview": 180},
+                # MuJoCo projection first yields raw OpenGL-frame pixels; the shared
+                # CanonicalImageAdapter below applies the same vertical row flip as RGB.
+                rotations={"agentview": 0},
                 flips={"agentview": "none"},
             )
             calibration = calib["agentview"]
@@ -331,6 +570,7 @@ class ObjectRelativePerceptionObserver:
             calibration=calibration,
             move_vectors=self.move_vectors,
             workspace_z_bounds_m=workspace,
+            canonical_image_adapter=self.canonical_image_adapter,
         )
         self.last_resolution = geometry
         eef_projection = geometry.get("eef_projection_px")
@@ -356,10 +596,15 @@ class ObjectRelativePerceptionObserver:
             evidence_timestamp=time.monotonic(),
             source_width=width,
             source_height=height,
+            target_identity_status=segmentation.identity_status,
+            target_candidate_id=segmentation.selected_candidate_id,
         )
         self.perception_history.append({
             "image": image.copy(),
+            "raw_image": np.ascontiguousarray(raw_image).copy(),
             "segmentation": segmentation,
+            "candidates": segmentation.candidates,
+            "identity_anchor": self.identity_anchor,
             "calibration": calibration,
             "resolution": dict(geometry),
             "object_relative_state": relative,
@@ -379,6 +624,9 @@ class ObjectRelativePerceptionObserver:
             "chosen_candidate": (geometry.get("chosen_candidate") if segmentation.visible else None),
             "sam3_error": response.get("error") if not segmentation.visible else None,
             "sam3_confidence_threshold": self.confidence_threshold,
+            "sam3_candidate_count": len(segmentation.candidates),
+            "target_identity_status": segmentation.identity_status,
+            "target_identity_association": segmentation.association_metrics,
         })
         if not segmentation.visible:
             merged_geometry["object_relative_alignment_valid"] = False
@@ -386,7 +634,7 @@ class ObjectRelativePerceptionObserver:
         return RobotObservation(
             observation_id=base.observation_id,
             frame_id=base.frame_id,
-            images=base.images,
+            images={**dict(base.images), "agentview": image},
             proprioception=base.proprioception,
             evidence=evidence,
             evidence_refs=base.evidence_refs,
@@ -402,6 +650,7 @@ class ObjectRelativePerceptionObserver:
         prefix: str,
         segmentation: TargetSegmentation | None = None,
         resolution: Mapping[str, Any] | None = None,
+        selected_direction: str | None = None,
     ) -> dict[str, str]:
         """Write exact source RGB, decoded mask, and diagnostic overlay for review."""
         from pathlib import Path
@@ -411,13 +660,48 @@ class ObjectRelativePerceptionObserver:
         source = np.ascontiguousarray(image, dtype=np.uint8)
         rgb_path = output / f"{prefix}_rgb.png"
         Image.fromarray(source, mode="RGB").save(rgb_path)
-        mask_path = None
-        overlay_path = None
         segmentation = segmentation if segmentation is not None else self.last_segmentation
+        result = {"rgb": str(rgb_path)}
+        overlay = Image.fromarray(source.copy(), mode="RGB").convert("RGBA")
+        draw = ImageDraw.Draw(overlay)
+        palette = ((30, 180, 255, 48), (40, 220, 80, 48), (255, 180, 20, 48),
+                   (200, 60, 255, 48), (20, 220, 200, 48), (255, 120, 40, 48))
+        candidate_records = []
+        if segmentation is not None:
+            for index, candidate in enumerate(segmentation.candidates):
+                candidate_record = {
+                    "candidate_id": candidate.candidate_id,
+                    "rank": candidate.rank,
+                    "backend_index": candidate.backend_index,
+                    "score": candidate.score,
+                    "area_px": candidate.area_px,
+                    "centroid_px": candidate.centroid_px,
+                    "bbox_xyxy": candidate.bbox_xyxy,
+                    "selected": candidate.candidate_id == segmentation.selected_candidate_id,
+                }
+                if candidate.mask is not None:
+                    candidate_path = output / f"{prefix}_candidate_{index:02d}_mask.png"
+                    Image.fromarray(candidate.mask.astype(np.uint8) * 255, mode="L").save(candidate_path)
+                    candidate_record["mask"] = str(candidate_path)
+                    if candidate.candidate_id != segmentation.selected_candidate_id:
+                        tint = np.zeros((*candidate.mask.shape, 4), dtype=np.uint8)
+                        tint[candidate.mask] = palette[index % len(palette)]
+                        overlay = Image.alpha_composite(overlay, Image.fromarray(tint, mode="RGBA"))
+                candidate_records.append(candidate_record)
+        draw = ImageDraw.Draw(overlay)
+        if segmentation is not None:
+            for candidate in segmentation.candidates:
+                if candidate.bbox_xyxy is None:
+                    continue
+                x0, y0, x1, y1 = candidate.bbox_xyxy
+                color = (255, 255, 0, 255) if candidate.candidate_id == segmentation.selected_candidate_id \
+                    else (255, 180, 40, 255)
+                draw.rectangle((x0, y0, x1 - 1, y1 - 1), outline=color, width=2)
+                draw.text((x0, max(0, y0 - 12)),
+                          f"{candidate.candidate_id} score={candidate.score}", fill=color)
         if segmentation is not None and segmentation.mask is not None:
             mask_path = output / f"{prefix}_mask.png"
             Image.fromarray(segmentation.mask.astype(np.uint8) * 255, mode="L").save(mask_path)
-            overlay = Image.fromarray(source.copy(), mode="RGB").convert("RGBA")
             tint = np.zeros((*segmentation.mask.shape, 4), dtype=np.uint8)
             tint[segmentation.mask] = (255, 24, 24, 96)
             overlay = Image.alpha_composite(overlay, Image.fromarray(tint, mode="RGBA"))
@@ -425,16 +709,61 @@ class ObjectRelativePerceptionObserver:
             if segmentation.centroid_px is not None:
                 x, y = segmentation.centroid_px
                 draw.ellipse((x - 5, y - 5, x + 5, y + 5), outline=(255, 255, 0, 255), width=2)
-            eef = (resolution if resolution is not None else self.last_resolution).get("eef_projection_px")
-            if eef is not None:
-                x, y = (float(eef[0]), float(eef[1]))
-                draw.line((x - 7, y, x + 7, y), fill=(0, 255, 255, 255), width=2)
-                draw.line((x, y - 7, x, y + 7), fill=(0, 255, 255, 255), width=2)
-            overlay_path = output / f"{prefix}_overlay.png"
-            overlay.convert("RGB").save(overlay_path)
-        result = {"rgb": str(rgb_path)}
-        if mask_path is not None:
             result["mask"] = str(mask_path)
-        if overlay_path is not None:
-            result["overlay"] = str(overlay_path)
+        current_resolution = resolution if resolution is not None else self.last_resolution
+        eef = current_resolution.get("eef_projection_px")
+        if eef is not None:
+            x, y = (float(eef[0]), float(eef[1]))
+            draw = ImageDraw.Draw(overlay)
+            draw.line((x - 7, y, x + 7, y), fill=(0, 255, 255, 255), width=2)
+            draw.line((x, y - 7, x, y + 7), fill=(0, 255, 255, 255), width=2)
+            draw.text((x + 8, y + 4), "EEF", fill=(0, 255, 255, 255))
+        candidate_directions = current_resolution.get("candidate_directions", [])
+        selected_projection = None
+        for item in candidate_directions:
+            pixel = item.get("hypothetical_projection_px")
+            if not item.get("valid") or pixel is None:
+                continue
+            x, y = (float(pixel[0]), float(pixel[1]))
+            is_selected = item.get("direction") == selected_direction
+            color = (255, 0, 255, 255) if is_selected else (255, 255, 255, 230)
+            r = 6 if is_selected else 3
+            draw.ellipse((x - r, y - r, x + r, y + r), outline=color, width=2)
+            draw.text((x + r + 1, y), str(item.get("direction", "?")), fill=color)
+            if is_selected:
+                selected_projection = item.get("hypothetical_projection_px")
+        if selected_projection is not None and eef is not None:
+            draw.line((float(eef[0]), float(eef[1]), float(selected_projection[0]),
+                       float(selected_projection[1])), fill=(255, 0, 255, 190), width=2)
+        anchor = self.identity_anchor
+        if anchor is not None and anchor.initial_mask.shape == source.shape[:2]:
+            anchor_path = output / "target_anchor_mask.png"
+            Image.fromarray(anchor.initial_mask.astype(np.uint8) * 255, mode="L").save(anchor_path)
+            result["target_anchor_mask"] = str(anchor_path)
+            anchor_tint = np.zeros((*anchor.initial_mask.shape, 4), dtype=np.uint8)
+            anchor_tint[anchor.initial_mask] = (0, 210, 255, 70)
+            anchor_overlay = Image.alpha_composite(Image.fromarray(source.copy(), mode="RGB").convert("RGBA"),
+                                                   Image.fromarray(anchor_tint, mode="RGBA"))
+            ImageDraw.Draw(anchor_overlay).text((8, 8),
+                f"TARGET IDENTITY ANCHOR frame={anchor.frame_id} candidate={anchor.candidate_id}",
+                fill=(0, 120, 255, 255))
+            anchor_overlay_path = output / f"{prefix}_anchor_overlay.png"
+            anchor_overlay.convert("RGB").save(anchor_overlay_path)
+            result["anchor_overlay"] = str(anchor_overlay_path)
+        if segmentation is not None and segmentation.identity_status == "TARGET_IDENTITY_LOST":
+            draw = ImageDraw.Draw(overlay)
+            draw.rectangle((0, 0, source.shape[1] - 1, 38), fill=(140, 0, 0, 230))
+            draw.text((10, 12), "TARGET IDENTITY LOST", fill=(255, 255, 255, 255))
+        overlay_path = output / f"{prefix}_overlay.png"
+        overlay.convert("RGB").save(overlay_path)
+        result["overlay"] = str(overlay_path)
+        candidate_json_path = output / f"{prefix}_candidates.json"
+        candidate_json_path.write_text(
+            json.dumps({
+                "identity_status": segmentation.identity_status if segmentation else None,
+                "selected_candidate_id": segmentation.selected_candidate_id if segmentation else None,
+                "association_metrics": segmentation.association_metrics if segmentation else None,
+                "candidates": candidate_records,
+            }, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        result["candidates"] = str(candidate_json_path)
         return result

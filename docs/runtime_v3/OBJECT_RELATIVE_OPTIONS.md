@@ -1,108 +1,115 @@
-# Runtime V3 object-relative verified alignment
+# Runtime V3 canonical images and same-target alignment
 
-This milestone adds one bounded visual alignment option to Runtime V3. It is a
-geometry check with a single 3 mm requested micro-motion, followed by a fresh
-SAM3 segmentation and camera projection. It does not add grasping, placement,
-recovery, or a multi-step alignment loop.
+This phase adds one canonical image convention and one-frame target identity
+continuity to the bounded Runtime V3 alignment experiment. It does not add
+closed-loop alignment, recovery, grasping, placement, or a memory component.
 
-## Evidence path
+## Image convention
 
-The Runtime V3 LIBERO adapter renders `agentview` and `robot0_eye_in_hand` at
-512×512. `LiberoObservationAdapter` preserves each simulator RGB array as
-captured. `Sam3Client` encodes that same RGB array as PNG; its server reports
-the decoded source dimensions. The Qwen visual smoke uses `VLMClient` image
-encoding and records the exact image dimensions from the finalized request
-audit. Neither path resizes or upsamples the input.
+The vendored robosuite sets `IMAGE_CONVENTION = "opengl"`; its mapping is `1`,
+and `RobotEnv.camera_rgb` returns `img[::convention]`. The captured LIBERO RGB
+array therefore keeps the OpenGL bottom-up row order. `libero_rgb` only converts
+to `uint8` and makes the array contiguous. The V3 observation adapter preserves
+that array. A same-frame contact sheet confirmed that the red carton's text is
+upside down in raw and becomes upright after only a vertical flip. A horizontal
+flip leaves it upside down; a 180-degree rotation also mirrors the scene
+horizontally and is not the required correction.
 
-SAM3 receives the task-metadata target phrase `salad dressing`. Runtime V3
-decodes the highest ranked returned mask only when its dimensions match the
-source frame. It derives centroid, half-open bounding box, and pixel area from
-the mask. SAM3's returned `score` is retained as a predicted mask-quality
-signal; it is not treated as a calibrated probability. A missing or malformed
-mask leaves the target invisible.
-The Runtime V3 trial uses the explicit SAM3 API threshold `0.05` because the
-returned target score for this small object is below its default `0.5`; the raw
-score remains visible in each trial record and is still only the model's mask
-quality signal, not a probability.
+`CanonicalImageAdapter` is the only V3 spatial image transform. It vertically
+flips the raw array once, before storage in `RobotObservation` or any call to
+SAM3. SAM3 PNG serialization and Qwen's `image_to_data_url` preserve the supplied
+array's orientation and dimensions. Runtime V3 RGB artifacts and overlays use
+the same canonical pixels. SAM3 masks returned for that canonical PNG are
+already in canonical coordinates.
 
-The LIBERO `agentview` raw frame uses the same 180° camera orientation already
-configured for the existing policy view. Runtime applies that orientation in
-the camera projection calibration so projected EEF coordinates share the raw
-frame's pixel axes; RGB sent to SAM3 and Qwen remains unchanged.
+`project_point` computes floating-point pixel coordinates in a top-left,
+row-down camera frame. `CanonicalImageAdapter.transform_projected_point`
+converts that projection through the raw OpenGL row convention, then applies
+the same canonical mapping as the image. V3 camera calibration uses zero
+rotation and no geometry-only flip. The previous `rotation_degrees=180` value
+was applied to projected pixels only; it never transformed RGB. The older
+general LIBERO config still has a 180-degree policy-view value, but this V3
+experiment does not call that image-preparation path.
 
-`ObjectRelativeState` is part of the canonical Runtime V3 `BeliefState`. It
-holds target visibility and mask measurements, the target centroid, the EEF
-projection, their image-space error, the raw camera name, timestamp, and
-source dimensions. There is no second belief-state representation.
+## Resolution audit
 
-## Runtime geometry owns physical direction
+Each entry below uses a direct simulator render, four standardized V3 HOLD
+settle ticks, and one SAM3 request on the canonical image. No source image was
+resized.
 
-Runtime reads the current EEF position from proprioception and camera
-intrinsics/extrinsics from the active MuJoCo `agentview` camera. It projects
-the EEF with the existing `camera_geometry.project_point` function. For each
-configured physical direction (`MV_FWD`, `MV_BACK`, `MV_LEFT`, `MV_RIGHT`,
-`MV_UP`, `MV_DOWN`), it projects a hypothetical EEF point 3 mm along that
-physical vector and computes:
+| Renderer and SAM input | Target detections | Candidate counts (states 0/1/2) | Mean top score | Top-mask area fraction | Normalized center spread |
+|---|---:|---:|---:|---:|---:|
+| 512×512 | 3/3 | 3 / 4 / 5 | 0.1497 | 0.00967 | <0.03 px at 512 scale |
+| 768×768 | 3/3 | 2 / 4 / 2 | 0.1107 | 0.00966 | <0.05 px at 512 scale |
 
-```text
-error_before = distance(target_centroid_px, projected_eef_px)
-error_after_i = distance(target_centroid_px, projected_hypothetical_eef_px_i)
-predicted_improvement_i = error_before - error_after_i
-```
+Visual review of all top masks confirms the salad-dressing bottle. Mask area
+fractions and normalized centers are effectively the same across resolutions.
+768 returned fewer candidates overall, while 512 returned higher top scores;
+there was no mask-stability gain at 768. Runtime V3 therefore remains at
+512×512. The Qwen OCR diagnostic used a separate direct 768×768 render.
 
-The Runtime geometry resolver chooses the valid candidate with the greatest
-positive predicted improvement. It records all six candidates, including
-invalid projections and workspace rejections. Pixel axes are never mapped
-directly to robot axes. Missing target evidence, invalid camera/EEF projection,
-invalid workspace bounds, or no positive candidate produces no alignment
-option, so the selector returns `REOBSERVE`.
+## SAM3 candidates and identity anchor
 
-## Option and authority
+The existing SAM3 MCP response includes a ranked `detections` list, with score,
+box, area, backend index, and a mask for each candidate. `Sam3Client.segment`
+preserves that response. The former V3 parser discarded all but its first
+decodable detection. The revised V3 parser retains all candidate metadata and
+masks. The first valid, top-ranked `salad dressing` detection establishes one
+transient anchor per trial: target phrase, initial binary mask, centroid,
+half-open box, area, candidate ID, and frame ID.
 
-The generated option exposed above the physical realization is
-`ALIGN_TO_TARGET_SMALL`. Runtime seals the selected physical vector in a
-`BoundedMicroMotionSpec` before Arbiter authorization. Its requested
-displacement is 3 mm, each calibrated control tick is 5 mm, and the maximum is
-five ticks. The existing Executor only runs the sealed direction and stops
-when its displacement contract is reached, a boundary is encountered, or the
-tick limit is reached. SAM3 runs on the initial observation and after the
-bounded movement; intermediate ticks collect only fresh proprioception and
-images for the bounded Executor's motion accounting.
+After motion, candidates are associated with that anchor using two gates:
+mask IoU at least `0.25`, and centroid displacement no greater than the larger
+of 12 px or half the initial box diagonal. The log also records box IoU, area
+ratio, centroid displacement, candidate ID, rank, and SAM score. SAM score is
+not used as the identity criterion. If no candidate passes both gates, the
+state is `TARGET_IDENTITY_LOST`; it has no target centroid or after-error and
+cannot produce an alignment option or an improvement metric. This anchor lives
+only for the current trial and is not persistent visual memory.
 
-Arbiter approves the object-relative option once. Runtime records the actual
-physical projection and off-axis displacement returned by Executor. It then
-resegments the target, reprojects the EEF, and reports whether the measured
-target-to-EEF pixel error decreased. The per-trial artifact directory keeps
-the before/after RGB images, binary masks, and overlays with target centroid
-and projected EEF markers.
+## Bounded trial results
 
-## Responsibility boundary
+The recorded run uses `LIBERO_OBJECT` task 2, seed 0, init states 0–2, four
+HOLD ticks per reset, and one Arbiter-approved bounded alignment per trial.
+Qwen did not participate in target selection or action decisions.
 
-**Runtime owns geometry. Qwen owns bounded semantics.** The real alignment
-trials use no Qwen call. The separate Qwen visual smoke receives one raw
-high-resolution image, the compact `ObjectRelativeState`, and semantic choices
-such as `OPTION_A = ALIGN_TO_TARGET`, `OPTION_B = REOBSERVE_TARGET`, and
-`OPTION_C = ABORT`. The prompt and option descriptions contain no robot
-direction vocabulary. The smoke has no controller or backend reference and
-executes zero robot actions.
+| Init state | Before centroid | After candidates | Associated candidate | Mask IoU | Centroid shift | Direction | Error before → after (px) |
+|---:|---:|---:|---:|---:|---:|---|---:|
+| 0 | (193.14, 254.47) | 2 | 0 | 0.377 | 29.74 px | DOWN | 140.19 → 164.36 |
+| 1 | (193.12, 254.48) | 2 | 0 | 0.377 | 29.74 px | DOWN | 143.10 → 167.43 |
+| 2 | (193.12, 254.47) | 3 | 0 | 0.377 | 29.76 px | DOWN | 130.73 → 155.35 |
 
-Qwen is not asked to choose LEFT/RIGHT or any other physical direction. If it
-is used in a future stage, it may choose among already valid semantic options;
-Runtime must still construct each option's geometry and physical realization.
+Identity was retained in 3/3 trials. Mean predicted improvement was 1.44 px;
+mean measured improvement was -24.37 px, so 0/3 same-identity trials improved
+the measured error. The projected EEF motion and observed EEF pixel motion had
+the same direction in all three trials. The target masks' centroids shifted by
+about 30 px despite the visually stationary bottle; this is recorded as SAM3
+mask-shape instability and limits confidence in the error-change measurement.
+The result does not pass the gate for a multi-step alignment milestone.
 
-## Trial command and output
+## Qwen and authority
 
-With the existing OpenETA SAM3 service and the configured local Qwen endpoint
-available, run:
+On the same 768×768 scene and identical one-word question, Qwen3-VL answered
+`MILK` for the raw orientation and `Milk` for the canonical orientation. Both
+responses identify the word; this is orientation sanity evidence, not action
+selection. Robot actions from Qwen: 0. Ground-truth/oracle diagnostics were not
+used. Runtime geometry selected the physical direction, the deterministic
+selector exposed the one semantic option, Arbiter approved once, and Executor
+ran the bounded motion.
 
-```bash
-OPENETA_SAM3_CHECKPOINT_PATH=/root/autodl-tmp/openeta-services/models/sam3/sam3.pt \
-  /root/autodl-tmp/OpenETA/sim/venvs/libero/bin/python \
-  scripts/runtime_v3_object_relative_alignment.py
-```
+## Artifacts and commands
 
-The script uses `LIBERO_OBJECT` task 2, seed 0, init states 0–2, four V3 HOLD
-pre-settle ticks per trial, and at most one authorized bounded micro-motion per
-trial. It writes per-trial `trial.json`, before/after `RGB`, `mask`, and
-`overlay` PNGs, one `qwen_visual_no_action.json`, and an aggregate `summary.json`
-under `rollouts/runtime_v3_object_relative_alignment/`.
+The orientation and resolution audit artifacts are under
+`rollouts/runtime_v3_object_relative_alignment/perception_audit_*`. The
+recorded trials, all-candidate masks, anchor visualizations, projections, and
+before/after overlays are under
+`rollouts/runtime_v3_object_relative_alignment/run_20261002T095805Z_f05c03ac`.
+The audit script is `scripts/runtime_v3_perception_audit.py`; the bounded
+experiment is `scripts/runtime_v3_object_relative_alignment.py`.
+
+An earlier trial attempt at
+`rollouts/runtime_v3_object_relative_alignment/run_20261002T095705Z_bb1ef022`
+completed one bounded motion for each reset init state, then hit a result-logging
+`UnboundLocalError` before writing measurements. Those three executions are
+excluded from the reported metrics; the corrected, recorded experiment above
+ran three fresh reset episodes and one motion per episode.

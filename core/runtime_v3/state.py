@@ -24,6 +24,8 @@ class ObjectRelativeState:
     evidence_timestamp: Optional[float] = None
     source_width: Optional[int] = None
     source_height: Optional[int] = None
+    target_identity_status: str = "UNANCHORED"
+    target_candidate_id: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -158,4 +160,7 @@ def _object_relative_state(value: Any) -> Optional[ObjectRelativeState]:
         evidence_timestamp=timestamp,
         source_width=(int(value["source_width"]) if value.get("source_width") is not None else None),
         source_height=(int(value["source_height"]) if value.get("source_height") is not None else None),
+        target_identity_status=str(value.get("target_identity_status", "UNANCHORED")),
+        target_candidate_id=(str(value["target_candidate_id"])
+                             if value.get("target_candidate_id") is not None else None),
     )

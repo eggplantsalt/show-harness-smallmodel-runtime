@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run three one-motion object-relative alignment trials and one Qwen no-action smoke."""
+"""Run three one-motion, same-target-verified Runtime V3 alignment trials."""
 
 from __future__ import annotations
 
@@ -23,22 +23,21 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from core.capabilities.sam3_client import Sam3Client
-from core.config import load_secrets_env, load_yaml
+from core.config import load_yaml
 from core.runtime_v3.adapters.libero_env import LiberoEnvironmentAdapter
 from core.runtime_v3.adapters.libero_observation import LiberoObservationAdapter
-from core.runtime_v3.adapters.qwen_selector import QwenSelectorAdapter
 from core.runtime_v3.arbiter import Arbiter, DecisionKind
 from core.runtime_v3.effects import EffectObserver
 from core.runtime_v3.executor import Executor, LiberoPrimitiveBackend
 from core.runtime_v3.object_relative import (
+    alignment_verification_metrics,
     ObjectRelativeAlignmentOptionGenerator,
     ObjectRelativePerceptionObserver,
 )
 from core.runtime_v3.runner import RuntimeV3Runner
 from core.runtime_v3.selector import DeterministicSelector
-from core.runtime_v3.state import BeliefState, StateBuilder
+from core.runtime_v3.state import StateBuilder
 from core.runtime_v3.temporal_calibration import run_v3_tick
-from core.sim.launch import build_config, make_vlm_client
 from interpreters.libero_atomic_controller import LiberoAtomicController
 
 
@@ -47,8 +46,6 @@ TASK_ID = 2
 TARGET_PHRASE = "salad dressing"
 INIT_STATES = (0, 1, 2)
 PRE_SETTLE_TICKS = 4
-CAMERA_HEIGHT = 512
-CAMERA_WIDTH = 512
 REQUESTED_MM = 3.0
 MAX_TICKS = 5
 CONTROL_TICK_MM = 5.0
@@ -93,9 +90,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--sam3-url", default="http://127.0.0.1:8773/sse")
     parser.add_argument("--sam3-python", default="/root/autodl-tmp/openeta-services/sam3/.venv/bin/python")
     parser.add_argument("--sam3-timeout-s", type=float, default=120.0)
-    parser.add_argument("--vlm-backend", default=None)
-    parser.add_argument("--vlm-url", default=os.environ.get("VLM_URL") or os.environ.get("VLLM_BASE_URL"))
-    parser.add_argument("--model", default=os.environ.get("VLLM_MODEL"))
+    parser.add_argument("--camera-resolution", type=int, default=512)
     return parser
 
 
@@ -109,16 +104,6 @@ def _new_run_dir(base: str | Path) -> Path:
 def _write_json(path: Path, record: Any) -> None:
     path.write_text(json.dumps(_jsonable(record), indent=2, ensure_ascii=False) + "\n",
                     encoding="utf-8")
-
-
-def _make_vlm_client(args: argparse.Namespace, config: dict[str, Any]):
-    vlm_args = argparse.Namespace(
-        task_suite_name=None, task_id=None, episode_index=None, max_steps=None,
-        loop_period_s=None, log_dir=None, vlm_backend=args.vlm_backend,
-        vlm_url=args.vlm_url, model=args.model,
-    )
-    resolved = build_config(vlm_args, config)
-    return make_vlm_client(vlm_args, resolved)
 
 
 def _configure_local_sam3_proxy_bypass(url: str) -> None:
@@ -153,7 +138,8 @@ def _run_trial(
     config: dict[str, Any],
     sam3: Sam3Client,
     workspace: tuple[float, float],
-) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    camera_resolution: int,
+) -> dict[str, Any]:
     trial_dir = run_dir / f"init_state_{init_state_index}"
     trial_dir.mkdir(parents=True, exist_ok=False)
     environment = LiberoEnvironmentAdapter.create(
@@ -161,8 +147,8 @@ def _run_trial(
         task_id=TASK_ID,
         init_state_index=init_state_index,
         seed=0,
-        camera_height=CAMERA_HEIGHT,
-        camera_width=CAMERA_WIDTH,
+        camera_height=camera_resolution,
+        camera_width=camera_resolution,
         horizon=32,
     )
     try:
@@ -226,6 +212,7 @@ def _run_trial(
             max_steps=1,
             reset=False,
         )
+        event = events[0] if events else {}
         history = observer.perception_history
         initial = history[0] if history else None
         final = history[-1] if len(history) > 1 else None
@@ -233,6 +220,8 @@ def _run_trial(
             before_artifacts = observer.save_visual_artifacts(
                 str(trial_dir / "artifacts"), image=initial["image"], prefix="before",
                 segmentation=initial["segmentation"], resolution=initial["resolution"],
+                selected_direction=(event.get("approved_action").primitive.micro_motion_spec.direction
+                                    if event.get("approved_action") else None),
             )
         else:
             before_artifacts = {}
@@ -240,25 +229,33 @@ def _run_trial(
             after_artifacts = observer.save_visual_artifacts(
                 str(trial_dir / "artifacts"), image=final["image"], prefix="after",
                 segmentation=final["segmentation"], resolution=final["resolution"],
+                selected_direction=(event.get("approved_action").primitive.micro_motion_spec.direction
+                                    if event.get("approved_action") else None),
             )
         else:
             after_artifacts = {}
-        event = events[0] if events else {}
         state_before = event.get("state_before")
         state_after = event.get("state_after")
         execution_record = event.get("execution")
         execution = getattr(execution_record, "result", None)
         before_state = initial.get("object_relative_state") if initial else None
         after_state = final.get("object_relative_state") if final else None
-        error_before = (before_state.image_error_norm_px if before_state is not None else None)
-        error_after = (after_state.image_error_norm_px if after_state is not None else None)
+        error_before = (before_state.image_error_norm_px
+                        if before_state is not None and before_state.target_identity_status == "ANCHORED"
+                        else None)
+        post_identity_status = (final["segmentation"].identity_status if final else "TARGET_IDENTITY_LOST")
+        raw_error_after = (after_state.image_error_norm_px if after_state is not None else None)
+        verification = alignment_verification_metrics(
+            error_before, raw_error_after,
+            identity_status=post_identity_status,
+        )
+        error_after = verification["error_after_px"]
         expected_effect = event.get("approved_action").expected_effect if event.get("approved_action") else {}
         chosen_spec = (event.get("approved_action").primitive.micro_motion_spec
                        if event.get("approved_action") else None)
         predicted_after = expected_effect.get("predicted_image_error_after_px")
         predicted_improvement = expected_effect.get("predicted_improvement_px")
-        actual_improvement = (float(error_before) - float(error_after)
-                              if error_before is not None and error_after is not None else None)
+        actual_improvement = verification["actual_improvement_px"]
         centroid_shift = None
         if (before_state is not None and after_state is not None
                 and before_state.target_centroid_px is not None
@@ -274,6 +271,26 @@ def _run_trial(
         segmentation_after = final.get("segmentation") if final else None
         calibration = initial.get("calibration") if initial else None
         resolution_before = _raw_resolution(base_observer)
+        association_metrics = segmentation_after.association_metrics if segmentation_after else None
+        selected_association = None
+        if isinstance(association_metrics, dict):
+            selected_id = association_metrics.get("selected_candidate_id")
+            selected_association = next((item for item in association_metrics.get("candidates", [])
+                                         if item.get("candidate_id") == selected_id), None)
+        predicted_eef_shift = None
+        observed_eef_shift = None
+        geometry_consistent = None
+        if before_state is not None and before_state.eef_projection_px is not None and chosen_spec is not None:
+            chosen_candidate = next((item for item in (state_before.relevant_geometry.get("candidate_directions", [])
+                                                        if state_before else [])
+                                     if item.get("direction") == chosen_spec.direction and item.get("valid")), None)
+            if chosen_candidate is not None:
+                predicted_eef_shift = (np.asarray(chosen_candidate["hypothetical_projection_px"], dtype=float)
+                                       - np.asarray(before_state.eef_projection_px, dtype=float)).tolist()
+                if after_state is not None and after_state.eef_projection_px is not None:
+                    observed_eef_shift = (np.asarray(after_state.eef_projection_px, dtype=float)
+                                          - np.asarray(before_state.eef_projection_px, dtype=float)).tolist()
+                    geometry_consistent = bool(float(np.dot(predicted_eef_shift, observed_eef_shift)) > 0.0)
         record = {
             "suite": SUITE,
             "task_id": TASK_ID,
@@ -320,6 +337,21 @@ def _run_trial(
                 "flip": calibration.flip,
             } if calibration is not None else None),
             "target_visible_before": bool(segmentation_before and segmentation_before.visible),
+            "target_identity_status_before": (segmentation_before.identity_status if segmentation_before else None),
+            "target_identity_anchor": ({
+                "target_phrase": observer.identity_anchor.target_phrase,
+                "candidate_id": observer.identity_anchor.candidate_id,
+                "frame_id": observer.identity_anchor.frame_id,
+                "centroid_px": observer.identity_anchor.centroid_px,
+                "bbox_xyxy": observer.identity_anchor.bbox_xyxy,
+                "mask_area": observer.identity_anchor.mask_area,
+            } if observer.identity_anchor is not None else None),
+            "sam3_candidates_before": ([{
+                "candidate_id": item.candidate_id, "rank": item.rank,
+                "backend_index": item.backend_index, "score": item.score,
+                "area_px": item.area_px, "centroid_px": item.centroid_px,
+                "bbox_xyxy": item.bbox_xyxy,
+            } for item in segmentation_before.candidates] if segmentation_before else []),
             "sam3_quality_score_before": (segmentation_before.quality_score if segmentation_before else None),
             "target_centroid_before_px": before_state.target_centroid_px if before_state else None,
             "eef_projection_before_px": before_state.eef_projection_px if before_state else None,
@@ -342,6 +374,17 @@ def _run_trial(
             "runner_status": result.get("status"),
             "execution": execution,
             "target_visible_after": bool(segmentation_after and segmentation_after.visible),
+            "target_identity_status_after": post_identity_status,
+            "same_target_identity": post_identity_status == "SAME_TARGET",
+            "identity_retained": post_identity_status == "SAME_TARGET",
+            "target_association_metrics": association_metrics,
+            "selected_association_metrics": selected_association,
+            "sam3_candidates_after": ([{
+                "candidate_id": item.candidate_id, "rank": item.rank,
+                "backend_index": item.backend_index, "score": item.score,
+                "area_px": item.area_px, "centroid_px": item.centroid_px,
+                "bbox_xyxy": item.bbox_xyxy,
+            } for item in segmentation_after.candidates] if segmentation_after else []),
             "sam3_quality_score_after": (segmentation_after.quality_score if segmentation_after else None),
             "target_centroid_after_px": after_state.target_centroid_px if after_state else None,
             "target_centroid_shift_px": centroid_shift,
@@ -349,65 +392,22 @@ def _run_trial(
             "pixel_error_after": error_after,
             "actual_improvement_px": actual_improvement,
             "prediction_error_predicted_minus_actual_px": prediction_error,
-            "alignment_improved": (bool(float(error_after) < float(error_before))
-                                   if error_before is not None and error_after is not None else None),
+            **verification,
+            "predicted_eef_pixel_shift": predicted_eef_shift,
+            "observed_eef_pixel_shift": observed_eef_shift,
+            "geometry_direction_consistent": geometry_consistent,
             "artifacts": {"before": before_artifacts, "after": after_artifacts},
             "source_changed_by_resize": False,
         }
         _write_json(trial_dir / "trial.json", record)
-        qwen_input = None
-        if init_state_index == INIT_STATES[0] and initial is not None and before_state is not None:
-            qwen_input = {"image": initial["image"], "object_relative_state": before_state,
-                          "task_instruction": environment.task_description}
-        return record, qwen_input
+        return record
     finally:
         environment.close()
 
 
-def _qwen_visual_smoke(
-    *, args: argparse.Namespace, config: dict[str, Any], qwen_input: dict[str, Any], run_dir: Path,
-) -> dict[str, Any]:
-    load_secrets_env()
-    client = _make_vlm_client(args, config)
-    client.health_check(wait_s=0.0)
-    selector = QwenSelectorAdapter(client, qwen_input["task_instruction"], max_tokens=96)
-    state = BeliefState(
-        task_id=f"{SUITE}:{TASK_ID}",
-        target_identity=TARGET_PHRASE,
-        object_relative_state=qwen_input["object_relative_state"],
-    )
-    options = [
-        {"option_id": "OPTION_A", "description": "Align to the visible target."},
-        {"option_id": "OPTION_B", "description": "Reobserve the target."},
-        {"option_id": "OPTION_C", "description": "Abort this attempt."},
-    ]
-    selection = selector.select_visual_semantic(state, qwen_input["image"], options)
-    record = {
-        "mode": "NO_ACTION_VISUAL_SEMANTIC_SELECTOR_SMOKE",
-        "model": selector.model,
-        "task_instruction": qwen_input["task_instruction"],
-        "target_phrase": TARGET_PHRASE,
-        "source_width": int(qwen_input["image"].shape[1]),
-        "source_height": int(qwen_input["image"].shape[0]),
-        "model_input_width": selector.last_record.get("model_input_width"),
-        "model_input_height": selector.last_record.get("model_input_height"),
-        "semantic_options": options,
-        "selection": selection,
-        "qwen_record": selector.last_record,
-        "robot_actions_executed": 0,
-    }
-    _write_json(run_dir / "qwen_visual_no_action.json", record)
-    close = getattr(client, "close", None)
-    if callable(close):
-        close()
-    return record
-
-
 def _summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    visible_before = [row for row in rows if row.get("pixel_error_before") is not None]
-    visible_after = [row for row in rows if row.get("pixel_error_after") is not None]
-    valid = [row for row in rows if row.get("pixel_error_before") is not None
-             and row.get("pixel_error_after") is not None]
+    valid = [row for row in rows if row.get("same_target_identity")
+             and row.get("pixel_error_before") is not None and row.get("pixel_error_after") is not None]
     improved = [row for row in valid if row.get("alignment_improved")]
 
     def mean(group: list[dict[str, Any]], key: str):
@@ -419,21 +419,26 @@ def _summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "real_bounded_executions": sum(int(row.get("runner_actions", 0)) for row in rows),
         "max_bounded_motions_per_trial": 1,
         "visible_before_count": sum(bool(row.get("target_visible_before")) for row in rows),
+        "identity_retained_count": sum(bool(row.get("identity_retained")) for row in rows),
+        "identity_retention_rate": (sum(bool(row.get("identity_retained")) for row in rows) / len(rows)
+                                     if rows else None),
         "alignment_evaluable_trials": len(valid),
         "alignment_improved_count": len(improved),
-        "alignment_improvement_rate": len(improved) / len(rows) if rows else None,
         "alignment_improvement_rate_among_evaluable": len(improved) / len(valid) if valid else None,
-        "mean_error_before_px": mean(visible_before, "pixel_error_before"),
+        "conditional_alignment_improvement_rate": len(improved) / len(valid) if valid else None,
         "mean_error_before_px_among_evaluable": mean(valid, "pixel_error_before"),
-        "mean_error_after_px": mean(visible_after, "pixel_error_after"),
+        "mean_error_after_px_among_evaluable": mean(valid, "pixel_error_after"),
         "mean_actual_improvement_px": mean(valid, "actual_improvement_px"),
         "mean_predicted_improvement_px": mean(rows, "predicted_improvement_px"),
         "mean_prediction_error_predicted_minus_actual_px": mean(valid, "prediction_error_predicted_minus_actual_px"),
+        "geometry_direction_consistency_count": sum(row.get("geometry_direction_consistent") is True for row in rows),
     }
 
 
 def main() -> int:
     args = _parser().parse_args()
+    if args.camera_resolution not in {512, 768}:
+        raise SystemExit("--camera-resolution must match an audited source renderer size: 512 or 768")
     config = load_yaml(args.config)
     _configure_local_sam3_proxy_bypass(args.sam3_url)
     if config.get("libero_dir"):
@@ -443,33 +448,27 @@ def main() -> int:
     sam3 = Sam3Client(url=args.sam3_url, python=args.sam3_python,
                       timeout_s=args.sam3_timeout_s, max_attempts=1)
     rows: list[dict[str, Any]] = []
-    qwen_input = None
     blockers: list[str] = []
     try:
         for init_state_index in INIT_STATES:
             try:
-                record, candidate_qwen_input = _run_trial(
+                record = _run_trial(
                     init_state_index=init_state_index,
                     run_dir=run_dir,
                     config=config,
                     sam3=sam3,
                     workspace=workspace,
+                    camera_resolution=args.camera_resolution,
                 )
                 rows.append(record)
                 if not record.get("target_visible_before"):
                     blockers.append(
                         f"init_state_{init_state_index}: SAM3 returned no usable target mask; no alignment was authorized"
                     )
-                elif not record.get("target_visible_after"):
-                    blockers.append(
-                        f"init_state_{init_state_index}: post-motion SAM3 returned no usable target mask"
-                    )
-                elif record.get("runner_actions") != 1 or record.get("arbiter_approved_alignment_actions") != 1:
+                if record.get("runner_actions") != 1 or record.get("arbiter_approved_alignment_actions") != 1:
                     blockers.append(
                         f"init_state_{init_state_index}: expected exactly one authorized alignment execution"
                     )
-                if candidate_qwen_input is not None:
-                    qwen_input = candidate_qwen_input
             except Exception as exc:
                 blockers.append(f"init_state_{init_state_index}: {type(exc).__name__}: {exc}")
                 _write_json(run_dir / f"init_state_{init_state_index}" / "failure.json", {
@@ -479,42 +478,33 @@ def main() -> int:
     finally:
         sam3.close()
 
-    qwen_record = None
-    if qwen_input is not None:
-        try:
-            qwen_record = _qwen_visual_smoke(
-                args=args, config=config, qwen_input=qwen_input, run_dir=run_dir,
-            )
-        except Exception as exc:
-            blockers.append(f"qwen_visual_smoke: {type(exc).__name__}: {exc}")
-            qwen_record = {"status": "BLOCKED", "error": f"{type(exc).__name__}: {exc}",
-                           "robot_actions_executed": 0}
-            _write_json(run_dir / "qwen_visual_no_action.json", qwen_record)
     summary = _summary(rows)
     summary_record = {
         "status": ("COMPLETED" if len(rows) == len(INIT_STATES) and not blockers
                    else "BLOCKED" if blockers else "PARTIAL"),
         "branch": "runtime-v3",
-        "baseline_commit": "d0581189ad8c12d82bf0bf15171e6cf4c006c437",
+        "baseline_commit": "d8b52dbb5ddaa0f4417aa6a0ee0de4b97ab80ba1",
         "suite": SUITE,
         "task_id": TASK_ID,
         "target_phrase": TARGET_PHRASE,
-        "camera_render_width": CAMERA_WIDTH,
-        "camera_render_height": CAMERA_HEIGHT,
-        "resolution_policy": "source RGB rendered at 512x512; no resize or upsample in SAM3/Qwen client path",
+        "camera_render_width": args.camera_resolution,
+        "camera_render_height": args.camera_resolution,
+        "canonical_transform": "vertical_flip",
+        "resolution_policy": f"source RGB rendered directly at {args.camera_resolution}x{args.camera_resolution}; no resize or upsample",
         "sam3_interface": "existing OpenETA SAM3 MCP via core.capabilities.sam3_client.Sam3Client",
         "sam3_checkpoint_path": os.environ.get("OPENETA_SAM3_CHECKPOINT_PATH",
                                                "/root/autodl-tmp/openeta-services/models/sam3/sam3.pt"),
         "rows": rows,
         "summary": summary,
-        "qwen_visual_no_action": qwen_record,
         "blockers": blockers,
         "legacy_config_modified": False,
         "robot_actions_from_qwen": 0,
+        "oracle_diagnostic_only": False,
+        "oracle_used_by_runtime": False,
     }
     _write_json(run_dir / "summary.json", summary_record)
     print(json.dumps(_jsonable(summary_record), indent=2, ensure_ascii=False))
-    return 0 if len(rows) == len(INIT_STATES) and qwen_record is not None else 1
+    return 0 if len(rows) == len(INIT_STATES) and not blockers else 1
 
 
 if __name__ == "__main__":
