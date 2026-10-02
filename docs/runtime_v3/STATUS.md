@@ -6,7 +6,7 @@
 - Created local branch `runtime-v3` from that baseline.
 - Added canonical state, observation, option, selector, Arbiter, executor, effect, memory-interface, and short runner modules under `core/runtime_v3/`.
 - Added architecture and migration notes.
-- Added authority and import-boundary tests plus a mock one-step runner smoke test; the V3 test module passes 8 tests.
+- Added authority and import-boundary tests plus a mock one-step runner smoke test; the V3 test module passes 9 tests.
 
 ## Not implemented
 
@@ -20,7 +20,7 @@
 - Current branch: `runtime-v3`.
 - Legacy tag: `legacy-full-harness-0928`.
 - New remote: blocked (`GITHUB_REMOTE_BLOCKED`).
-- Local smoke/test status: `./.venv/bin/python -m pytest -q tests/runtime_v3/test_runtime_v3.py` — 8 passed. Static compile and whitespace checks are recorded in the migration report.
+- Local smoke/test status: `./.venv/bin/python -m pytest -q tests/runtime_v3/test_runtime_v3.py` — 9 passed. Static compile and whitespace checks are recorded in the migration report.
 
 ## Next experiment
 

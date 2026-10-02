@@ -10,7 +10,7 @@ from .arbiter import Arbiter, ApprovedAction
 
 
 class PrimitiveBackend(Protocol):
-    def execute_primitive(self, primitive: Any) -> Any: ...
+    def execute_approved_action(self, action: ApprovedAction) -> Any: ...
 
 
 @dataclass(frozen=True)
@@ -33,7 +33,7 @@ class Executor:
         if action.primitive.max_steps != 1:
             raise ValueError("Executor accepts exactly one bounded primitive")
         started = time.monotonic()
-        result = self.backend.execute_primitive(action.primitive)
+        result = self.backend.execute_approved_action(action)
         return ExecutionRecord(
             option_id=action.option_id,
             primitive_kind=action.primitive.kind,
@@ -46,11 +46,15 @@ class Executor:
 class LiberoPrimitiveBackend:
     """One environment step per approved primitive using the existing adapter."""
 
-    def __init__(self, environment: Any, controller: Any) -> None:
+    def __init__(self, environment: Any, controller: Any, arbiter: Arbiter) -> None:
         self.environment = environment
         self.controller = controller
+        self.arbiter = arbiter
 
-    def execute_primitive(self, primitive: Any) -> Any:
+    def execute_approved_action(self, action: ApprovedAction) -> Any:
+        if not self.arbiter.is_approved(action):
+            raise TypeError("LIBERO backend accepts only an action authorized by its Arbiter")
+        primitive = action.primitive
         if primitive.kind == "move":
             if primitive.token is None:
                 raise ValueError("move primitive requires an atomic token")

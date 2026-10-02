@@ -23,8 +23,8 @@ class FakeBackend:
     def __init__(self):
         self.calls = []
 
-    def execute_primitive(self, primitive):
-        self.calls.append(primitive)
+    def execute_approved_action(self, action):
+        self.calls.append(action.primitive)
         return {"ok": True}
 
 
@@ -73,6 +73,29 @@ def test_executor_rejects_unapproved_action():
     with pytest.raises(TypeError):
         executor.execute(forged)
     assert backend.calls == []
+
+
+def test_libero_backend_rejects_direct_unapproved_controller_call():
+    class Controller:
+        def __init__(self):
+            self.calls = 0
+
+        def hold_action(self):
+            self.calls += 1
+            return "hold"
+
+    class Environment:
+        def step(self, action):
+            return action
+
+    arbiter = Arbiter()
+    controller = Controller()
+    from core.runtime_v3.executor import LiberoPrimitiveBackend
+    backend = LiberoPrimitiveBackend(Environment(), controller, arbiter)
+    forged = ApprovedAction("OPTION_0", PrimitiveCommand("hold"), {}, 0, 1)
+    with pytest.raises(TypeError):
+        backend.execute_approved_action(forged)
+    assert controller.calls == 0
 
 
 def test_robot_controller_is_called_only_after_arbiter_authorize():
