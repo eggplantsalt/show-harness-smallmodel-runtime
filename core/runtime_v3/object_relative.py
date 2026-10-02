@@ -19,6 +19,8 @@ from core.capabilities.camera_geometry import (
     project_point,
 )
 from .canonical_image import CanonicalImageAdapter
+from .depth import DepthProvider, metric_entity_reference_from_estimate
+from .metric_entity import MetricEntityReference, freeze_metric_reference
 from .observer import RobotObservation
 from .options import BoundedMicroMotionSpec, PrimitiveCommand, RuntimeOption
 from .scene_settling import SceneReadyEvidence
@@ -767,6 +769,7 @@ class ObjectRelativePerceptionObserver:
         scene_ready_required: bool = False,
         alignment_scales_m: Sequence[float] | None = None,
         scale_contracts: Mapping[float, Mapping[str, Any]] | None = None,
+        metric_depth_provider: DepthProvider | None = None,
     ) -> None:
         self.base_observer = base_observer
         self.sam3 = sam3
@@ -779,6 +782,8 @@ class ObjectRelativePerceptionObserver:
         self.alignment_scales_m = (tuple(float(v) for v in alignment_scales_m)
                                    if alignment_scales_m is not None else None)
         self.scale_contracts = dict(scale_contracts or {})
+        self.metric_depth_provider = metric_depth_provider
+        self.metric_reference_anchor: MetricEntityReference | None = None
         self.scene_ready_evidence = SceneReadyEvidence() if self.scene_ready_required else None
         self.identity_anchor: TargetIdentityAnchor | None = None
         self.reference_anchor: TargetReferenceAnchor | None = None
@@ -798,6 +803,8 @@ class ObjectRelativePerceptionObserver:
         """Invalidate the active reference; it cannot be re-established implicitly."""
         self._last_reference_invalidation_reason = str(reason)
         self.reference_anchor = invalidate_target_reference_anchor(self.reference_anchor, reason)
+        if self.metric_reference_anchor is not None and self.metric_reference_anchor.valid:
+            self.metric_reference_anchor = self.metric_reference_anchor.invalidate(reason)
 
     def request_target_reference_reground(self) -> None:
         """Explicitly request a new identity association and visual reference."""
@@ -809,7 +816,14 @@ class ObjectRelativePerceptionObserver:
         return self.base_observer.observe(environment)
 
     def observe(self, environment: Any) -> RobotObservation:
-        base = self.base_observer.observe(environment)
+        return self.observe_from_base_observation(
+            environment, self.base_observer.observe(environment)
+        )
+
+    def observe_from_base_observation(
+        self, environment: Any, base: RobotObservation,
+    ) -> RobotObservation:
+        """Add visual target evidence to one already acquired RGB observation."""
         raw_image = np.asarray(base.images.get("agentview"))
         if raw_image.ndim != 3 or raw_image.shape[2] != 3:
             raise ValueError("agentview source must be an HxWx3 RGB array")
@@ -834,6 +848,7 @@ class ObjectRelativePerceptionObserver:
         if self._reference_reground_requested:
             self.identity_anchor = None
             self.reference_anchor = None
+            self.metric_reference_anchor = None
             if self.scene_ready_evidence is not None:
                 self.scene_ready_evidence.reset()
             self._reference_reground_requested = False
@@ -905,6 +920,22 @@ class ObjectRelativePerceptionObserver:
         except (AttributeError, KeyError, TypeError, ValueError):
             calibration = None
         self.last_calibration = calibration
+        metric_candidate: MetricEntityReference | None = None
+        metric_depth: np.ndarray | None = None
+        if self.metric_depth_provider is not None:
+            try:
+                estimate = self.metric_depth_provider.estimate(image)
+                metric_depth = estimate.depth_m
+                metric_candidate = metric_entity_reference_from_estimate(
+                    entity_key=self.target_phrase,
+                    camera="agentview",
+                    source_frame_id=base.frame_id,
+                    target_mask=(segmentation.mask if segmentation.visible else None),
+                    estimate=estimate,
+                    calibration=calibration,
+                )
+            except (AttributeError, TypeError, ValueError, RuntimeError, OverflowError):
+                metric_candidate = None
         current_camera_signature = (camera_calibration_signature(
             calibration, image_orientation=self.canonical_image_adapter.orientation,
         )
@@ -954,6 +985,11 @@ class ObjectRelativePerceptionObserver:
                     camera_signature=current_camera_signature,
                 )
                 self._reference_reground_requested = False
+        if (self.metric_depth_provider is not None and self.scene_ready
+                and metric_candidate is not None):
+            self.metric_reference_anchor = freeze_metric_reference(
+                self.metric_reference_anchor, metric_candidate
+            )
         reference_valid = bool(self.reference_anchor and self.reference_anchor.valid)
         reference_point = (self.reference_anchor.reference_point_px if reference_valid else None)
         workspace = base.evidence.get("relevant_geometry", {}).get("workspace_z_bounds_m")
@@ -1006,6 +1042,7 @@ class ObjectRelativePerceptionObserver:
             target_reference_invalidation_reason=(
                 self.reference_anchor.invalidation_reason if self.reference_anchor else None
             ),
+            metric_entity_reference=self.metric_reference_anchor,
             scene_ready=self.scene_ready,
             scene_ready_gate_enabled=self.scene_ready_required,
         )
@@ -1027,6 +1064,10 @@ class ObjectRelativePerceptionObserver:
             "resolution": dict(geometry),
             "dynamic_sam_error_px": dynamic_sam_error,
             "object_relative_state": relative,
+            "frame_id": base.frame_id,
+            "metric_entity_reference_candidate": metric_candidate,
+            "metric_entity_reference_anchor": self.metric_reference_anchor,
+            "metric_depth_estimate_m": metric_depth,
         })
         evidence = dict(base.evidence)
         evidence["target_identity"] = self.target_phrase

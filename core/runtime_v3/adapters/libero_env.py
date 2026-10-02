@@ -6,7 +6,6 @@ from typing import Any, Mapping
 
 from core.sim.libero_task import (
     LiberoTaskHandle,
-    libero_success,
     make_libero_task,
     reset_libero,
     step_libero,
@@ -80,9 +79,6 @@ class LiberoEnvironmentAdapter:
         self.step_count += 1
         self._set_observation(observation)
         return result
-
-    def check_success(self) -> bool:
-        return libero_success(self.env)
 
     def close(self) -> None:
         close = getattr(self.env, "close", None)

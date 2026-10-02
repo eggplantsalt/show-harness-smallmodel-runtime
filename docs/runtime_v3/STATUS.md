@@ -1,5 +1,57 @@
 # Runtime V3 Status
 
+## M3.5 observation boundary and deployable metric depth (2026-10-03)
+
+- Started from stable commit `0973f4c107124415c790a214a98ec480c1076935` on
+  `runtime-v3`. Kept simulator depth out of the formal Runtime observation and
+  decision path. Its reader and comparisons live only under `scripts/`; the
+  formal depth provider accepts RGB and emits a pinned MoGe-2 metric estimate.
+- Added the generic `MetricEntityReference`, robust mask-conditioned estimated
+  depth unprojection, and the explicit formal/diagnostic observation boundary.
+  Metric references remain telemetry; the existing option generator, candidate
+  ranking, Arbiter, Executor, and termination policy remain unchanged. No 3D
+  control or manipulation action was added.
+- Model audit: `Ruicheng/moge-2-vitl`, revision
+  `39c4d5e957afe587e04eec59dc2bcc3be5ecd968`; metric depth in meters at source
+  resolution; RGB-only model input; 1.31 GB checkpoint. Loaded and ran 512×512
+  inference in the LIBERO Python 3.10.12 / PyTorch 2.14.0+cu130 environment on
+  an RTX 4080 SUPER (31.47 GiB). `transformers` is not installed; MoGe uses its
+  own v2 model loader. No training or oracle scale fitting was performed.
+- Stage A ran `LIBERO_OBJECT` task 2, seed 0, states 0–5. All 36/36 references
+  were valid and the valid mask-depth ratio was 100%. Only 3/6 states passed the
+  existing 3 mm jitter gate. Mean successive world-reference displacement was
+  1.62 mm; the maximum was 4.67 mm. State maxima 0–5 were 2.48, 1.66, 2.83,
+  3.30, 4.67, and 3.61 mm.
+- Formal-vs-oracle comparison remained post-inference diagnostic only. Mask
+  region depth MAE averaged 0.300 m (median of frame MAEs 0.308 m); estimated
+  reference versus same-mask GT-depth reference error averaged 0.308 m (median
+  0.315 m). Estimated-reference offset from the target body origin averaged
+  0.296 m, which includes visible-surface/body-origin differences and is not a
+  pure depth-model error.
+- The model's median range over the SAM mask exceeded GT depth by 0.310 m on
+  average. Same-mask GT-depth reference jitter peaked at only 0.056 mm while the
+  monocular estimate reached 4.67 mm, indicating that estimator variation, not
+  observed scene/mask motion, dominates the reference jitter in this static test.
+- Stage B was gated off due to Stage A instability: zero alignment steps and no
+  wrist-frustum coverage evaluation. This is a deployability blocker for the
+  current RGB-only metric grounding contract on the audited images. Do not
+  proceed to 3D metric alignment based on the simulator reference.
+- Runtime V3 suite: 197 passed. Full experiment artifacts are under
+  `rollouts/runtime_v3_metric_entity_grounding_rgb_only/run_20261002T155631Z_422a6ba3/`.
+- The `legacy-full-harness-0928` baseline files were not modified. An unrelated
+  working-tree edit to `AGENTS.md` appeared during the turn and is preserved;
+  it is excluded from the M3.5 commit unless separately requested.
+
+### M3.5 judgment and next gate
+
+Deployable metric entity grounding reliability: **NO** for the current
+model/task images under the 3 mm stability requirement. Diagnostic depth explains
+range and geometry disagreement but cannot improve Runtime information. RGB-only
+still lacks accurate, stable, independently observable metric range here; the
+task also has no direct visibility into contact, hidden geometry, or occluded
+target motion. Reassess a deployable depth model or real RGB-D sensor contract
+before Stage B or any 3D control.
+
 ## SceneReady and single-step validation (2026-10-02)
 
 - Started from `218d2e0e30e4bed5854fef175dd8955ff88760a3` on `runtime-v3`; the starting tree was clean and synchronized with `origin/runtime-v3`.
@@ -73,11 +125,10 @@
 - The frozen legacy tag and its policy files were not modified.
 - This task's code, experiment, and selector artifacts remain in the Runtime V3 worktree; do not merge them into the frozen legacy baseline.
 
-## Next gate
+## Historical M3.4 gate
 
-The Stage A gate, stable Stage B control window, and single-step frozen-reference
-improvement all passed in the tested six states. Multi-step object-relative
-alignment is the next milestone to consider. It has not been implemented; the
-next phase should still cap each decision to one bounded execution and preserve
-the oracle/Runtime separation while testing whether fresh observations support
-another verified option.
+The earlier M3.4 hold-only and single-step 2D frozen-reference checks passed in
+the tested six states. That evidence supports the existing 2D objective only.
+The later M3.5 deployable metric-depth gate failed; it supersedes any suggestion
+that 3D metric alignment is the next milestone. Preserve the M3.4 capability, but
+do not use simulator depth to clear the M3.5 blocker.

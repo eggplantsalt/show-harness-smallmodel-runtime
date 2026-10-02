@@ -217,14 +217,16 @@ def test_runtime_selected_direction_and_scale_still_come_from_runtime_geometry()
     assert option_b.primitive.micro_motion_spec.requested_displacement_m == 0.009
 
 
-def test_contact_is_a_diagnostic_stop_and_cannot_select_a_different_action():
+def test_contact_diagnostic_cannot_stop_or_select_a_different_action():
     state = _runtime_state()
     baseline = MultiScaleAlignmentOptionGenerator().generate(state)[0]
-    assert audit.contact_stop_reason(True) == audit.DIAGNOSTIC_CONTACT
-    assert audit._stop_reason(state, contact=True) == audit.DIAGNOSTIC_CONTACT
-    contact_annotated_state = _runtime_state(extras={"oracle_contact": True})
+    contact_annotated_state = _runtime_state(extras={
+        "oracle_contact": True, "oracle_target_position_xyz_m": [99.0, 99.0, 99.0],
+        "oracle_eef_target_distance_m": 0.0,
+    })
     selected = MultiScaleAlignmentOptionGenerator().generate(contact_annotated_state)[0]
     assert selected.primitive.micro_motion_spec == baseline.primitive.micro_motion_spec
+    assert audit._stop_reason(contact_annotated_state) == audit._stop_reason(state)
 
 
 def test_qwen_is_not_in_the_observability_runtime_and_summary_counts_zero(tmp_path):

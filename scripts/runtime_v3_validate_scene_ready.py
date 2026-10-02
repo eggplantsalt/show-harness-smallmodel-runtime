@@ -38,11 +38,13 @@ from core.runtime_v3.canonical_image import CanonicalImageAdapter
 from core.runtime_v3.object_relative import ObjectRelativePerceptionObserver
 from core.runtime_v3.scene_initialization import scene_ready_status
 from core.runtime_v3.scene_settling import (
-    compare_oracle_and_sam_pixel_motion,
     SCENE_READY_MAX_BBOX_EDGE_SHIFT_PX,
     SCENE_READY_MAX_CENTROID_SHIFT_PX,
     SCENE_READY_MAX_MASK_AREA_CHANGE_PX,
     SCENE_READY_WINDOW_OBSERVATIONS,
+)
+from scripts.runtime_v3_scene_settling_diagnostic import (
+    compare_oracle_and_sam_pixel_motion,
     project_world_motion_to_canonical_pixels,
 )
 from core.runtime_v3.temporal_calibration import run_v3_tick

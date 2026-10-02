@@ -51,7 +51,6 @@ TARGET_BODY = "salad_dressing_1_main"
 CONTROL_TICK_M = CONTROL_TICK_MM / 1000.0
 ORIENTATION_CHOICES = ("identity", "vertical_flip", "horizontal_flip", "rotate_180")
 SEMANTIC_OPTION_ID = "ALIGN_TO_TARGET_BOUNDED"
-DIAGNOSTIC_CONTACT = "DIAGNOSTIC_CONTACT"
 WORKSPACE_BOUNDARY = "WORKSPACE_BOUNDARY"
 
 
@@ -112,10 +111,6 @@ class AuditArbiter(Arbiter):
                 and decision.action.option_id == SEMANTIC_OPTION_ID):
             self.approval_count += 1
         return decision
-
-
-class DiagnosticContactStop(Exception):
-    """Abort the current bounded tick loop immediately after oracle contact."""
 
 
 def jsonable(value: Any) -> Any:
@@ -204,10 +199,6 @@ def oracle_distance(eef_xyz_m: Sequence[float] | None,
     if not np.all(np.isfinite(eef)) or not np.all(np.isfinite(target)):
         return None
     return float(np.linalg.norm(eef - target))
-
-
-def contact_stop_reason(contact: bool) -> str | None:
-    return DIAGNOSTIC_CONTACT if bool(contact) else None
 
 
 def workspace_stop_reason(state: BeliefState) -> str | None:
@@ -328,15 +319,27 @@ def robot_target_contact_diagnostic(environment: Any) -> dict[str, Any]:
 
 
 def _setup_episode(*, init_state: int, config: Mapping[str, Any], sam3: Any,
-                   camera_resolution: int, workspace: tuple[float, float]):
+                   camera_resolution: int, workspace: tuple[float, float],
+                   diagnostic_camera_depths: bool = False,
+                   metric_depth_provider: Any | None = None):
     from core.runtime_v3.adapters.libero_env import LiberoEnvironmentAdapter
     from core.runtime_v3.adapters.libero_observation import LiberoObservationAdapter
+    from core.sim.libero_task import make_libero_task
     from interpreters.libero_atomic_controller import LiberoAtomicController
 
-    environment = LiberoEnvironmentAdapter.create(
-        suite_name=SUITE, task_id=TASK_ID, init_state_index=init_state, seed=0,
-        camera_height=camera_resolution, camera_width=camera_resolution, horizon=180,
-    )
+    if diagnostic_camera_depths:
+        # Privileged depth is enabled only by this experiment-script path.
+        handle = make_libero_task(
+            suite_name=SUITE, task_id=TASK_ID, init_state_index=init_state, seed=0,
+            camera_height=camera_resolution, camera_width=camera_resolution,
+            diagnostic_camera_depths=True, horizon=180, settle_steps=0,
+        )
+        environment = LiberoEnvironmentAdapter(handle)
+    else:
+        environment = LiberoEnvironmentAdapter.create(
+            suite_name=SUITE, task_id=TASK_ID, init_state_index=init_state, seed=0,
+            camera_height=camera_resolution, camera_width=camera_resolution, horizon=180,
+        )
     if TARGET_PHRASE.casefold() not in environment.task_description.casefold():
         environment.close()
         raise RuntimeError("target phrase is absent from the task instruction")
@@ -368,6 +371,7 @@ def _setup_episode(*, init_state: int, config: Mapping[str, Any], sam3: Any,
         scene_ready_required=True, alignment_scales_m=SCALES_M,
         scale_contracts={scale: {"verified": True, "max_ticks": TICK_BUDGETS[scale]}
                          for scale in SCALES_M},
+        metric_depth_provider=metric_depth_provider,
     )
     scene = run_scene_ready_holds(
         environment, observer, controller, task_id=f"{SUITE}:{TASK_ID}",
@@ -678,9 +682,7 @@ def _save_contact_sheet(images: Sequence[tuple[str, Path]], output_path: Path) -
     return str(output_path)
 
 
-def _stop_reason(state: BeliefState, *, contact: bool = False) -> str | None:
-    if contact:
-        return DIAGNOSTIC_CONTACT
+def _stop_reason(state: BeliefState) -> str | None:
     boundary = workspace_stop_reason(state)
     if boundary:
         return boundary
@@ -700,8 +702,8 @@ def _stop_reason(state: BeliefState, *, contact: bool = False) -> str | None:
 
 
 def _post_action_stop(step: int, improvement: float | None, state: BeliefState,
-                      contact: bool, execution: Mapping[str, Any] | None) -> str | None:
-    reason = _stop_reason(state, contact=contact)
+                      execution: Mapping[str, Any] | None) -> str | None:
+    reason = _stop_reason(state)
     if reason:
         return reason
     if execution and execution.get("termination") == "BOUNDARY_STOP":
@@ -723,6 +725,12 @@ def _series_row(record: Mapping[str, Any]) -> dict[str, Any]:
         "wrist_center_error_normalized", "selected_direction", "selected_scale_mm",
         "eef_position_xyz_m", "eef_quaternion", "gripper_state", "gripper_width_m",
         "oracle_contact",
+        "runtime_estimated_metric_distance_m",
+        "depth_metric_reference_world_m",
+        "depth_metric_candidate_reference_world_m",
+        "depth_metric_candidate_valid_depth_ratio",
+        "depth_metric_reference_valid_depth_ratio",
+        "wrist_depth_reference_coverage_status",
     )}
 
 
@@ -740,7 +748,10 @@ def _write_csv(path: Path, rows: Sequence[Mapping[str, Any]]) -> None:
 
 def _run_episode(*, init_state: int, run_dir: Path, config: Mapping[str, Any], sam3: Any,
                  camera_resolution: int, wrist_orientation: str,
-                 orientation_audit_path: str | None) -> dict[str, Any]:
+                 orientation_audit_path: str | None,
+                 diagnostic_camera_depths: bool = False,
+                 metric_depth_provider: Any | None = None,
+                 diagnostic_callback: Callable[..., Mapping[str, Any]] | None = None) -> dict[str, Any]:
     episode_dir = run_dir / f"init_state_{init_state}"
     episode_dir.mkdir(parents=True, exist_ok=False)
     artifacts_dir = episode_dir / "observations"
@@ -750,6 +761,8 @@ def _run_episode(*, init_state: int, run_dir: Path, config: Mapping[str, Any], s
         environment, controller, base, observer, ready_holds, scene = _setup_episode(
             init_state=init_state, config=config, sam3=sam3,
             camera_resolution=camera_resolution, workspace=WORKSPACE_Z_M,
+            diagnostic_camera_depths=diagnostic_camera_depths,
+            metric_depth_provider=metric_depth_provider,
         )
         # Oracle and wrist signals remain local to this experiment script; they are
         # never attached to Runtime observations, state, options or decisions.
@@ -783,6 +796,19 @@ def _run_episode(*, init_state: int, run_dir: Path, config: Mapping[str, Any], s
                 previous_wrist_anchor=wrist_anchor["value"], environment=environment,
                 selected_direction=selected_direction, selected_scale_mm=selected_scale_mm,
             )
+            if diagnostic_callback is not None:
+                # The experiment callback receives read-only evidence and may only
+                # add report fields. Runtime state, options, and approvals never
+                # consume this return value.
+                try:
+                    extra = diagnostic_callback(
+                        frame=frame, raw=raw, state=state, environment=environment,
+                        step=step, capture_label=label, record_data=data,
+                    )
+                    if isinstance(extra, Mapping):
+                        data.update(dict(extra))
+                except Exception as exc:
+                    data["experiment_diagnostic_error"] = f"{type(exc).__name__}: {exc}"
             wrist_anchor["value"] = next_anchor
             metrics = data["wrist_metrics"]
             paths = _save_view_artifacts(
@@ -813,15 +839,6 @@ def _run_episode(*, init_state: int, run_dir: Path, config: Mapping[str, Any], s
             if (relative is None or not relative.target_visible or not relative.target_reference_valid
                     or not observer.scene_ready):
                 raise RuntimeError("target reference or SceneReady evidence invalid before authorization")
-            contact = robot_target_contact_diagnostic(environment)
-            if contact.get("available") and contact.get("robot_target_contact"):
-                if not episode_contact["detected"]:
-                    episode_contact.update({
-                        "detected": True, "semantic_step": active_step["index"],
-                        "control_tick_in_episode": episode_contact["tick_count"],
-                        "control_tick_in_action": 0, "record": contact,
-                    })
-                raise DiagnosticContactStop("pre-action simulator contact diagnostic")
             reason = workspace_stop_reason(state)
             if reason:
                 raise RuntimeError(reason)
@@ -870,16 +887,6 @@ def _run_episode(*, init_state: int, run_dir: Path, config: Mapping[str, Any], s
             obs = base.observe(current_environment)
             episode_contact["tick_count"] += 1
             ticks_this_action["count"] += 1
-            contact = robot_target_contact_diagnostic(current_environment)
-            if contact.get("available") and contact.get("robot_target_contact"):
-                if not episode_contact["detected"]:
-                    episode_contact.update({
-                        "detected": True, "semantic_step": active_step["index"],
-                        "control_tick_in_episode": episode_contact["tick_count"],
-                        "control_tick_in_action": ticks_this_action["count"],
-                        "record": contact,
-                    })
-                raise DiagnosticContactStop("robot-target contact during bounded execution")
             return obs
 
         observer.observe_for_execution_tick = observe_tick
@@ -903,73 +910,6 @@ def _run_episode(*, init_state: int, run_dir: Path, config: Mapping[str, Any], s
                                         max_steps=1, reset=False)
             if not events:
                 state = result.get("state") or runner.state
-                if episode_contact["detected"]:
-                    termination = DIAGNOSTIC_CONTACT
-                    contact_was_approved = arbiter.approval_count > approvals0
-                    contact_data: dict[str, Any] = {}
-                    # A contact during an approved tick is reobserved without motion;
-                    # a pre-action contact uses the already available frame.
-                    if contact_was_approved and state is not None:
-                        try:
-                            observation = observer.observe(environment)
-                            state = StateBuilder().update(state, observation)
-                            frame = observer.perception_history[-1]
-                            _data_record, contact_data, _seg, _wrist = capture(
-                                state, frame, step=index, label="contact_stop")
-                            contact_data["diagnostic_stop"] = DIAGNOSTIC_CONTACT
-                        except Exception as exc:
-                            contact_data = {"diagnostic_observation_error": f"{type(exc).__name__}: {exc}"}
-                    elif state is not None and observer.perception_history:
-                        frame = observer.perception_history[-1]
-                        _data_record, contact_data, _seg, _wrist = capture(
-                            state, frame, step=index-1, label="contact_stop_preaction")
-                    if contact_data and contact_data.get("oracle_eef_target_distance_m") is not None:
-                        row = _series_row(contact_data)
-                        row["step"] = index if contact_was_approved else max(0, index-1)
-                        trajectory.append(row)
-                    prior = preaction.get("state")
-                    before_eef = _robot_state(prior)["eef_position_xyz_m"] if prior else None
-                    after_eef = _robot_state(state)["eef_position_xyz_m"] if state else None
-                    contact_exec = {"termination": DIAGNOSTIC_CONTACT,
-                                    "ticks_executed": ticks_this_action["count"],
-                                    "actual_displacement_xyz_m": (
-                                        (np.asarray(after_eef)-np.asarray(before_eef)).tolist()
-                                        if before_eef is not None and after_eef is not None else None),
-                                    "diagnostic_only_stop": True}
-                    before_dist = (preaction["record_data"].get("oracle_eef_target_distance_m")
-                                   if preaction.get("record_data") else None)
-                    after_dist = contact_data.get("oracle_eef_target_distance_m")
-                    prior_error = error_from_state(prior) if prior else None
-                    after_error = error_from_state(state) if state else None
-                    executed_option = preaction.get("option") if contact_was_approved else None
-                    executed_spec = (executed_option.primitive.micro_motion_spec
-                                     if executed_option is not None else None)
-                    steps.append({"alignment_step": index, "executed": contact_was_approved,
-                                  "direction": executed_spec.direction if executed_spec else None,
-                                  "scale_mm": executed_spec.requested_displacement_m*1000.0
-                                  if executed_spec else None,
-                                  "image_error_before_px": prior_error,
-                                  "image_error_after_px": after_error,
-                                  "image_error_improvement_px": prior_error-after_error
-                                  if prior_error is not None and after_error is not None else None,
-                                  "termination_reason": DIAGNOSTIC_CONTACT,
-                                  "execution": contact_exec,
-                                  "oracle_distance_before_m": before_dist,
-                                  "oracle_distance_after_m": after_dist,
-                                  "oracle_distance_improvement_m": before_dist-after_dist
-                                  if before_dist is not None and after_dist is not None else None,
-                                  "oracle_target_position_before_xyz_m": (
-                                      preaction["record_data"].get("oracle_target_position_xyz_m")
-                                      if preaction.get("record_data") else None),
-                                  "oracle_target_position_after_xyz_m":
-                                      contact_data.get("oracle_target_position_xyz_m"),
-                                  "contact_semantic_step": episode_contact["semantic_step"],
-                                  "first_contact_control_tick_in_episode": episode_contact["control_tick_in_episode"],
-                                  "first_contact_control_tick_in_action": episode_contact["control_tick_in_action"],
-                                  "authorization_calls_for_step": arbiter.authorization_calls-auth0,
-                                  "approvals_for_step": arbiter.approval_count-approvals0})
-                    break
-
                 if state is not None and preaction.get("record") is None:
                     frame = observer.perception_history[-1] if observer.perception_history else None
                     if frame is not None:
@@ -1067,8 +1007,7 @@ def _run_episode(*, init_state: int, run_dir: Path, config: Mapping[str, Any], s
             row["selected_direction"] = spec.direction
             row["selected_scale_mm"] = spec.requested_displacement_m*1000.0
             trajectory.append(row)
-            stop = _post_action_stop(index, image_improvement, after,
-                                     bool(contact_after), execution)
+            stop = _post_action_stop(index, image_improvement, after, execution)
             if stop:
                 termination = stop
                 record["termination_reason"] = stop

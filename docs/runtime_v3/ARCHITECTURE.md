@@ -70,6 +70,15 @@ errors; later SAM centroids remain diagnostic and cannot replace it. See
 [`TARGET_REFERENCE.md`](TARGET_REFERENCE.md) for establishment, invalidation,
 and re-grounding rules.
 
+M3.5 adds a generic `MetricEntityReference` produced from a deployable RGB-only
+monocular metric-depth estimate, a SAM mask, and calibrated camera geometry. It
+is carried as perception evidence but is not consumed by option generation,
+candidate ranking, Arbiter, Executor, or termination. MuJoCo depth and target
+pose comparisons live in experiment scripts and are evaluation evidence only;
+the Stage A stability gate failed, so this result does not authorize 3D
+alignment. See [`OBSERVATION_BOUNDARY.md`](OBSERVATION_BOUNDARY.md) and
+[`METRIC_ENTITY_GROUNDING.md`](METRIC_ENTITY_GROUNDING.md).
+
 `OptionGenerator` accepts explicit geometry candidates and turns them into
 typed options. It cannot access the environment or Executor. Each option has an
 ID, semantic description, preconditions, expected effect, bounded primitive,

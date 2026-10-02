@@ -6,6 +6,8 @@ import math
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Optional
 
+from .metric_entity import MetricEntityReference
+
 
 @dataclass(frozen=True)
 class ObjectRelativeState:
@@ -30,6 +32,7 @@ class ObjectRelativeState:
     target_reference_valid: bool = False
     target_reference_camera: Optional[str] = None
     target_reference_invalidation_reason: Optional[str] = None
+    metric_entity_reference: Optional[MetricEntityReference] = None
     scene_ready: bool = True
     scene_ready_gate_enabled: bool = False
 
@@ -177,6 +180,44 @@ def _object_relative_state(value: Any) -> Optional[ObjectRelativeState]:
             str(value["target_reference_invalidation_reason"])
             if value.get("target_reference_invalidation_reason") is not None else None
         ),
+        metric_entity_reference=_metric_entity_reference(value.get("metric_entity_reference")),
         scene_ready=bool(value.get("scene_ready", True)),
         scene_ready_gate_enabled=bool(value.get("scene_ready_gate_enabled", False)),
     )
+
+
+def _metric_entity_reference(value: Any) -> Optional[MetricEntityReference]:
+    if isinstance(value, MetricEntityReference):
+        return value
+    if not isinstance(value, Mapping):
+        return None
+    required = {
+        "entity_key", "camera", "coordinate_frame", "reference_world_m",
+        "valid_depth_count", "mask_pixel_count", "valid_depth_ratio",
+        "depth_median_m", "depth_spread_m", "depth_source", "source_frame_id", "valid",
+    }
+    if not required.issubset(value):
+        return None
+    point = value.get("reference_world_m")
+    if point is not None and not isinstance(point, (list, tuple)):
+        return None
+    try:
+        return MetricEntityReference(
+            entity_key=str(value["entity_key"]), camera=str(value["camera"]),
+            coordinate_frame=str(value["coordinate_frame"]),
+            reference_world_m=tuple(float(v) for v in point) if point is not None else None,
+            valid_depth_count=int(value["valid_depth_count"]),
+            mask_pixel_count=int(value["mask_pixel_count"]),
+            valid_depth_ratio=float(value["valid_depth_ratio"]),
+            depth_median_m=(float(value["depth_median_m"])
+                            if value.get("depth_median_m") is not None else None),
+            depth_spread_m=(float(value["depth_spread_m"])
+                            if value.get("depth_spread_m") is not None else None),
+            depth_source=str(value["depth_source"]),
+            source_frame_id=str(value["source_frame_id"]),
+            valid=bool(value["valid"]),
+            invalid_reason=(str(value["invalid_reason"])
+                            if value.get("invalid_reason") is not None else None),
+        )
+    except (TypeError, ValueError, OverflowError):
+        return None

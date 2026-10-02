@@ -11,13 +11,15 @@ from core.runtime_v3.canonical_image import CanonicalImageAdapter
 from core.runtime_v3.scene_settling import (
     SceneReadyEvidence,
     action_excess_motion,
-    compare_oracle_and_sam_pixel_motion,
     displacement,
-    project_world_motion_to_canonical_pixels,
     require_matched_duration,
     scene_readiness_sample,
-    target_motion_curve,
     validate_no_action_commands,
+)
+from scripts.runtime_v3_scene_settling_diagnostic import (
+    compare_oracle_and_sam_pixel_motion,
+    project_world_motion_to_canonical_pixels,
+    target_motion_curve,
 )
 
 

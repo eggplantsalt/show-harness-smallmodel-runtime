@@ -39,12 +39,14 @@ from core.runtime_v3.object_relative import ObjectRelativeAlignmentOptionGenerat
 from core.runtime_v3.runner import RuntimeV3Runner
 from core.runtime_v3.scene_settling import (
     action_excess_motion,
-    compare_oracle_and_sam_pixel_motion,
     displacement,
-    project_world_motion_to_canonical_pixels,
     require_matched_duration,
-    target_motion_curve,
     validate_no_action_commands,
+)
+from scripts.runtime_v3_scene_settling_diagnostic import (
+    compare_oracle_and_sam_pixel_motion,
+    project_world_motion_to_canonical_pixels,
+    target_motion_curve,
 )
 from core.runtime_v3.selector import DeterministicSelector
 from core.runtime_v3.state import StateBuilder

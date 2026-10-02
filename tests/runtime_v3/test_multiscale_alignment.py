@@ -7,6 +7,7 @@ import pytest
 from core.capabilities.camera_geometry import CameraCalibration
 from core.runtime_v3.arbiter import Arbiter
 from core.runtime_v3.executor import Executor
+from core.runtime_v3.metric_entity import MetricEntityReference
 from core.runtime_v3.object_relative import (
     DIRECTION_ORDER, MultiScaleAlignmentOptionGenerator,
     make_multiscale_alignment_option, resolve_object_relative_geometry,
@@ -246,9 +247,27 @@ def test_candidate_lattice_artifact_keeps_every_candidate_and_marks_the_winner()
 
 def test_qwen_oracle_diagnostic_fields_cannot_change_runtime_candidate_choice():
     selected = _picked_geometry()
-    baseline = make_multiscale_alignment_option(_state_for(selected))
+    baseline_state = _state_for(selected)
+    baseline = make_multiscale_alignment_option(baseline_state)
     annotated = make_multiscale_alignment_option(_state_for(
         selected, extras={"qwen_requested_direction": "UP", "qwen_requested_scale_m": 0.009,
-                          "oracle_target_world_position_m": [99, 99, 99]}))
+                          "oracle_target_world_position_m": [99, 99, 99],
+                          "runtime_metric_distance_m": 0.001,
+                          "metric_entity_reference_world_m": [-99, 99, -99]}))
+    formal_reference = MetricEntityReference(
+        entity_key="semantic entity", camera="agentview", coordinate_frame="world",
+        reference_world_m=(-99.0, 99.0, -99.0), valid_depth_count=4, mask_pixel_count=4,
+        valid_depth_ratio=1.0, depth_median_m=1.0, depth_spread_m=0.0,
+        depth_source="monocular_metric", source_frame_id="frame-1", valid=True,
+    )
+    state_with_estimated_3d_evidence = replace(
+        baseline_state,
+        object_relative_state=replace(
+            baseline_state.object_relative_state,
+            metric_entity_reference=formal_reference,
+        ),
+    )
+    with_metric = make_multiscale_alignment_option(state_with_estimated_3d_evidence)
     assert annotated.primitive.micro_motion_spec == baseline.primitive.micro_motion_spec
+    assert with_metric.primitive.micro_motion_spec == baseline.primitive.micro_motion_spec
     assert annotated.expected_effect["predicted_improvement_px"] == baseline.expected_effect["predicted_improvement_px"]

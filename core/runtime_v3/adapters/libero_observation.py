@@ -27,7 +27,7 @@ class RawObservation:
 
 
 class LiberoObservationAdapter:
-    """Read-only Observer; it has no environment action/controller reference."""
+    """Read-only RGB/proprio Observer; simulator-only channels are not exposed."""
 
     def __init__(
         self,
@@ -43,6 +43,7 @@ class LiberoObservationAdapter:
         self.on_raw_observation = on_raw_observation
         self.observation_index = 0
         self.last_raw: RawObservation | None = None
+        self.last_observation: RobotObservation | None = None
 
     def observe(self, environment: Any) -> RobotObservation:
         raw = environment.get_observation()
@@ -68,7 +69,8 @@ class LiberoObservationAdapter:
             eef_position_xyz=position,
             eef_quaternion=quaternion,
             gripper_width_m=width,
-            raw_keys=tuple(sorted(str(key) for key in raw.keys())),
+            raw_keys=tuple(sorted(str(key) for key in raw.keys()
+                                  if not str(key).casefold().endswith("_depth"))),
         )
         self.last_raw = record
         if self.on_raw_observation is not None:
@@ -92,7 +94,7 @@ class LiberoObservationAdapter:
         ) if wrist is not None else (
             f"libero:observation:{self.observation_index}:agentview",
         )
-        return RobotObservation(
+        observation = RobotObservation(
             observation_id=f"libero-observation-{self.observation_index}",
             frame_id=self.observation_index,
             images={"agentview": agentview, "wrist": wrist},
@@ -115,3 +117,5 @@ class LiberoObservationAdapter:
             fresh=True,
             done=False,
         )
+        self.last_observation = observation
+        return observation
