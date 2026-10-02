@@ -98,7 +98,7 @@ class RuntimeV3Runner:
                 if action.primitive.kind == "micro_motion":
                     execution = self.executor.execute(
                         action,
-                        tick_observer=lambda: self.observer.observe(environment),
+                        tick_observer=lambda: self._observe_execution_tick(environment),
                     )
                 else:
                     execution = self.executor.execute(action)
@@ -150,6 +150,13 @@ class RuntimeV3Runner:
 
         status = "DONE" if self.state.done else "STEP_LIMIT"
         return {"status": status, "actions": actions, "state": self.state}
+
+    def _observe_execution_tick(self, environment: Any) -> Any:
+        """Allow perceptual observers to keep every low-level tick lightweight."""
+        observe = getattr(self.observer, "observe_for_execution_tick", None)
+        if callable(observe):
+            return observe(environment)
+        return self.observer.observe(environment)
 
 
 def make_deterministic_stub_runner(**kwargs: Any) -> RuntimeV3Runner:
