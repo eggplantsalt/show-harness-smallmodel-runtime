@@ -86,6 +86,18 @@ def test_canonical_vertical_flip_maps_image_mask_point_and_half_open_bbox_togeth
     assert adapter.transform_bbox((2, 1, 5, 3), width=7, height=5) == (2.0, 2.0, 5.0, 4.0)
 
 
+def test_canonical_horizontal_and_180_transforms_keep_raster_coordinates_consistent():
+    image = np.arange(3 * 5, dtype=np.uint8).reshape(3, 5)
+    horizontal = CanonicalImageAdapter("horizontal_flip")
+    rotate = CanonicalImageAdapter("rotate_180")
+    assert np.array_equal(horizontal.transform_mask(image), np.fliplr(image))
+    assert horizontal.transform_point((1, 0), width=5, height=3) == (3.0, 0.0)
+    assert horizontal.transform_bbox((1, 0, 3, 2), width=5, height=3) == (2.0, 0.0, 4.0, 2.0)
+    assert np.array_equal(rotate.transform_mask(image), np.rot90(image, 2))
+    assert rotate.transform_point((1, 0), width=5, height=3) == (3.0, 2.0)
+    assert rotate.transform_bbox((1, 0, 3, 2), width=5, height=3) == (2.0, 1.0, 4.0, 3.0)
+
+
 def test_canonical_eef_projection_uses_the_same_orientation_as_the_image():
     adapter = CanonicalImageAdapter()
     calibration = CameraCalibration(
@@ -149,6 +161,11 @@ def test_target_identity_anchor_is_built_from_the_initial_selected_mask():
     assert np.array_equal(anchor.initial_mask, mask)
 
 
+def test_target_identity_anchor_is_not_created_without_a_valid_mask():
+    segmentation = segmentation_from_response({"success": True, "details": {"detections": []}}, (32, 40))
+    assert make_target_identity_anchor(segmentation, target_phrase="salad dressing", frame_id=1) is None
+
+
 def test_same_target_mask_is_associated_by_overlap_even_if_another_candidate_scores_higher():
     anchor_mask = np.zeros((64, 80), dtype=bool)
     anchor_mask[10:22, 10:25] = True
@@ -167,6 +184,21 @@ def test_same_target_mask_is_associated_by_overlap_even_if_another_candidate_sco
     assert association.candidate_metrics[1]["mask_iou"] == 1.0
 
 
+def test_identity_association_rejects_a_mask_from_a_different_source_resolution():
+    anchor_mask = np.zeros((64, 80), dtype=bool)
+    anchor_mask[10:20, 10:20] = True
+    anchor = TargetIdentityAnchor("salad dressing", anchor_mask, (14.5, 14.5),
+                                  (10, 10, 20, 20), int(anchor_mask.sum()), "0", 1)
+    wrong_resolution_mask = np.zeros((32, 40), dtype=bool)
+    wrong_resolution_mask[5:10, 5:10] = True
+    candidate = TargetCandidate("1", 0, 1, wrong_resolution_mask, (7.0, 7.0),
+                                (5, 5, 10, 10), int(wrong_resolution_mask.sum()), 0.9)
+    result = associate_target_candidate(anchor, [candidate])
+    assert result.status == "TARGET_IDENTITY_LOST"
+    assert result.candidate is None
+    assert result.candidate_metrics[0]["reason"] == "candidate_mask_or_geometry_unavailable"
+
+
 def test_different_object_cannot_replace_anchor_and_identity_loss_has_no_improvement_metric():
     anchor_mask = np.zeros((64, 80), dtype=bool)
     anchor_mask[10:22, 10:25] = True
@@ -183,6 +215,16 @@ def test_different_object_cannot_replace_anchor_and_identity_loss_has_no_improve
     assert verification["error_after_px"] is None
     assert verification["actual_improvement_px"] is None
     assert verification["alignment_improved"] is None
+
+
+def test_valid_same_target_verification_computes_actual_improvement():
+    verification = alignment_verification_metrics(10.0, 7.0, identity_status="SAME_TARGET")
+    assert verification == {
+        "verification_status": "SAME_TARGET",
+        "error_after_px": 7.0,
+        "actual_improvement_px": 3.0,
+        "alignment_improved": True,
+    }
 
 
 def test_identity_lost_state_cannot_generate_alignment_option():
