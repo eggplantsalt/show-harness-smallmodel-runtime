@@ -43,6 +43,8 @@ class Executor:
             raise TypeError("Executor accepts only an action authorized by its Arbiter")
         if action.primitive.max_steps != 1:
             raise ValueError("Executor accepts exactly one Arbiter-approved option")
+        if not self.arbiter.consume_approval(action):
+            raise TypeError("an Arbiter-approved action can be executed only once")
         started = time.monotonic()
         if action.primitive.kind == "micro_motion":
             if tick_observer is None:

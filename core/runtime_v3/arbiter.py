@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from enum import Enum
+from threading import Lock
 from typing import Any, Mapping, Sequence
 
 from .options import PrimitiveCommand, RuntimeOption
@@ -38,6 +39,29 @@ class ArbiterDecision:
     reason: str = ""
 
 
+class _ApprovalToken:
+    """Private mutable one-use capability carried by an approved action."""
+
+    __slots__ = ("_arbiter_seal", "_consumed", "_lock")
+
+    def __init__(self, arbiter_seal: object) -> None:
+        self._arbiter_seal = arbiter_seal
+        self._consumed = False
+        self._lock = Lock()
+
+    def belongs_to(self, arbiter_seal: object) -> bool:
+        return self._arbiter_seal is arbiter_seal
+
+    def consume(self, arbiter_seal: object) -> bool:
+        if not self.belongs_to(arbiter_seal):
+            return False
+        with self._lock:
+            if self._consumed:
+                return False
+            self._consumed = True
+            return True
+
+
 def _read_path(value: Any, path: str) -> Any:
     current = value
     for part in path.split("."):
@@ -53,7 +77,16 @@ class Arbiter:
         self.__seal = object()
 
     def is_approved(self, action: ApprovedAction) -> bool:
-        return isinstance(action, ApprovedAction) and action._approval is self.__seal
+        token = action._approval if isinstance(action, ApprovedAction) else None
+        return isinstance(token, _ApprovalToken) and token.belongs_to(self.__seal)
+
+    def consume_approval(self, action: ApprovedAction) -> bool:
+        """Consume one approved action for one Executor.execute call."""
+        if not self.is_approved(action):
+            return False
+        token = action._approval
+        assert isinstance(token, _ApprovalToken)
+        return token.consume(self.__seal)
 
     def authorize(
         self,
@@ -129,7 +162,7 @@ class Arbiter:
             evidence_frame_id=state.frame_id,
             start_eef_position_xyz_m=start_position,
             workspace_z_bounds_m=workspace_z_bounds,
-            _approval=self.__seal,
+            _approval=_ApprovalToken(self.__seal),
         )
         return ArbiterDecision(DecisionKind.APPROVED, action=action)
 
