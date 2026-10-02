@@ -15,12 +15,20 @@ class Selection:
     option_id: str
     status: str = "SELECTED"
     raw_output: str = ""
+    parsed_selection: str | None = None
+    prompt_chars: int | None = None
+    latency_s: float | None = None
 
 
 class DeterministicSelector:
     """Safe stub used until a compact model adapter is configured."""
 
+    def __init__(self, option_id: str | None = None) -> None:
+        self.option_id = option_id
+
     def select(self, state: BeliefState, options: Sequence[RuntimeOption]) -> Selection:
+        if self.option_id is not None and any(o.option_id == self.option_id for o in options):
+            return Selection(self.option_id, parsed_selection=self.option_id)
         return Selection("REOBSERVE", status="REOBSERVE", raw_output="stub")
 
 
@@ -75,4 +83,4 @@ class CompactVLMSelector:
         valid = {o.option_id for o in options} | {"REOBSERVE", "ABORT"}
         if choice not in valid:
             return Selection("INVALID_SELECTION", status="INVALID_SELECTION", raw_output=encoded)
-        return Selection(choice, status="SELECTED", raw_output=encoded)
+        return Selection(choice, status="SELECTED", raw_output=encoded, parsed_selection=choice)

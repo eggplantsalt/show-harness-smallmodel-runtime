@@ -47,24 +47,46 @@ class RuntimeV3Runner:
         done_fn: Optional[Callable[[Any], bool]] = None,
     ) -> dict[str, Any]:
         if reset:
-            environment.reset()
-        self.state = self.state_builder.initialize(task_id)
-        observation = self.observer.observe(environment)
-        self.state = self.state_builder.update(self.state, observation)
+            try:
+                environment.reset()
+            except Exception as exc:
+                return {"status": "ENV_INIT_FAILED", "reason": f"{type(exc).__name__}: {exc}", "actions": 0}
+        try:
+            self.state = self.state_builder.initialize(task_id)
+            observation = self.observer.observe(environment)
+        except Exception as exc:
+            return {"status": "OBSERVATION_FAILED", "reason": f"{type(exc).__name__}: {exc}", "actions": 0}
+        try:
+            self.state = self.state_builder.update(self.state, observation)
+        except Exception as exc:
+            return {"status": "STATE_BUILD_FAILED", "reason": f"{type(exc).__name__}: {exc}", "actions": 0}
         actions = 0
         reobservations = 0
 
         while not self.state.done and actions + reobservations < max_steps:
-            options = self.option_generator.generate(self.state)
-            selection = self.selector.select(self.state, options)
-            decision = self.arbiter.authorize(self.state, options, selection)
+            try:
+                options = self.option_generator.generate(self.state)
+            except Exception as exc:
+                return {"status": "OPTION_GENERATION_FAILED", "reason": f"{type(exc).__name__}: {exc}",
+                        "actions": actions, "state": self.state}
+            try:
+                selection = self.selector.select(self.state, options)
+                decision = self.arbiter.authorize(self.state, options, selection)
+            except Exception as exc:
+                return {"status": "ARBITER_REJECTED", "reason": f"{type(exc).__name__}: {exc}",
+                        "actions": actions, "state": self.state}
             if decision.kind == DecisionKind.REOBSERVE:
                 reobservations += 1
-                observation = self.observer.observe(environment)
-                self.state = self.state_builder.update(self.state, observation)
+                try:
+                    observation = self.observer.observe(environment)
+                    self.state = self.state_builder.update(self.state, observation)
+                except Exception as exc:
+                    return {"status": "OBSERVATION_FAILED", "reason": f"{type(exc).__name__}: {exc}",
+                            "actions": actions, "state": self.state}
                 continue
             if decision.kind in {DecisionKind.ABORT, DecisionKind.INVALID_SELECTION}:
-                return {"status": decision.kind.value, "reason": decision.reason,
+                return {"status": "ARBITER_REJECTED", "decision": decision.kind.value,
+                        "reason": decision.reason,
                         "actions": actions, "state": self.state}
 
             action = decision.action
@@ -72,19 +94,27 @@ class RuntimeV3Runner:
                 return {"status": "ABORT", "reason": "arbiter returned no approved action",
                         "actions": actions, "state": self.state}
             before = self.state
-            execution = self.executor.execute(action)
+            try:
+                execution = self.executor.execute(action)
+            except Exception as exc:
+                return {"status": "EXECUTION_FAILED", "reason": f"{type(exc).__name__}: {exc}",
+                        "actions": actions, "state": self.state}
             actions += 1
 
             # Every approved primitive is followed by a new observation before
             # the next option selection.
-            observation = self.observer.observe(environment)
-            after = self.state_builder.update(
-                before,
-                observation,
-                action=action.option_id,
-                expected_effect=action.expected_effect,
-            )
-            effect = self.effect_observer.compare(before, action.expected_effect, after)
+            try:
+                observation = self.observer.observe(environment)
+                after = self.state_builder.update(
+                    before,
+                    observation,
+                    action=action.option_id,
+                    expected_effect=action.expected_effect,
+                )
+                effect = self.effect_observer.compare(before, action.expected_effect, after)
+            except Exception as exc:
+                return {"status": "EFFECT_NOT_OBSERVED", "reason": f"{type(exc).__name__}: {exc}",
+                        "actions": actions, "state": before}
             self.state = replace(after, last_observed_effect={
                 "expected": dict(effect.expected),
                 "observed": dict(effect.observed),
@@ -92,12 +122,18 @@ class RuntimeV3Runner:
                 "unexpected_motion": effect.unexpected_motion,
                 "no_effect": effect.no_effect,
                 "uncertainty": effect.uncertainty,
+                "before_eef_position": effect.before_eef_position,
+                "after_eef_position": effect.after_eef_position,
+                "expected_delta": effect.expected_delta,
+                "observed_delta": effect.observed_delta,
             })
             if self.logger is not None:
                 self.logger({
+                    "step_id": before.step_id,
                     "state_before": before,
                     "options": options,
                     "selection": selection,
+                    "arbiter_result": {"kind": decision.kind.value, "reason": decision.reason},
                     "approved_action": action,
                     "execution": execution,
                     "state_after": self.state,

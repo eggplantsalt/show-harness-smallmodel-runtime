@@ -61,7 +61,8 @@ def test_invalid_selector_id_never_executes():
         effect_observer=EffectObserver(),
     )
     result = runner.run_episode(Environment(), task_id="invalid", max_steps=2)
-    assert result["status"] == DecisionKind.INVALID_SELECTION.value
+    assert result["status"] == "ARBITER_REJECTED"
+    assert result["decision"] == DecisionKind.INVALID_SELECTION.value
     assert backend.calls == []
 
 
@@ -126,7 +127,7 @@ def test_state_builder_returns_one_canonical_belief_state():
 def test_runtime_v3_has_no_legacy_policy_imports():
     forbidden = ("visual_route", "recursive", "recovery", "verified_runtime",
                  "runtime_v2", "mem_text", "placement_review")
-    for path in (ROOT / "core/runtime_v3").glob("*.py"):
+    for path in (ROOT / "core/runtime_v3").rglob("*.py"):
         tree = ast.parse(path.read_text())
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom):

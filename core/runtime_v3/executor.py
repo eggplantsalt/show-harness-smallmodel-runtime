@@ -58,7 +58,8 @@ class LiberoPrimitiveBackend:
         if primitive.kind == "move":
             if primitive.token is None:
                 raise ValueError("move primitive requires an atomic token")
-            action = self.controller.action_for_atomic(primitive.token)
+            step_m = primitive.parameters.get("step_m")
+            action = self.controller.action_for_atomic(primitive.token, step_m=step_m)
         elif primitive.kind == "grasp":
             action = self.controller.close_gripper()
         elif primitive.kind == "release":
@@ -67,4 +68,13 @@ class LiberoPrimitiveBackend:
             action = self.controller.hold_action()
         else:
             raise ValueError(f"unsupported primitive kind: {primitive.kind}")
-        return self.environment.step(action)
+        result = self.environment.step(action)
+        if isinstance(result, tuple) and len(result) >= 4:
+            info = result[3]
+            return {
+                "backend_returned": True,
+                "done": bool(result[1]),
+                "truncated": bool(result[2]),
+                "info_keys": sorted(str(key) for key in info) if isinstance(info, dict) else [],
+            }
+        return {"backend_returned": True}

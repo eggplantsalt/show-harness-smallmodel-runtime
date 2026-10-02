@@ -17,6 +17,7 @@ class BeliefState:
     target_image_position: Optional[tuple[float, float]] = None
     end_effector_state: Optional[Mapping[str, Any]] = None
     gripper_state: Optional[str] = None
+    gripper_width_m: Optional[float] = None
     holding_state: Optional[str] = None
     contact_state: Optional[str] = None
     relevant_geometry: Mapping[str, Any] = field(default_factory=dict)
@@ -60,6 +61,7 @@ class StateBuilder:
             target_image_position=evidence.get("target_image_position", previous.target_image_position),
             end_effector_state=proprioception.get("end_effector_state"),
             gripper_state=proprioception.get("gripper_state"),
+            gripper_width_m=proprioception.get("gripper_width_m"),
             holding_state=evidence.get("holding_state", previous.holding_state),
             contact_state=evidence.get("contact_state", previous.contact_state),
             relevant_geometry=geometry,
