@@ -6,7 +6,7 @@
 | --- | --- |
 | `LiberoEnvironmentAdapter` creates, resets, steps, checks, and closes the simulator | `core.sim.libero_task.make_libero_task`, `reset_libero`, `step_libero`, `libero_success`; task reset is configured with `settle_steps=0` |
 | `LiberoObservationAdapter` reads cameras and robot state | `libero_rgb`, `libero_tcp`, `libero_quat`, and `libero_gripper_width` from `core.sim.libero_task` |
-| `LiberoPrimitiveBackend` converts a sealed V3 action to one LIBERO action | Existing `interpreters.libero_atomic_controller.LiberoAtomicController`; `action_for_atomic("MV_UP", step_m=0.005)` produces the existing 7D OSC_POSE action, and the backend submits it through the environment adapter once |
+| `LiberoPrimitiveBackend` converts a sealed V3 action to a LIBERO action | Existing `interpreters.libero_atomic_controller.LiberoAtomicController`; one-tick primitives still map directly to one 7D OSC_POSE action. A bounded micro-motion maps its semantic direction (for example, `LEFT`) to the configured `MV_LEFT` token inside the backend, then submits one 5 mm control-tick command per Executor iteration. |
 | `QwenSelectorAdapter` for the no-action selector check | Existing `core.vlm.vlm_client.VLMClient.complete_json`, constructed with `core.sim.launch.build_config` / `make_vlm_client` |
 | Raw smoke records | Small JSONL/JSON writer in `scripts/runtime_v3_smoke.py`; raw camera frames are saved as PNG |
 
@@ -32,8 +32,8 @@ LiberoEnvironmentAdapter.create
 → SmokeOptionGenerator.generate
 → DeterministicSelector.select
 → Arbiter.authorize
-→ Executor.execute
-→ LiberoPrimitiveBackend.execute_approved_action
+→ Executor.execute (one approved option)
+→ LiberoPrimitiveBackend.execute_approved_action or execute_approved_micro_tick
 → LiberoEnvironmentAdapter.step / core.sim.libero_task.step_libero / env.step
 → LiberoObservationAdapter.observe
 → StateBuilder.update
@@ -192,6 +192,50 @@ as an option semantic unit, but this experiment did not change RuntimeOption
 or Executor; both remain one-tick. Full raw and corrected projections, ratios,
 off-axis magnitudes, direction cosines, and per-tick trajectories are in
 `rollouts/runtime_v3_response/run_20261002T063447Z_ca3cc2bc/`.
+
+## Bounded micro-motion execution and cross-state trial
+
+`BoundedMicroMotionOptionGenerator` emits semantic IDs such as
+`MOVE_LEFT_SMALL`; the option stores a `BoundedMicroMotionSpec` with a 3 mm
+projection request, at most five ticks, and a 5 mm command per control tick.
+The Arbiter seals the spec with the fresh starting EEF position and observed
+workspace Z bounds. The Executor repeats only the approved direction and calls
+the Observer after every control tick. It stops on target projection, negative
+incremental progress, the tick limit, or before the next tick would cross the Z
+envelope. The backend maps semantic direction to `MV_*`; the RuntimeOption does
+not expose that controller token. Each execution remains one option selection
+and one Arbiter approval.
+
+The calibration used `LIBERO_OBJECT` task 2, seed 0, init states 0, 1, and 2.
+Every trial started with four HOLD ticks and tested each of FWD, BACK, LEFT,
+RIGHT, UP, and DOWN once, for 18 bounded executions. Target success is exactly
+projection >= 3 mm. No prompt tuning, alternative seeds, or movement-vector
+changes were used.
+
+| Direction | n | Target reached | Mean projection (mm) | Mean absolute error (mm) | Mean ticks | Mean off-axis (mm) | Mean direction cosine |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| FWD | 3 | 3/3 | 3.213 | 0.213 | 4.00 | 0.795 | 0.9703 |
+| BACK | 3 | 3/3 | 3.157 | 0.157 | 4.00 | 0.919 | 0.9590 |
+| LEFT | 3 | 3/3 | 3.376 | 0.376 | 3.33 | 0.214 | 0.9968 |
+| RIGHT | 3 | 3/3 | 3.823 | 0.823 | 4.00 | 0.256 | 0.9972 |
+| UP | 3 | 3/3 | 3.413 | 0.413 | 3.33 | 0.230 | 0.9977 |
+| DOWN | 3 | 3/3 | 4.058 | 1.058 | 4.00 | 0.312 | 0.9958 |
+
+All 18 trials terminated as `TARGET_REACHED`; there were no `MAX_TICKS_REACHED`,
+`NEGATIVE_PROGRESS`, or `BOUNDARY_STOP` outcomes. By init state, each state
+reached 6/6 targets. Mean projection / absolute error / off-axis / direction
+cosine were: state 0, 3.534 / 0.534 / 0.522 mm / 0.9848; state 1, 3.359 /
+0.359 / 0.517 mm / 0.9842; and state 2, 3.627 / 0.627 / 0.324 mm / 0.9894.
+FWD and BACK have the largest cross-axis displacement (0.795 and 0.919 mm);
+DOWN has the largest mean overshoot (1.058 mm). These remain diagnostic values,
+not extra pass thresholds.
+
+Machine-readable tick observations, projections, off-axis deltas, execution
+durations, termination reasons, and the state-by-direction summary are in
+`rollouts/runtime_v3_micro_motion/run_20261002T081115Z_34899d71/`. Every trial
+also has an `agentview`/`wrist` MP4 and its source PNG frames. The data cover
+three init states from one LIBERO task with one execution per direction/state;
+they do not measure cross-task transfer or repeat variance.
 
 ## Qwen selector contract
 

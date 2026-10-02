@@ -27,7 +27,7 @@ Observer -> RobotObservation -> StateBuilder -> BeliefState
     -> OptionGenerator -> RuntimeOption[]
     -> Selector -> SelectedOptionID
     -> Arbiter -> ApprovedAction | REOBSERVE | ABORT
-    -> Executor -> one bounded primitive
+    -> Executor -> one bounded primitive or one bounded micro-motion
     -> Observer -> new BeliefState -> EffectObserver -> EffectRecord
 ```
 
@@ -45,16 +45,23 @@ and those options. Its schema accepts an option ID, `REOBSERVE`, or `ABORT`.
 Invalid output is returned as `INVALID_SELECTION` and never guessed.
 
 `Arbiter` is the only action authority. It verifies option membership,
-preconditions, evidence freshness, and the one-primitive bound, then produces a
+preconditions, evidence freshness, and the execution bound, then produces a
 sealed `ApprovedAction`. `Executor` checks that approval and is the only module
-that calls the atomic controller. Each execution is followed by a new
-observation before another selection.
+that calls the atomic controller. A bounded micro-motion is one approval whose
+spec fixes a semantic direction, requested displacement, and maximum of five
+control ticks. Executor repeats only that direction, observes the EEF after
+each tick, and stops at the target projection, on negative progress, at the
+tick limit, or before crossing the approved workspace Z bounds. It cannot
+change direction or replan inside the approved motion. Runner resumes option
+selection only after this bounded realization completes.
 
-The temporal calibration procedure can repeat the same bounded token across
-multiple control ticks to measure its response. Each tick still runs a fresh
-observe → option → selector → Arbiter → Executor cycle, and each Executor call
-remains one tick. The experiment does not change the production option or
-execution bound.
+The earlier temporal-response calibration repeated tokens as separate
+single-tick V3 cycles. The bounded micro-motion calibration now measures the
+production execution unit: four separately approved HOLD pre-settle ticks,
+followed by one Arbiter-approved `MOVE_<DIRECTION>_SMALL` option. Executor
+repeats that direction with a fresh physical observation after each control
+tick. The target is 3 mm and the initial hard budget is five ticks; this is the
+first conservative scale, not a claim that 3 mm is optimal.
 
 Memory currently defines only `ExperienceRecord` and `ExperienceStore`. It
 does not learn, alter policy, or inject legacy RSI/textual lessons.
@@ -65,5 +72,6 @@ does not learn, alter policy, or inject legacy RSI/textual lessons.
 - Verified Options: every candidate carries its preconditions and evidence.
 - Bounded Semantic Selection: the VLM chooses among IDs or requests reobserve/abort.
 - Single Arbiter: only Arbiter creates an approved action.
-- Bounded Execution: one primitive is executed before observation resumes.
+- Bounded Execution: one primitive or one same-direction micro-motion is
+  executed before option selection resumes.
 - Effect Re-observation: expected effects are compared with new robot/image evidence.

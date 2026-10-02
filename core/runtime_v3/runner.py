@@ -95,7 +95,13 @@ class RuntimeV3Runner:
                         "actions": actions, "state": self.state}
             before = self.state
             try:
-                execution = self.executor.execute(action)
+                if action.primitive.kind == "micro_motion":
+                    execution = self.executor.execute(
+                        action,
+                        tick_observer=lambda: self.observer.observe(environment),
+                    )
+                else:
+                    execution = self.executor.execute(action)
             except Exception as exc:
                 return {"status": "EXECUTION_FAILED", "reason": f"{type(exc).__name__}: {exc}",
                         "actions": actions, "state": self.state}
