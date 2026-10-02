@@ -107,6 +107,25 @@ def test_b_qwen_adapter_parses_legal_option_id():
     assert "OPTION_X" in client.kwargs["prompt"]
 
 
+def test_qwen_valid_structured_output_matches_exact_bounded_schema():
+    client = FakeQwenClient('{"selection":"OPTION_X"}')
+    selector = QwenSelectorAdapter(client, "instruction")
+    selection = selector.select(_state(), [_option()])
+    assert selection.status == "SELECTED"
+    assert selection.option_id == "OPTION_X"
+    assert client.kwargs["schema"]["additionalProperties"] is False
+    assert client.kwargs["schema"]["required"] == ["selection"]
+
+
+@pytest.mark.parametrize("raw", ["MV_LEFT", "move left"])
+def test_qwen_invalid_raw_motion_and_natural_language_fail_closed(raw):
+    selection = QwenSelectorAdapter(FakeQwenClient(raw), "instruction").select(
+        _state(), [_option()]
+    )
+    assert selection.status == "INVALID_SELECTION"
+    assert selection.option_id == "INVALID_SELECTION"
+
+
 def test_c_qwen_adapter_rejects_nonexistent_option():
     client = FakeQwenClient('{"selection":"OPTION_999"}')
     selection = QwenSelectorAdapter(client, "instruction").select(_state(), [_option()])
