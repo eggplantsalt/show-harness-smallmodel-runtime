@@ -33,20 +33,20 @@ class BoundedMicroMotionSpec:
         tick_step = float(self.control_tick_step_m)
         if not math.isfinite(requested) or requested <= 0:
             raise ValueError("requested_displacement_m must be finite and positive")
-        if requested > 0.003:
-            raise ValueError("requested_displacement_m cannot exceed the initial 3 mm V3 scale")
+        if requested > 0.009:
+            raise ValueError("requested_displacement_m cannot exceed the calibrated 9 mm V3 scale")
         if not math.isfinite(tick_step) or tick_step <= 0:
             raise ValueError("control_tick_step_m must be finite and positive")
         if tick_step > 0.005:
             raise ValueError("control_tick_step_m cannot exceed the calibrated 5 mm control tick")
         if isinstance(self.max_ticks, bool):
-            raise ValueError("max_ticks must be between 1 and 5")
+            raise ValueError("max_ticks must be between 1 and 10")
         try:
             ticks = int(self.max_ticks)
         except (TypeError, ValueError, OverflowError) as exc:
-            raise ValueError("max_ticks must be between 1 and 5") from exc
-        if ticks != self.max_ticks or not 1 <= ticks <= 5:
-            raise ValueError("max_ticks must be between 1 and 5")
+            raise ValueError("max_ticks must be between 1 and 10") from exc
+        if ticks != self.max_ticks or not 1 <= ticks <= 10:
+            raise ValueError("max_ticks must be between 1 and 10")
         object.__setattr__(self, "direction", direction)
         object.__setattr__(self, "direction_unit", unit)
         object.__setattr__(self, "requested_displacement_m", requested)

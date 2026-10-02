@@ -426,6 +426,8 @@ def resolve_object_relative_geometry(
     move_vectors: Mapping[str, Sequence[float]],
     workspace_z_bounds_m: Sequence[float] | None,
     requested_displacement_m: float = REQUESTED_ALIGNMENT_M,
+    candidate_scales_m: Sequence[float] | None = None,
+    scale_contracts: Mapping[float, Mapping[str, Any]] | None = None,
     canonical_image_adapter: CanonicalImageAdapter | None = None,
 ) -> dict[str, Any]:
     """Project six physical hypotheses and rank them by predicted image error."""
@@ -434,6 +436,8 @@ def resolve_object_relative_geometry(
         "object_relative_alignment_valid": False,
         "candidate_directions": [],
         "chosen_candidate": None,
+        "candidate_lattice": [],
+        "chosen_lattice_candidate": None,
         "reason": None,
     }
     if calibration is None:
@@ -526,6 +530,83 @@ def resolve_object_relative_geometry(
                    if best["predicted_improvement_px"] > 0.0
                    else "no_candidate_predicted_to_improve_alignment"),
     }
+    if candidate_scales_m is not None:
+        contracts = {float(scale): contract for scale, contract in (scale_contracts or {}).items()}
+        lattice: list[dict[str, Any]] = []
+        for raw_scale in candidate_scales_m:
+            try:
+                scale = float(raw_scale)
+            except (TypeError, ValueError):
+                continue
+            contract = contracts.get(scale)
+            contract_valid = bool(contract and contract.get("verified"))
+            try:
+                max_ticks = int(contract["max_ticks"]) if contract else None
+            except (KeyError, TypeError, ValueError):
+                max_ticks = None
+            if max_ticks is None or not 1 <= max_ticks <= 10:
+                contract_valid = False
+            for direction in DIRECTION_ORDER:
+                token = f"MV_{direction}"
+                row: dict[str, Any] = {
+                    "direction": direction,
+                    "displacement_m": scale,
+                    "displacement_mm": scale * 1000.0,
+                    "scale_contract_valid": contract_valid,
+                    "max_ticks": max_ticks,
+                    "workspace_valid": False,
+                    "valid": False,
+                    "reason": None,
+                }
+                if not math.isfinite(scale) or not 0 < scale <= 0.009:
+                    row["reason"] = "scale_outside_calibrated_range"
+                    lattice.append(row)
+                    continue
+                try:
+                    unit = np.asarray(move_vectors[token], dtype=float).reshape(3)
+                except (KeyError, TypeError, ValueError):
+                    row["reason"] = "direction_mapping_missing"
+                    lattice.append(row)
+                    continue
+                norm = float(np.linalg.norm(unit))
+                if (not np.all(np.isfinite(unit))
+                        or not math.isclose(norm, 1.0, rel_tol=1e-6, abs_tol=1e-6)):
+                    row["reason"] = "direction_mapping_invalid"
+                    lattice.append(row)
+                    continue
+                hypothetical = position + unit * scale
+                row.update({"direction_unit": unit.tolist(),
+                            "hypothetical_eef_xyz_m": hypothetical.tolist()})
+                if hypothetical[2] < bounds[0] or hypothetical[2] > bounds[1]:
+                    row["reason"] = "workspace_boundary"
+                    lattice.append(row)
+                    continue
+                row["workspace_valid"] = True
+                projected = project_point(calibration, hypothetical)
+                if projected is None or not projected["in_frame"]:
+                    row["reason"] = "hypothetical_projection_invalid"
+                    lattice.append(row)
+                    continue
+                projected_canonical = project_to_observation(projected["pixel_xy"])
+                after_error = float(np.linalg.norm(target - np.asarray(projected_canonical)))
+                improvement = before_error - after_error
+                final_valid = contract_valid and improvement > 0.0
+                row.update({
+                    "predicted_projection_px": list(projected_canonical),
+                    "predicted_error_px": after_error,
+                    "predicted_improvement_px": improvement,
+                    "valid": final_valid,
+                    "reason": ("scale_contract_not_verified" if not contract_valid else
+                               None if improvement > 0.0 else "no_predicted_improvement"),
+                })
+                lattice.append(row)
+        eligible = [item for item in lattice if item.get("valid")]
+        result["candidate_lattice"] = lattice
+        result["chosen_lattice_candidate"] = (
+            max(eligible, key=lambda item: item["predicted_improvement_px"])
+            if eligible else None
+        )
+        result["multiscale_alignment_valid"] = bool(eligible)
     return result
 
 
@@ -599,6 +680,78 @@ class ObjectRelativeAlignmentOptionGenerator:
         return [option] if option is not None else []
 
 
+def make_multiscale_alignment_option(state: BeliefState) -> RuntimeOption | None:
+    """Seal the geometry-selected, Stage-A-verified scale into one semantic option."""
+    relative = state.object_relative_state
+    geometry = state.relevant_geometry
+    choice = geometry.get("chosen_lattice_candidate")
+    if (relative is None or not relative.target_visible or relative.eef_projection_px is None
+            or relative.target_reference_point_px is None or not relative.target_reference_valid
+            or relative.target_identity_status not in {"ANCHORED", "SAME_TARGET"}
+            or not bool(geometry.get("camera_projection_valid"))
+            or not bool(geometry.get("workspace_valid"))
+            or not bool(geometry.get("multiscale_alignment_valid"))
+            or not isinstance(choice, Mapping)
+            or not bool(choice.get("valid"))
+            or not bool(choice.get("scale_contract_valid"))
+            or not bool(choice.get("workspace_valid"))):
+        return None
+    try:
+        direction = str(choice["direction"])
+        unit = tuple(float(value) for value in choice["direction_unit"])
+        displacement = float(choice["displacement_m"])
+        max_ticks = int(choice["max_ticks"])
+        before = float(geometry["pixel_error_before_px"])
+        predicted_after = float(choice["predicted_error_px"])
+        predicted_improvement = float(choice["predicted_improvement_px"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if len(unit) != 3 or not all(math.isfinite(value) for value in
+                                 (displacement, before, predicted_after, predicted_improvement)):
+        return None
+    spec = BoundedMicroMotionSpec(
+        direction=direction, direction_unit=unit,
+        requested_displacement_m=displacement, max_ticks=max_ticks,
+        control_tick_step_m=CONTROL_TICK_STEP_M,
+    )
+    return RuntimeOption(
+        option_id="ALIGN_TO_TARGET_BOUNDED",
+        option_type="object_relative_verified_alignment",
+        description="Reduce frozen target-reference error using a verified bounded realization.",
+        preconditions={
+            "observation_fresh": True,
+            "object_relative_state.target_visible": True,
+            "relevant_geometry.camera_projection_valid": True,
+            "relevant_geometry.workspace_valid": True,
+            "relevant_geometry.multiscale_alignment_valid": True,
+        },
+        expected_effect={
+            "target_phrase": relative.target_phrase,
+            "target_reference_px": list(relative.target_reference_point_px),
+            "image_error_before_px": before,
+            "predicted_image_error_after_px": predicted_after,
+            "predicted_improvement_px": predicted_improvement,
+            "physical_direction": direction,
+            "physical_displacement_m": displacement,
+            "physical_scale_contract_verified": True,
+            "verification": "reproject_eef_to_frozen_target_reference",
+        },
+        primitive=PrimitiveCommand(
+            kind="micro_motion", max_steps=1, max_duration_s=5.0,
+            micro_motion_spec=spec,
+        ),
+        confidence=1.0, evidence=state.evidence_refs, evidence_frame_id=state.frame_id,
+    )
+
+
+class MultiScaleAlignmentOptionGenerator:
+    """Expose one semantic ALIGN option for the lowest-error valid lattice point."""
+
+    def generate(self, state: BeliefState) -> list[RuntimeOption]:
+        option = make_multiscale_alignment_option(state)
+        return [option] if option is not None else []
+
+
 class ObjectRelativePerceptionObserver:
     """Add SAM3 target evidence and camera-calibrated hypotheses to an observer."""
 
@@ -612,6 +765,8 @@ class ObjectRelativePerceptionObserver:
         confidence_threshold: float = SAM3_CONFIDENCE_THRESHOLD,
         canonical_image_adapter: CanonicalImageAdapter | None = None,
         scene_ready_required: bool = False,
+        alignment_scales_m: Sequence[float] | None = None,
+        scale_contracts: Mapping[float, Mapping[str, Any]] | None = None,
     ) -> None:
         self.base_observer = base_observer
         self.sam3 = sam3
@@ -621,6 +776,9 @@ class ObjectRelativePerceptionObserver:
                              for key, value in move_vectors.items()}
         self.canonical_image_adapter = canonical_image_adapter or CanonicalImageAdapter()
         self.scene_ready_required = bool(scene_ready_required)
+        self.alignment_scales_m = (tuple(float(v) for v in alignment_scales_m)
+                                   if alignment_scales_m is not None else None)
+        self.scale_contracts = dict(scale_contracts or {})
         self.scene_ready_evidence = SceneReadyEvidence() if self.scene_ready_required else None
         self.identity_anchor: TargetIdentityAnchor | None = None
         self.reference_anchor: TargetReferenceAnchor | None = None
@@ -805,6 +963,8 @@ class ObjectRelativePerceptionObserver:
             calibration=calibration,
             move_vectors=self.move_vectors,
             workspace_z_bounds_m=workspace,
+            candidate_scales_m=self.alignment_scales_m,
+            scale_contracts=self.scale_contracts,
             canonical_image_adapter=self.canonical_image_adapter,
         )
         self.last_resolution = geometry
@@ -886,6 +1046,9 @@ class ObjectRelativePerceptionObserver:
             ),
             "dynamic_sam_error_px": dynamic_sam_error,
             "candidate_directions": geometry.get("candidate_directions", []),
+            "candidate_lattice": geometry.get("candidate_lattice", []),
+            "chosen_lattice_candidate": geometry.get("chosen_lattice_candidate"),
+            "multiscale_alignment_valid": bool(geometry.get("multiscale_alignment_valid")),
             "chosen_candidate": (geometry.get("chosen_candidate") if segmentation.visible else None),
             "sam3_error": response.get("error") if not segmentation.visible else None,
             "sam3_confidence_threshold": self.confidence_threshold,
