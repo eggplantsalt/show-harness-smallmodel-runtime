@@ -12,7 +12,7 @@ from dataclasses import asdict, is_dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import urlparse
 
 import numpy as np
@@ -159,6 +159,7 @@ def _oracle_target_world_position(environment: Any) -> dict[str, Any]:
 def _save_reference_comparison_overlay(
     *, observer: ObjectRelativePerceptionObserver, before: dict[str, Any] | None,
     after: dict[str, Any] | None, predicted_projection_px: Any, output_path: Path,
+    scene_ready_trigger_tick: int | None = None,
 ) -> str | None:
     if before is None or after is None:
         return None
@@ -216,6 +217,10 @@ def _save_reference_comparison_overlay(
         else:
             legend_draw.ellipse((9, y+2, 19, y+12), outline=color, width=2)
         legend_draw.text((24, y), label, fill=color)
+    if scene_ready_trigger_tick is not None:
+        legend_draw.rectangle((5, 492, 282, 510), fill=(0, 0, 0))
+        legend_draw.text((9, 494), f"SCENE READY TRIGGER TICK {scene_ready_trigger_tick}",
+                         fill=(255, 255, 255))
     output_path.parent.mkdir(parents=True, exist_ok=True)
     image.save(output_path)
     return str(output_path)
@@ -254,6 +259,7 @@ def _run_trial(
     sam3: Sam3Client,
     workspace: tuple[float, float],
     camera_resolution: int,
+    diagnostic_callback: Callable[[str, Any], dict[str, Any] | None] | None = None,
 ) -> dict[str, Any]:
     trial_dir = run_dir / f"init_state_{init_state_index}"
     trial_dir.mkdir(parents=True, exist_ok=False)
@@ -278,6 +284,7 @@ def _run_trial(
     pre_action_ready_record: dict[str, Any] | None = None
     formal_initial_frame: dict[str, Any] | None = None
     scene_ready_result: dict[str, Any] | None = None
+    oracle_tick_diagnostics: list[dict[str, Any]] = []
     environment = LiberoEnvironmentAdapter.create(
         suite_name=SUITE,
         task_id=TASK_ID,
@@ -336,6 +343,12 @@ def _run_trial(
         )
         if not scene_ready_result.get("ready") or not observer.scene_ready:
             raise RuntimeError(f"visual SceneReady was not established: {scene_ready_result}")
+        scene_ready_trigger_tick = next(
+            (int(sample["environment_step"]) for sample in scene_ready_result.get("samples", [])
+             if sample.get("scene_ready")), None,
+        )
+        if scene_ready_trigger_tick is None:
+            raise RuntimeError("SceneReady passed without a trigger tick in its initialization trace")
 
         def write_pre_action_ready(state, options, selection) -> None:
             nonlocal oracle_before, pre_action_ready_record, formal_initial_frame
@@ -360,6 +373,10 @@ def _run_trial(
                 selected_direction=selected_direction,
             ))
             oracle_before = _oracle_target_world_position(environment)
+            if diagnostic_callback is not None:
+                diagnostic = diagnostic_callback("PRE_ACTION_READY", environment)
+                if diagnostic is not None:
+                    oracle_tick_diagnostics.append(diagnostic)
             chosen = next((candidate for candidate in state.relevant_geometry.get("candidate_directions", [])
                            if candidate.get("direction") == selected_direction and candidate.get("valid")), None)
             pre_action_ready_record = {
@@ -375,6 +392,8 @@ def _run_trial(
                                                  if chosen else None),
                 "before_artifacts": dict(before_artifacts),
                 "scene_ready": observer.scene_ready,
+                "scene_ready_trigger_tick": scene_ready_trigger_tick,
+                "stable_anchor_environment_tick": int(environment.step_count),
                 "scene_ready_evidence": (observer.scene_ready_evidence.to_record()
                                           if observer.scene_ready_evidence else None),
                 "logger_writable": True,
@@ -390,6 +409,19 @@ def _run_trial(
 
         arbiter = CountingArbiter(before_authorize=write_pre_action_ready)
         backend = LiberoPrimitiveBackend(environment, controller, arbiter)
+
+        def observe_execution_tick(current_environment):
+            # The returned Runtime observation contains only EEF/proprioception.
+            # Diagnostic oracle data is recorded separately and its return value
+            # is deliberately discarded here.
+            observation = base_observer.observe(current_environment)
+            if diagnostic_callback is not None:
+                diagnostic = diagnostic_callback("EXECUTOR_TICK", current_environment)
+                if diagnostic is not None:
+                    oracle_tick_diagnostics.append(diagnostic)
+            return observation
+
+        observer.observe_for_execution_tick = observe_execution_tick
         runner = RuntimeV3Runner(
             observer=observer,
             state_builder=StateBuilder(),
@@ -519,6 +551,7 @@ def _run_trial(
             after=final,
             predicted_projection_px=predicted_eef_projection,
             output_path=artifacts_dir / "reference_comparison.png",
+            scene_ready_trigger_tick=scene_ready_trigger_tick,
         )
         oracle_displacement_vector = None
         oracle_displacement_norm = None
@@ -539,6 +572,7 @@ def _run_trial(
             "pre_settle_hold_ticks": PRE_SETTLE_TICKS,
             "pre_settle_cycles": pre_settle,
             "scene_ready_initialization": scene_ready_result,
+            "scene_ready_trigger_environment_tick": scene_ready_trigger_tick,
             "source_resolution_before": {
                 "agentview": ([int(initial["image"].shape[1]), int(initial["image"].shape[0])]
                               if initial else None),
@@ -671,6 +705,7 @@ def _run_trial(
                 "fed_to_arbiter": False,
                 "fed_to_executor": False,
                 "fed_to_qwen": False,
+                "tick_samples": oracle_tick_diagnostics,
             },
             "camera_unchanged": bool(initial and final
                                      and initial.get("camera_signature") == final.get("camera_signature")),

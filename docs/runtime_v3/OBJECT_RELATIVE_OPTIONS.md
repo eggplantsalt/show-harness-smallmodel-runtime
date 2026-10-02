@@ -10,6 +10,14 @@ This phase adds one canonical image convention and one-frame target identity
 continuity to the bounded Runtime V3 alignment experiment. It does not add
 closed-loop alignment, recovery, grasping, placement, or a memory component.
 
+The initialization prerequisite is
+`Observation → RobotReady → SceneReady → Target Grounding → Identity Anchor →
+Reference Anchor → Verified Option Generation`. SceneReady is a Runtime
+precondition that verifies the scene is ready for a visual reference. It does
+not determine an action or act as a policy/planner/recovery module. The gate
+uses associated SAM geometry only; oracle target poses are diagnostic artifacts
+and never enter Runtime.
+
 ## Image convention
 
 The vendored robosuite sets `IMAGE_CONVENTION = "opengl"`; its mapping is `1`,
@@ -188,3 +196,34 @@ The first fresh-run attempt stopped in before-overlay setup with a
 `NameError` and wrote no `PRE_ACTION_READY`; its three trials had zero bounded
 executions and are excluded. The image-size bug was fixed and covered by a test
 before the successful re-test run above.
+
+## SceneReady online validation and stable single-step trials (2026-10-02)
+
+The initialization-only experiment extended coverage to init states 0–5, with
+four separate RobotReady HOLDs followed by SceneReady HOLDs and exactly three
+diagnostic HOLDs after each trigger. All six trials passed. Trigger ticks were
+10, 12, 11, 13, 10, and 11 (mean 11.17); there were no timeouts or false-ready
+curves. Review classified two triggers as aligned with the observed tick-10
+near-stationary tail and four as late by one to three ticks. Parameters were
+left unchanged. The raw xyz/z and SAM geometry traces and contact sheets are in
+`rollouts/runtime_v3_scene_ready_validation/run_20261002T114329Z_08d48db9/`.
+
+The Stage B trials reuse these six init states and allow at most one bounded
+object-relative action per episode. Oracle target poses are sampled after each
+Executor tick in a separate diagnostic trace; only the Runtime observation is
+returned to Executor. Frozen-reference improvement remains the formal metric.
+The single-step result and control-window motion assessment are recorded in
+the adjacent `stage_b/` directory.
+
+All six stable trials selected `DOWN`, received exactly one Arbiter approval,
+and executed one bounded motion. Frozen-reference error improved in 6/6
+trials: mean 164.394 → 162.395 px, or +1.9995 px actual improvement versus
++1.4980 px predicted (mean residual +0.5015 px). Same-target identity was
+retained throughout. Oracle displacement during each control window was
+4.42e-9 m or less, a continuation of the Stage A HOLD-only decay tail; the
+projected shift rounded to 0.00 px at the existing projection precision, and
+the maximum post-SAM centroid shift was 0.008 px. No trial showed obvious
+post-ready target motion. Runtime received none of the oracle diagnostics and
+Qwen actions remained zero. This supports the single-step verified-option
+contract for the tested task/seed/states and permits considering multi-step
+alignment as the next milestone; this phase does not implement it.

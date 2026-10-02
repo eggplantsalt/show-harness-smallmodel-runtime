@@ -1,5 +1,18 @@
 # Runtime V3 Status
 
+## SceneReady and single-step validation (2026-10-02)
+
+- Started from `218d2e0e30e4bed5854fef175dd8955ff88760a3` on `runtime-v3`; the starting tree was clean and synchronized with `origin/runtime-v3`.
+- Added `scripts/runtime_v3_validate_scene_ready.py` with a hold-only Stage A and a separately gated Stage B. Stage A inspects the available init-state inventory, then uses the first six states in order.
+- Stage A ran `LIBERO_OBJECT` task 2 / seed 0 / states 0–5 at 512×512. The existing 3-frame, 0.02 px centroid, 0 px bbox-edge, 1 px area gate was unchanged, with a 40-HOLD limit. RobotReady completed at tick 4; SceneReady triggers were ticks 10, 12, 11, 13, 10, 11 (mean 11.17): 6/6 ready, 0/6 timeout, 0/6 false-ready.
+- Per-tick xyz/z curves show the reset object motion decays into a near-stationary tail around tick 10. All three post-ready HOLD deltas per trial continue the decaying tail without a renewed excursion. Trigger assessment: 2 aligned with tick 10 and 4 late by 1–3 ticks. Keep the existing threshold for this task/seed/state range; stochastic SAM and cross-task generality remain untested.
+- After reviewing Stage A raw curves, Stage B ran the same six states with one bounded `ALIGN_TO_TARGET_SMALL` per episode. Runtime selected `DOWN` in all six; there were exactly six bounded motions and six Arbiter approvals total. Qwen actions: 0.
+- All six Stage B trials had valid frozen-reference metrics and improved: mean error 164.394 → 162.395 px, mean actual improvement +1.9995 px versus +1.4980 px predicted, with +0.5015 px mean residual. Same-target identity was retained 6/6.
+- Oracle target displacement during the action windows was at most 4.42e-9 m and continued the Stage A HOLD-only settling tail. The projected shift rounded to 0.00 px at the existing 0.01 px precision; maximum post-SAM centroid shift was 0.008 px. No trial showed obvious post-ready target motion. Oracle data remained outside Runtime state and authority.
+- The earlier 56.593 mm action/control displacement is now explained by reset settling: matched ACTION and NO_ACTION curves were identical, and this gate waits until the tail has decayed. A matched hold comparison showed excess motion 0.
+- Added 15 SceneReady-focused tests. Final `PYTHONPATH=. .venv/bin/pytest tests/runtime_v3 -q`: 127 passed. Full `.venv` suite: 341 passed, 2 skipped, and one CoTracker fixture failed because that Python lacks `torch`; that exact test passed in the LIBERO Python environment (1 passed).
+- Stage A and Stage B artifacts, traces, `oracle_motion_curves.png`, contact sheets, PRE_ACTION_READY records, and comparison overlays are under `rollouts/runtime_v3_scene_ready_validation/run_20261002T114329Z_08d48db9/`.
+
 ## Target reference phase (2026-10-02)
 
 - Started from `030f20fdca1385adb93f281560db1ffa78e8cba3` on `runtime-v3`; the frozen-reference offline replay passed with improvements of +1.881, +1.934, and +2.041 px. The old dynamic-SAM metric remained negative in all three episodes.
@@ -51,22 +64,20 @@
 ## Not implemented
 
 - No reliable Runtime contact detector or visual target-motion detector is available to invalidate a reference when the target moves.
-- No matched no-action control explains the 56.593 mm target-body displacement measured during the bounded-motion windows.
 - No multi-step alignment, GRASP, RELEASE, placement, recovery, VisualRoute, reflection, RSI, experience/visual memory, learned tracker, training, or benchmark run was added.
-- Results cover one LIBERO task, seed 0, and three fixed init states; there is no cross-task validation or repeat-variance study.
+- Results cover one LIBERO task, seed 0, and six fixed init states; there is no cross-task validation or repeat-variance study.
 
 ## Git and legacy isolation
 
-- Active branch: `runtime-v3`, starting this phase from `030f20fdca1385adb93f281560db1ffa78e8cba3`.
+- Active branch: `runtime-v3`, starting this phase from `218d2e0e30e4bed5854fef175dd8955ff88760a3`.
 - The frozen legacy tag and its policy files were not modified.
 - This task's code, experiment, and selector artifacts remain in the Runtime V3 worktree; do not merge them into the frozen legacy baseline.
 
 ## Next gate
 
-Do **not** advance to multi-step object-relative alignment yet. The fixed pixel
-reference improved in 3/3 trials, but the target body moved by 56.593 mm during
-each observation window while Runtime had no invalidation signal. First
-diagnose that motion with a matched no-action control and establish a
-non-oracle observation signal for target motion; keep oracle poses diagnostic
-only. Reconsider multi-step alignment only after a same-object, stationary
-reference gate is supported by the evidence.
+The Stage A gate, stable Stage B control window, and single-step frozen-reference
+improvement all passed in the tested six states. Multi-step object-relative
+alignment is the next milestone to consider. It has not been implemented; the
+next phase should still cap each decision to one bounded execution and preserve
+the oracle/Runtime separation while testing whether fresh observations support
+another verified option.

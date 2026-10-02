@@ -7,6 +7,17 @@ from typing import Any
 from .temporal_calibration import run_v3_tick
 
 
+def scene_ready_status(*, ready: bool, hold_ticks: int, max_hold_ticks: int) -> str:
+    """Name the bounded visual-gate outcome without consulting diagnostics."""
+    if int(hold_ticks) < 0 or int(max_hold_ticks) < 0:
+        raise ValueError("SceneReady hold counts cannot be negative")
+    if ready:
+        return "SCENE_READY"
+    if int(hold_ticks) >= int(max_hold_ticks):
+        return "SCENE_READY_TIMEOUT"
+    return "SCENE_READY_PENDING"
+
+
 def run_scene_ready_holds(
     environment: Any,
     observer: Any,
@@ -68,4 +79,6 @@ def run_scene_ready_holds(
             return {"ready": True, "hold_ticks": len(commands), "samples": samples,
                     "commands": commands}
     return {"ready": False, "hold_ticks": len(commands), "samples": samples,
-            "commands": commands, "reason": "SCENE_READY_WINDOW_NOT_MET_WITHIN_BOUND"}
+            "commands": commands,
+            "reason": scene_ready_status(ready=False, hold_ticks=len(commands),
+                                         max_hold_ticks=max_hold_ticks)}

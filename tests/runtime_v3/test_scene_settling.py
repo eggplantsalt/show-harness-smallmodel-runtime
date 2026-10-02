@@ -171,3 +171,162 @@ def test_no_action_trial_uses_runtime_hold_path_and_never_requests_a_move_token(
     assert '"kind": "HOLD"' in no_action
     assert '"translation_command_count": 0' in no_action
     assert "validate_no_action_commands(commands)" in no_action
+
+
+def test_scene_ready_window_does_not_trigger_before_three_samples():
+    gate = SceneReadyEvidence()
+    sample = {"target_identity_status": "SAME_TARGET", "centroid_px": [10, 20],
+              "bbox_xyxy": [2, 4, 30, 45], "mask_area_px": 234}
+    assert [gate.update(**sample) for _ in range(2)] == [False, False]
+    assert gate.ready is False
+    assert gate.update(**sample) is True
+
+
+def test_centroid_instability_clears_stability_window_and_keeps_new_sample():
+    gate = SceneReadyEvidence()
+    sample = {"target_identity_status": "SAME_TARGET", "centroid_px": [10, 20],
+              "bbox_xyxy": [2, 4, 30, 45], "mask_area_px": 234}
+    gate.update(**sample)
+    gate.update(**sample)
+    moved = {**sample, "centroid_px": [10.03, 20]}
+    assert gate.update(**moved) is False
+    assert gate.to_record()["stable_observation_count"] == 1
+    assert gate.to_record()["last_visual_interval"]["centroid_shift_px"] > 0.02
+
+
+def test_bbox_edge_instability_clears_stability_window():
+    gate = SceneReadyEvidence()
+    sample = {"target_identity_status": "SAME_TARGET", "centroid_px": [10, 20],
+              "bbox_xyxy": [2, 4, 30, 45], "mask_area_px": 234}
+    gate.update(**sample)
+    gate.update(**sample)
+    changed = {**sample, "bbox_xyxy": [2, 4, 31, 45]}
+    assert gate.update(**changed) is False
+    assert gate.to_record()["stable_observation_count"] == 1
+    assert gate.to_record()["last_visual_interval"]["bbox_max_edge_shift_px"] == 1.0
+
+
+def test_mask_area_instability_clears_stability_window():
+    gate = SceneReadyEvidence()
+    sample = {"target_identity_status": "SAME_TARGET", "centroid_px": [10, 20],
+              "bbox_xyxy": [2, 4, 30, 45], "mask_area_px": 234}
+    gate.update(**sample)
+    gate.update(**sample)
+    changed = {**sample, "mask_area_px": 236}
+    assert gate.update(**changed) is False
+    assert gate.to_record()["stable_observation_count"] == 1
+    assert gate.to_record()["last_visual_interval"]["mask_area_change_px"] == 2
+
+
+def test_identity_loss_clears_scene_ready_evidence():
+    gate = SceneReadyEvidence()
+    sample = {"target_identity_status": "SAME_TARGET", "centroid_px": [10, 20],
+              "bbox_xyxy": [2, 4, 30, 45], "mask_area_px": 234}
+    gate.update(**sample)
+    assert gate.update(**{**sample, "target_identity_status": "TARGET_IDENTITY_LOST"}) is False
+    assert gate.to_record()["stable_observation_count"] == 0
+
+
+def test_missing_mask_geometry_clears_scene_ready_evidence():
+    gate = SceneReadyEvidence()
+    sample = {"target_identity_status": "SAME_TARGET", "centroid_px": [10, 20],
+              "bbox_xyxy": [2, 4, 30, 45], "mask_area_px": 234}
+    gate.update(**sample)
+    assert gate.update(**{**sample, "bbox_xyxy": None}) is False
+    assert gate.to_record()["stable_observation_count"] == 0
+
+
+def test_scene_ready_timeout_has_explicit_status_and_does_not_become_ready():
+    from core.runtime_v3.scene_initialization import scene_ready_status
+
+    assert scene_ready_status(ready=False, hold_ticks=39, max_hold_ticks=40) == "SCENE_READY_PENDING"
+    assert scene_ready_status(ready=False, hold_ticks=40, max_hold_ticks=40) == "SCENE_READY_TIMEOUT"
+    assert scene_ready_status(ready=True, hold_ticks=40, max_hold_ticks=40) == "SCENE_READY"
+
+
+def test_scene_ready_status_rejects_negative_tick_counts():
+    from core.runtime_v3.scene_initialization import scene_ready_status
+
+    with pytest.raises(ValueError, match="cannot be negative"):
+        scene_ready_status(ready=False, hold_ticks=-1, max_hold_ticks=40)
+
+
+def test_scene_ready_update_contract_has_no_oracle_argument():
+    signature = inspect.signature(SceneReadyEvidence.update)
+    assert not any("oracle" in name.casefold() for name in signature.parameters)
+    assert set(signature.parameters) == {
+        "self", "target_identity_status", "centroid_px", "bbox_xyxy", "mask_area_px",
+    }
+
+
+def test_false_ready_measurements_are_artifact_only_and_not_runtime_inputs():
+    runtime_source = (ROOT / "core/runtime_v3/object_relative.py").read_text(encoding="utf-8")
+    init_source = (ROOT / "core/runtime_v3/scene_initialization.py").read_text(encoding="utf-8")
+    validation_source = (ROOT / "scripts/runtime_v3_validate_scene_ready.py").read_text(encoding="utf-8")
+    assert "oracle_target_world_position_m" not in runtime_source
+    assert "environment.env.sim.data.xpos" not in runtime_source
+    assert "oracle_target_world_position_m" not in init_source
+    assert '"oracle_used_by_runtime": False' in validation_source
+    assert "false_ready_assessment" in validation_source
+
+
+def test_scene_ready_trigger_tick_is_written_to_each_validation_trace():
+    source = (ROOT / "scripts/runtime_v3_validate_scene_ready.py").read_text(encoding="utf-8")
+    assert '"scene_ready_triggered_this_tick"' in source
+    assert '"scene_ready_trigger_tick"' in source
+    assert '"trigger_environment_tick"' in source
+
+
+def test_scene_ready_trace_records_sam_geometry_and_oracle_curve_separately():
+    source = (ROOT / "scripts/runtime_v3_validate_scene_ready.py").read_text(encoding="utf-8")
+    for field in ("centroid_px", "bbox_xyxy", "mask_area_px", "stable_window_length",
+                  "target_delta_from_previous_tick_m", "target_displacement_from_previous_tick_norm_m",
+                  "z_m"):
+        assert field in source
+    assert '"oracle_used_by_runtime": False' in source
+
+
+def test_validation_script_uses_zero_qwen_and_runtime_hold_helper():
+    source = (ROOT / "scripts/runtime_v3_validate_scene_ready.py").read_text(encoding="utf-8")
+    assert "Qwen" not in source
+    assert '"qwen_action_count": 0' in source
+    assert "run_v3_tick(" in source
+    assert "token=None" in source
+
+
+def test_runner_physical_execution_still_routes_through_executor():
+    from core.runtime_v3 import runner
+
+    source = inspect.getsource(runner.RuntimeV3Runner.run_episode)
+    assert "self.executor.execute(" in source
+    assert "execute_approved_micro_tick" not in source
+
+
+def test_one_stable_alignment_option_gets_exactly_one_arbiter_approval():
+    from core.runtime_v3.options import BoundedMicroMotionSpec, PrimitiveCommand, RuntimeOption
+    from core.runtime_v3.selector import Selection
+    from core.runtime_v3.state import BeliefState
+    from scripts.runtime_v3_object_relative_alignment import CountingArbiter
+
+    state = BeliefState(
+        task_id="LIBERO_OBJECT:2", step_id=1, frame_id=7, observation_fresh=True,
+        evidence_refs=("frame-7",),
+        end_effector_state={"position_xyz": [0.0, 0.0, 0.3]},
+        relevant_geometry={"workspace_valid": True, "workspace_z_bounds_m": [0.02, 0.6]},
+    )
+    option = RuntimeOption(
+        option_id="ALIGN_TO_TARGET_SMALL", option_type="object_relative_alignment",
+        description="one bounded alignment", preconditions={
+            "observation_fresh": True, "relevant_geometry.workspace_valid": True,
+        }, expected_effect={}, primitive=PrimitiveCommand(
+            kind="micro_motion", max_steps=1, max_duration_s=5.0,
+            micro_motion_spec=BoundedMicroMotionSpec(
+                direction="FWD", direction_unit=(1.0, 0.0, 0.0),
+            ),
+        ), confidence=1.0, evidence=("frame-7",), evidence_frame_id=7,
+    )
+    arbiter = CountingArbiter(before_authorize=lambda *_args: None)
+    decision = arbiter.authorize(state, [option], Selection("ALIGN_TO_TARGET_SMALL"))
+    assert decision.kind.value == "APPROVED"
+    assert arbiter.authorization_calls == 1
+    assert arbiter.approval_count == 1

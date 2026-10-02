@@ -31,6 +31,30 @@ Observer -> RobotObservation -> StateBuilder -> BeliefState
     -> Observer -> new BeliefState -> EffectObserver -> EffectRecord
 ```
 
+## Online initialization preconditions
+
+Object-relative control starts only after this Runtime-owned chain completes:
+
+```text
+Observation → RobotReady → SceneReady → Target Grounding → Identity Anchor
+            → Reference Anchor → Verified Option Generation
+```
+
+`RobotReady` and `SceneReady` are separate milestones. RobotReady confirms the
+existing four bounded zero-translation HOLDs completed. SceneReady checks that
+the same associated SAM target has a consecutive visual window with stable
+centroid, bounding-box edges, and mask area. The current gate uses a three
+observation window, thresholds of 0.02 px / 0 px / 1 px, and a maximum of 40
+HOLD ticks. Oracle poses are excluded from this gate and remain experiment
+diagnostics only.
+
+SceneReady is a Runtime precondition for establishing a stable visual
+reference. It does not choose the robot's next action and is not a planner,
+policy, or recovery behavior. After it passes, target grounding and the two
+stage-local anchors provide evidence for ordinary verified option generation.
+If the bounded window expires, initialization reports `SCENE_READY_TIMEOUT`
+and control does not proceed.
+
 The only canonical state is `core.runtime_v3.state.BeliefState`. It carries
 task/step/stage, target identity and confidence, target pose or image position,
 end-effector and gripper state, holding/contact evidence, relevant geometry,

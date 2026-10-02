@@ -18,10 +18,19 @@ with “stable servo reference”.
 
 ## Establishment and lifetime
 
-The first valid target identity association creates one reference point from
-that frame's mask centroid. The reference belongs to the current pre-contact
-alignment stage, current camera, and current visual coordinate convention. It
-is not an object pose and is never reconstructed from simulator state.
+Before a stable reference exists, SceneReady uses same-instance association to
+check a three-observation visual window. Once that gate passes, Runtime grounds
+the target, promotes the settled associated mask to `TargetIdentityAnchor`, and
+creates `TargetReferenceAnchor` from its centroid. The reference belongs to
+the current pre-contact alignment stage, current camera, and current visual
+coordinate convention. It is not an object pose and is never reconstructed
+from simulator state.
+
+The complete initialization order is `Observation → RobotReady → SceneReady →
+Target Grounding → Identity Anchor → Reference Anchor → Verified Option
+Generation`. RobotReady remains a distinct four-HOLD precondition. SceneReady
+is Runtime prerequisite verification, not policy or action selection. It uses
+associated SAM geometry only and times out after at most 40 HOLD ticks.
 
 While the anchor is valid, the geometry resolver and alignment error use its
 fixed `reference_point_px`. Later SAM centroids remain available for identity,
@@ -104,3 +113,24 @@ Do not use this result to authorize multi-step alignment. First explain the
 target movement and establish an observation-only way to distinguish actual
 target motion from segmentation-shape changes without using oracle state in
 Runtime.
+
+## SceneReady online validation (2026-10-02)
+
+The separate initialization-only validation ran task 2 / seed 0 / init states
+0–5 at 512×512. All six trials triggered SceneReady at environment ticks
+10–13; none timed out. The raw diagnostic oracle curves enter a near-stationary
+tail around tick 10. In each trial, the three post-ready HOLD deltas continued
+the already-decaying tail without a renewed excursion. This evaluation was
+performed after recording the raw curves; the oracle was not supplied to
+Runtime. Full per-tick records and the reviewed classification are under
+`rollouts/runtime_v3_scene_ready_validation/run_20261002T114329Z_08d48db9/`.
+
+This supports the current thresholds for this task, seed, and six init-state
+indices. It does not establish stochastic SAM or cross-task robustness. The
+single-step re-test then ran one bounded action in each of the same six states.
+All six frozen-reference errors improved; mean target world displacement
+during the control window was at most 4.42e-9 m, with no renewed settling
+excursion relative to the HOLD-only traces. Projected target pixel motion
+rounded to 0.00 px at the existing 0.01 px projection precision. Runtime did
+not receive oracle data. Per-tick records and comparison overlays are under
+`rollouts/runtime_v3_scene_ready_validation/run_20261002T114329Z_08d48db9/stage_b/`.
