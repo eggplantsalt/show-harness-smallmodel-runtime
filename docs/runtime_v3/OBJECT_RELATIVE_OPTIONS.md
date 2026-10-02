@@ -1,5 +1,11 @@
 # Runtime V3 canonical images and same-target alignment
 
+> **2026-10-02 update:** The original results below used a dynamic post-action
+> SAM centroid as the measured error. The frozen-reference replay and new
+> target-motion diagnostic are recorded in [Target reference re-test](#target-reference-re-test-2026-10-02).
+> The earlier attribution to SAM mask-shape instability alone is superseded:
+> the re-test found actual target-body motion during the same observation window.
+
 This phase adds one canonical image convention and one-frame target identity
 continuity to the bounded Runtime V3 alignment experiment. It does not add
 closed-loop alignment, recovery, grasping, placement, or a memory component.
@@ -120,3 +126,65 @@ completed one bounded motion for each reset init state, then hit a result-loggin
 `UnboundLocalError` before writing measurements. Those three executions are
 excluded from the reported metrics; the corrected, recorded experiment above
 ran three fresh reset episodes and one motion per episode.
+
+## Target reference re-test (2026-10-02)
+
+### Offline replay of the previous three executions
+
+The run `run_20261002T095805Z_f05c03ac` was replayed without using its
+post-action SAM centroid for the frozen metric. The reference is each trial's
+before-frame target centroid. The dynamic column preserves the original metric.
+
+| Init state | Dynamic-SAM improvement (px) | Frozen-reference before → after (px) | Frozen improvement (px) |
+|---:|---:|---:|---:|
+| 0 | -24.168 | 140.188 → 138.307 | +1.881 |
+| 1 | -24.334 | 143.096 → 141.161 | +1.934 |
+| 2 | -24.620 | 130.734 → 128.693 | +2.041 |
+
+Frozen-reference improvement is 3/3 (mean +1.952 px); dynamic-SAM improvement
+is 0/3 (mean -24.374 px). The old run did not record target body poses on both
+sides of the action. Its oracle record contains only separate initial-reset
+poses, so historical object displacement cannot be calculated; see
+`run_20261002T095805Z_f05c03ac/oracle_motion_availability.json`.
+
+### Fresh bounded trials
+
+The follow-up run `run_20261002T103924Z_241fbc7a` uses task 2, seed 0, init
+states 0/1/2, four HOLD ticks, direct 512×512 rendering, and one Arbiter-approved
+`DOWN` micro-motion per trial. Each trial wrote and read back
+`PRE_ACTION_READY.json` before Arbiter approval. Qwen actions: 0.
+
+| Init | Error before (px) | Direction | Predicted gain (px) | Error after (px) | Actual frozen gain (px) | Residual actual − predicted (px) | Dynamic-SAM gain (px) | SAM centroid shift (px) |
+|---:|---:|---|---:|---:|---:|---:|---:|---:|
+| 0 | 140.188 | DOWN | 1.441 | 138.307 | +1.881 | +0.440 | -24.168 | 29.742 |
+| 1 | 143.096 | DOWN | 1.445 | 141.161 | +1.934 | +0.489 | -24.334 | 29.743 |
+| 2 | 130.734 | DOWN | 1.441 | 128.693 | +2.041 | +0.600 | -24.620 | 29.761 |
+
+Identity was retained 3/3; the agentview camera signature was unchanged 3/3.
+The diagnostic-only `salad_dressing_1_main` world displacement was
+`[0.000001297, -0.000010727, -0.056592971] m` in every trial, norm
+`0.056592972 m` (56.593 mm). No success threshold was imposed. Runtime received
+none of this pose data, and reported no contact, grasp, release, or target-motion
+evidence. The reference therefore remained valid in Runtime even though the
+oracle diagnostic shows the stationary-target assumption failed during the
+measurement window. A matched no-action control is absent, so the measurement
+does not prove that the bounded motion caused the displacement.
+
+The EEF projection moved in the predicted image direction in 3/3 trials. The
+fixed-reference error fell in 3/3, but that only measures distance to the
+initial pixel point after the target itself moved. The dynamic metric became
+more negative and the SAM centroid moved about 30 px. These data support a
+mixed/unresolved root-cause judgment: reference choice explains why the
+original and frozen metrics disagree, while actual target motion prevents
+claiming that the old failure was SAM jitter alone. Keep multi-step alignment
+blocked until the target-motion source is explained and an observation-only
+invalidation signal is established. Oracle poses remain diagnostic only.
+
+The per-trial `artifacts/reference_comparison.png` overlays show the fixed
+reference, before/after EEF projections, predicted projection, and the
+post-action SAM centroid labelled `DIAGNOSTIC ONLY`.
+
+The first fresh-run attempt stopped in before-overlay setup with a
+`NameError` and wrote no `PRE_ACTION_READY`; its three trials had zero bounded
+executions and are excluded. The image-size bug was fixed and covered by a test
+before the successful re-test run above.

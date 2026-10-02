@@ -9,7 +9,7 @@ from typing import Any, Mapping, Optional
 
 @dataclass(frozen=True)
 class ObjectRelativeState:
-    """SAM3 target evidence related to a camera-projected end effector."""
+    """Target identity evidence and the fixed visual control reference."""
 
     target_phrase: str
     target_visible: bool
@@ -26,6 +26,10 @@ class ObjectRelativeState:
     source_height: Optional[int] = None
     target_identity_status: str = "UNANCHORED"
     target_candidate_id: Optional[str] = None
+    target_reference_point_px: Optional[tuple[float, float]] = None
+    target_reference_valid: bool = False
+    target_reference_camera: Optional[str] = None
+    target_reference_invalidation_reason: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -163,4 +167,12 @@ def _object_relative_state(value: Any) -> Optional[ObjectRelativeState]:
         target_identity_status=str(value.get("target_identity_status", "UNANCHORED")),
         target_candidate_id=(str(value["target_candidate_id"])
                              if value.get("target_candidate_id") is not None else None),
+        target_reference_point_px=pair("target_reference_point_px"),
+        target_reference_valid=bool(value.get("target_reference_valid", False)),
+        target_reference_camera=(str(value["target_reference_camera"])
+                                 if value.get("target_reference_camera") is not None else None),
+        target_reference_invalidation_reason=(
+            str(value["target_reference_invalidation_reason"])
+            if value.get("target_reference_invalidation_reason") is not None else None
+        ),
     )

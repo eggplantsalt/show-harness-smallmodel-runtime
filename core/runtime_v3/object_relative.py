@@ -7,7 +7,7 @@ import io
 import json
 import math
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Mapping, Sequence
 
 import numpy as np
@@ -57,6 +57,157 @@ class TargetIdentityAnchor:
     mask_area: int
     candidate_id: str
     frame_id: int | None
+
+
+@dataclass(frozen=True)
+class TargetReferenceAnchor:
+    """Fixed visual pixel reference for one camera-stable pre-contact stage."""
+
+    target_identity: str
+    camera: str
+    reference_point_px: tuple[float, float]
+    reference_source: str
+    source_frame_id: int | None
+    source_bbox_px: tuple[int, int, int, int] | None
+    source_mask_area: int | None
+    camera_signature: tuple[Any, ...]
+    valid: bool = True
+    invalidation_reason: str | None = None
+
+    def invalidate(self, reason: str) -> "TargetReferenceAnchor":
+        return replace(self, valid=False, invalidation_reason=str(reason))
+
+
+def camera_calibration_signature(
+    calibration: CameraCalibration, *, image_orientation: str = "identity",
+) -> tuple[Any, ...]:
+    """Return a stable, hashable signature for the camera/image projection."""
+    position = np.asarray(calibration.position_world, dtype=float).reshape(3)
+    rotation = np.asarray(calibration.camera_to_world, dtype=float).reshape(3, 3)
+    return (
+        str(calibration.name), int(calibration.width), int(calibration.height),
+        round(float(calibration.fovy_deg), 9),
+        *(round(float(value), 9) for value in position),
+        *(round(float(value), 9) for value in rotation.reshape(-1)),
+        int(calibration.rotation_degrees), str(calibration.flip), str(image_orientation),
+    )
+
+
+def make_target_reference_anchor(
+    identity_anchor: TargetIdentityAnchor,
+    *,
+    camera: str,
+    camera_signature: Sequence[Any],
+) -> TargetReferenceAnchor:
+    """Freeze the initial associated mask centroid as the control reference."""
+    return TargetReferenceAnchor(
+        target_identity=identity_anchor.target_phrase,
+        camera=str(camera),
+        reference_point_px=tuple(float(value) for value in identity_anchor.centroid_px),
+        reference_source="initial_associated_sam_mask_centroid",
+        source_frame_id=identity_anchor.frame_id,
+        source_bbox_px=identity_anchor.bbox_xyxy,
+        source_mask_area=identity_anchor.mask_area,
+        camera_signature=tuple(camera_signature),
+    )
+
+
+def invalidate_target_reference_anchor(
+    anchor: TargetReferenceAnchor | None, reason: str
+) -> TargetReferenceAnchor | None:
+    return anchor.invalidate(reason) if anchor is not None and anchor.valid else anchor
+
+
+def frozen_reference_error(
+    reference_point_px: Sequence[float] | None,
+    eef_projection_px: Sequence[float] | None,
+    *,
+    reference_valid: bool = True,
+) -> float | None:
+    """Euclidean pixel distance to a fixed visual target reference."""
+    if not reference_valid or reference_point_px is None or eef_projection_px is None:
+        return None
+    try:
+        reference = np.asarray(reference_point_px, dtype=float).reshape(2)
+        eef = np.asarray(eef_projection_px, dtype=float).reshape(2)
+    except (TypeError, ValueError):
+        return None
+    if not np.all(np.isfinite(reference)) or not np.all(np.isfinite(eef)):
+        return None
+    return float(np.linalg.norm(reference - eef))
+
+
+def compare_alignment_improvements(
+    *, predicted_improvement_px: float | None, actual_improvement_px: float | None,
+) -> dict[str, float | None]:
+    """Compare projected model progress with observed fixed-reference progress."""
+    if predicted_improvement_px is None or actual_improvement_px is None:
+        return {"predicted_improvement_px": predicted_improvement_px,
+                "actual_improvement_px": actual_improvement_px,
+                "prediction_residual_actual_minus_predicted_px": None}
+    predicted, actual = float(predicted_improvement_px), float(actual_improvement_px)
+    if not math.isfinite(predicted) or not math.isfinite(actual):
+        return {"predicted_improvement_px": predicted,
+                "actual_improvement_px": actual,
+                "prediction_residual_actual_minus_predicted_px": None}
+    return {"predicted_improvement_px": predicted,
+            "actual_improvement_px": actual,
+            "prediction_residual_actual_minus_predicted_px": actual - predicted}
+
+
+def reference_invalidation_reason(
+    *,
+    previous_camera_signature: Sequence[Any] | None,
+    current_camera_signature: Sequence[Any] | None,
+    possible_contact: bool = False,
+    target_motion_evidence: bool = False,
+    grasp_event: bool = False,
+    release_event: bool = False,
+    explicit_reground: bool = False,
+) -> str | None:
+    if explicit_reground:
+        return "explicit_re_ground"
+    if (previous_camera_signature is not None and current_camera_signature is not None
+            and tuple(previous_camera_signature) != tuple(current_camera_signature)):
+        return "camera_changed"
+    if possible_contact:
+        return "possible_contact"
+    if target_motion_evidence:
+        return "target_motion_evidence"
+    if grasp_event:
+        return "grasp_event"
+    if release_event:
+        return "release_event"
+    return None
+
+
+def _runtime_invalidation_signals(evidence: Mapping[str, Any]) -> dict[str, bool]:
+    """Read only explicit contact/gripper event signals already present in evidence."""
+    def active(value: Any, states: set[str] | None = None) -> bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.strip().upper() in (states or {"TRUE", "YES", "ACTIVE"})
+        return False
+
+    contact_state = evidence.get("contact_state")
+    gripper_event = evidence.get("gripper_event")
+    gripper_event_name = (gripper_event.strip().upper()
+                          if isinstance(gripper_event, str) else "")
+    return {
+        "possible_contact": active(evidence.get("possible_contact"),
+                                   {"TRUE", "YES", "CONTACT", "POSSIBLE_CONTACT"})
+        or active(evidence.get("contact_detected"), {"TRUE", "YES", "CONTACT"})
+        or active(contact_state, {"TRUE", "YES", "CONTACT", "POSSIBLE_CONTACT"})
+        or (isinstance(contact_state, str)
+            and contact_state.strip().upper() in {"CONTACT", "POSSIBLE_CONTACT"}),
+        "target_motion_evidence": active(evidence.get("target_motion_evidence"),
+                                         {"TRUE", "YES", "MOVED", "MOTION"}),
+        "grasp_event": active(evidence.get("grasp_event"), {"TRUE", "YES", "GRASP", "GRASPED"})
+        or gripper_event_name in {"GRASP", "GRASPED"},
+        "release_event": active(evidence.get("release_event"), {"TRUE", "YES", "RELEASE", "RELEASED"})
+        or gripper_event_name in {"RELEASE", "RELEASED"},
+    }
 
 
 @dataclass(frozen=True)
@@ -267,7 +418,8 @@ def alignment_verification_metrics(
 
 def resolve_object_relative_geometry(
     *,
-    target_centroid_px: Sequence[float] | None,
+    target_centroid_px: Sequence[float] | None = None,
+    target_reference_px: Sequence[float] | None = None,
     eef_position_xyz_m: Sequence[float] | None,
     calibration: CameraCalibration | None,
     move_vectors: Mapping[str, Sequence[float]],
@@ -287,7 +439,9 @@ def resolve_object_relative_geometry(
         invalid["reason"] = "camera_calibration_invalid"
         return invalid
     try:
-        target = np.asarray(target_centroid_px, dtype=float).reshape(2)
+        selected_reference = (target_reference_px if target_reference_px is not None
+                              else target_centroid_px)
+        target = np.asarray(selected_reference, dtype=float).reshape(2)
         position = np.asarray(eef_position_xyz_m, dtype=float).reshape(3)
         bounds = np.asarray(workspace_z_bounds_m, dtype=float).reshape(2)
     except (TypeError, ValueError):
@@ -380,7 +534,8 @@ def make_alignment_option(state: BeliefState) -> RuntimeOption | None:
     geometry = state.relevant_geometry
     choice = geometry.get("chosen_candidate")
     if (relative is None or not relative.target_visible or relative.eef_projection_px is None
-            or relative.target_centroid_px is None or not isinstance(choice, Mapping)
+            or relative.target_centroid_px is None or relative.target_reference_point_px is None
+            or not relative.target_reference_valid or not isinstance(choice, Mapping)
             or relative.target_identity_status not in {"ANCHORED", "SAME_TARGET"}
             or not bool(geometry.get("camera_projection_valid"))
             or not bool(geometry.get("workspace_valid"))
@@ -417,10 +572,11 @@ def make_alignment_option(state: BeliefState) -> RuntimeOption | None:
         },
         expected_effect={
             "target_phrase": relative.target_phrase,
+            "target_reference_px": list(relative.target_reference_point_px),
             "image_error_before_px": before,
             "predicted_image_error_after_px": predicted_after,
             "predicted_improvement_px": predicted_improvement,
-            "verification": "resegment_and_reproject_target_relative_error",
+            "verification": "reproject_eef_to_frozen_target_reference",
         },
         primitive=PrimitiveCommand(
             kind="micro_motion",
@@ -463,10 +619,24 @@ class ObjectRelativePerceptionObserver:
                              for key, value in move_vectors.items()}
         self.canonical_image_adapter = canonical_image_adapter or CanonicalImageAdapter()
         self.identity_anchor: TargetIdentityAnchor | None = None
+        self.reference_anchor: TargetReferenceAnchor | None = None
+        self._camera_signature: tuple[Any, ...] | None = None
+        self._reference_reground_requested = False
+        self._last_reference_invalidation_reason: str | None = None
         self.last_segmentation: TargetSegmentation | None = None
         self.last_calibration: CameraCalibration | None = None
         self.last_resolution: dict[str, Any] = {}
         self.perception_history: list[dict[str, Any]] = []
+
+    def invalidate_target_reference(self, reason: str) -> None:
+        """Invalidate the active reference; it cannot be re-established implicitly."""
+        self._last_reference_invalidation_reason = str(reason)
+        self.reference_anchor = invalidate_target_reference_anchor(self.reference_anchor, reason)
+
+    def request_target_reference_reground(self) -> None:
+        """Explicitly request a new identity association and visual reference."""
+        self.invalidate_target_reference("explicit_re_ground")
+        self._reference_reground_requested = True
 
     def observe_for_execution_tick(self, environment: Any) -> RobotObservation:
         """Collect EEF-only tick evidence; SAM3 runs once after the bounded motion."""
@@ -495,6 +665,9 @@ class ObjectRelativePerceptionObserver:
                 }},
                 candidates=candidate_segmentation.candidates,
             )
+        if self._reference_reground_requested:
+            self.identity_anchor = None
+            self.reference_anchor = None
         if self.identity_anchor is None:
             self.identity_anchor = make_target_identity_anchor(
                 candidate_segmentation,
@@ -563,9 +736,36 @@ class ObjectRelativePerceptionObserver:
         except (AttributeError, KeyError, TypeError, ValueError):
             calibration = None
         self.last_calibration = calibration
+        current_camera_signature = (camera_calibration_signature(
+            calibration, image_orientation=self.canonical_image_adapter.orientation,
+        )
+                                   if calibration is not None else None)
+        signals = _runtime_invalidation_signals(base.evidence)
+        invalidation_reason = reference_invalidation_reason(
+            previous_camera_signature=self._camera_signature,
+            current_camera_signature=current_camera_signature,
+            **signals,
+        )
+        if invalidation_reason is not None:
+            self.invalidate_target_reference(invalidation_reason)
+        self._camera_signature = current_camera_signature
+
+        # The initial identity association establishes the reference exactly once.
+        # A later SAM centroid is never allowed to replace it. Re-grounding has an
+        # explicit API so the caller must opt into a new identity/reference epoch.
+        if (self.reference_anchor is None and self.identity_anchor is not None
+                and segmentation.visible and current_camera_signature is not None):
+            self.reference_anchor = make_target_reference_anchor(
+                self.identity_anchor,
+                camera=calibration.name,
+                camera_signature=current_camera_signature,
+            )
+            self._reference_reground_requested = False
+        reference_valid = bool(self.reference_anchor and self.reference_anchor.valid)
+        reference_point = (self.reference_anchor.reference_point_px if reference_valid else None)
         workspace = base.evidence.get("relevant_geometry", {}).get("workspace_z_bounds_m")
         geometry = resolve_object_relative_geometry(
-            target_centroid_px=segmentation.centroid_px if segmentation.visible else None,
+            target_reference_px=reference_point,
             eef_position_xyz_m=position,
             calibration=calibration,
             move_vectors=self.move_vectors,
@@ -576,10 +776,16 @@ class ObjectRelativePerceptionObserver:
         eef_projection = geometry.get("eef_projection_px")
         image_error = None
         error_norm = None
-        if segmentation.visible and eef_projection is not None and segmentation.centroid_px is not None:
-            delta = np.asarray(segmentation.centroid_px) - np.asarray(eef_projection)
+        if reference_valid and eef_projection is not None and reference_point is not None:
+            delta = np.asarray(reference_point) - np.asarray(eef_projection)
             image_error = (float(delta[0]), float(delta[1]))
             error_norm = float(np.linalg.norm(delta))
+        dynamic_sam_error = None
+        if segmentation.visible and eef_projection is not None and segmentation.centroid_px is not None:
+            dynamic_sam_error = float(np.linalg.norm(
+                np.asarray(segmentation.centroid_px, dtype=float)
+                - np.asarray(eef_projection, dtype=float)
+            ))
         relative = ObjectRelativeState(
             target_phrase=self.target_phrase,
             target_visible=segmentation.visible,
@@ -598,6 +804,13 @@ class ObjectRelativePerceptionObserver:
             source_height=height,
             target_identity_status=segmentation.identity_status,
             target_candidate_id=segmentation.selected_candidate_id,
+            target_reference_point_px=(tuple(float(value) for value in reference_point)
+                                       if reference_point is not None else None),
+            target_reference_valid=reference_valid,
+            target_reference_camera=(self.reference_anchor.camera if self.reference_anchor else None),
+            target_reference_invalidation_reason=(
+                self.reference_anchor.invalidation_reason if self.reference_anchor else None
+            ),
         )
         self.perception_history.append({
             "image": image.copy(),
@@ -605,8 +818,13 @@ class ObjectRelativePerceptionObserver:
             "segmentation": segmentation,
             "candidates": segmentation.candidates,
             "identity_anchor": self.identity_anchor,
+            "reference_anchor": self.reference_anchor,
             "calibration": calibration,
+            "camera_signature": current_camera_signature,
+            "reference_invalidation_signals": signals,
+            "reference_epoch_reset_reason": self._last_reference_invalidation_reason,
             "resolution": dict(geometry),
+            "dynamic_sam_error_px": dynamic_sam_error,
             "object_relative_state": relative,
         })
         evidence = dict(base.evidence)
@@ -620,6 +838,12 @@ class ObjectRelativePerceptionObserver:
             "object_relative_decision_owner": "runtime",
             "object_relative_decision_reason": geometry.get("reason"),
             "pixel_error_before_px": error_norm,
+            "target_reference_point_px": reference_point,
+            "target_reference_valid": reference_valid,
+            "target_reference_invalidation_reason": (
+                self.reference_anchor.invalidation_reason if self.reference_anchor else None
+            ),
+            "dynamic_sam_error_px": dynamic_sam_error,
             "candidate_directions": geometry.get("candidate_directions", []),
             "chosen_candidate": (geometry.get("chosen_candidate") if segmentation.visible else None),
             "sam3_error": response.get("error") if not segmentation.visible else None,
@@ -658,6 +882,7 @@ class ObjectRelativePerceptionObserver:
         output = Path(directory)
         output.mkdir(parents=True, exist_ok=True)
         source = np.ascontiguousarray(image, dtype=np.uint8)
+        height, width = source.shape[:2]
         rgb_path = output / f"{prefix}_rgb.png"
         Image.fromarray(source, mode="RGB").save(rgb_path)
         segmentation = segmentation if segmentation is not None else self.last_segmentation
@@ -696,8 +921,8 @@ class ObjectRelativePerceptionObserver:
                 x0, y0, x1, y1 = candidate.bbox_xyxy
                 color = (255, 255, 0, 255) if candidate.candidate_id == segmentation.selected_candidate_id \
                     else (255, 180, 40, 255)
-                draw.rectangle((x0, y0, x1 - 1, y1 - 1), outline=color, width=2)
-                draw.text((x0, max(0, y0 - 12)),
+            draw.rectangle((x0, y0, x1 - 1, y1 - 1), outline=color, width=2)
+            draw.text((x0, max(0, y0 - 12)),
                           f"{candidate.candidate_id} score={candidate.score}", fill=color)
         if segmentation is not None and segmentation.mask is not None:
             mask_path = output / f"{prefix}_mask.png"
@@ -708,8 +933,21 @@ class ObjectRelativePerceptionObserver:
             draw = ImageDraw.Draw(overlay)
             if segmentation.centroid_px is not None:
                 x, y = segmentation.centroid_px
-                draw.ellipse((x - 5, y - 5, x + 5, y + 5), outline=(255, 255, 0, 255), width=2)
+                centroid_color = (255, 45, 45, 255) if prefix == "after" else (255, 255, 0, 255)
+                draw.ellipse((x - 5, y - 5, x + 5, y + 5), outline=centroid_color, width=2)
+                if prefix == "after":
+                    draw.text((x + 7, y + 6), "SAM centroid: DIAGNOSTIC ONLY",
+                              fill=centroid_color)
             result["mask"] = str(mask_path)
+        reference_anchor = self.reference_anchor
+        if reference_anchor is not None and source.shape[:2] == (height, width):
+            x, y = reference_anchor.reference_point_px
+            color = (255, 215, 0, 255) if reference_anchor.valid else (255, 80, 80, 255)
+            draw = ImageDraw.Draw(overlay)
+            draw.polygon(((x, y - 7), (x + 7, y), (x, y + 7), (x - 7, y)),
+                         outline=color, fill=(0, 0, 0, 0))
+            label = "FIXED TARGET REFERENCE" if reference_anchor.valid else "REFERENCE INVALID"
+            draw.text((x + 8, y - 12), label, fill=color)
         current_resolution = resolution if resolution is not None else self.last_resolution
         eef = current_resolution.get("eef_projection_px")
         if eef is not None:

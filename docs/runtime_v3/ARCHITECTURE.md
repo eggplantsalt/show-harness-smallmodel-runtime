@@ -37,6 +37,15 @@ end-effector and gripper state, holding/contact evidence, relevant geometry,
 the previous action and expected/observed effects, uncertainty, and evidence
 references. Fields remain optional while adapters are being added.
 
+For pre-contact object-relative alignment, semantic target identity and the
+control reference are separate. `TargetIdentityAnchor` associates later SAM
+candidates with the selected instance. A stage-local `TargetReferenceAnchor`
+freezes the initial associated mask centroid in canonical camera pixels. The
+geometry resolver uses that fixed point for predicted and observed alignment
+errors; later SAM centroids remain diagnostic and cannot replace it. See
+[`TARGET_REFERENCE.md`](TARGET_REFERENCE.md) for establishment, invalidation,
+and re-grounding rules.
+
 `OptionGenerator` accepts explicit geometry candidates and turns them into
 typed options. It cannot access the environment or Executor. Each option has an
 ID, semantic description, preconditions, expected effect, bounded primitive,
@@ -75,3 +84,5 @@ does not learn, alter policy, or inject legacy RSI/textual lessons.
 - Bounded Execution: one primitive or one same-direction micro-motion is
   executed before option selection resumes.
 - Effect Re-observation: expected effects are compared with new robot/image evidence.
+- Stable Visual Reference: identity association may continue across frames, while
+  the control point remains fixed until an explicit invalidation and re-ground.

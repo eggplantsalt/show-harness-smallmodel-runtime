@@ -486,6 +486,8 @@ def _alignable_state(direction="FWD", unit=(1, 0, 0)):
             target_centroid_px=(300, 256), eef_projection_px=(256, 256),
             image_error_px=(44, 0), image_error_norm_px=44,
             target_identity_status="ANCHORED",
+            target_reference_point_px=(300, 256), target_reference_valid=True,
+            target_reference_camera="agentview",
         ),
         relevant_geometry={
             "workspace_valid": True, "workspace_z_bounds_m": [-2.0, 1.0],

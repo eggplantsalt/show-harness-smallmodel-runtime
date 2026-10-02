@@ -16,7 +16,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -31,6 +31,8 @@ from core.runtime_v3.effects import EffectObserver
 from core.runtime_v3.executor import Executor, LiberoPrimitiveBackend
 from core.runtime_v3.object_relative import (
     alignment_verification_metrics,
+    compare_alignment_improvements,
+    frozen_reference_error,
     ObjectRelativeAlignmentOptionGenerator,
     ObjectRelativePerceptionObserver,
 )
@@ -52,14 +54,25 @@ CONTROL_TICK_MM = 5.0
 
 
 class CountingArbiter(Arbiter):
-    def __init__(self) -> None:
+    def __init__(self, *, before_authorize=None) -> None:
         super().__init__()
         self.authorization_calls = 0
         self.approval_count = 0
+        self.before_authorize = before_authorize
+        self.pre_action_ready_written = False
 
-    def authorize(self, *args, **kwargs):
+    def authorize(self, state, options, selection):
         self.authorization_calls += 1
-        decision = super().authorize(*args, **kwargs)
+        if selection.option_id == "ALIGN_TO_TARGET_SMALL":
+            if self.before_authorize is None:
+                raise RuntimeError("PRE_ACTION_READY writer is required before alignment authorization")
+            self.before_authorize(state, options, selection)
+            self.pre_action_ready_written = True
+        decision = super().authorize(state, options, selection)
+        if (decision.kind == DecisionKind.APPROVED and decision.action is not None
+                and decision.action.option_id == "ALIGN_TO_TARGET_SMALL"
+                and not self.pre_action_ready_written):
+            raise RuntimeError("alignment approval attempted without PRE_ACTION_READY")
         if decision.kind == DecisionKind.APPROVED:
             self.approval_count += 1
         return decision
@@ -102,8 +115,109 @@ def _new_run_dir(base: str | Path) -> Path:
 
 
 def _write_json(path: Path, record: Any) -> None:
-    path.write_text(json.dumps(_jsonable(record), indent=2, ensure_ascii=False) + "\n",
-                    encoding="utf-8")
+    payload = json.dumps(_jsonable(record), indent=2, ensure_ascii=False) + "\n"
+    with path.open("w", encoding="utf-8") as stream:
+        stream.write(payload)
+        stream.flush()
+        os.fsync(stream.fileno())
+
+
+def _ensure_output_writable(directory: Path) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    probe = directory / f".write_probe_{uuid.uuid4().hex}"
+    with probe.open("x", encoding="utf-8") as stream:
+        stream.write("logger output check\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+    probe.unlink()
+
+
+def _oracle_target_world_position(environment: Any) -> dict[str, Any]:
+    """Read simulator target pose for a diagnostic record only."""
+    target_body = "salad_dressing_1_main"
+    try:
+        sim = environment.env.sim
+        model, data = sim.model, sim.data
+        if callable(getattr(model, "body_name2id", None)):
+            body_id = int(model.body_name2id(target_body))
+        elif callable(getattr(model, "body", None)):
+            body_id = int(model.body(target_body).id)
+        else:
+            raise AttributeError("MuJoCo model has no body-name lookup")
+        position = np.asarray(data.xpos[body_id], dtype=float).reshape(3)
+        if not np.all(np.isfinite(position)):
+            raise ValueError("body position is not finite")
+        return {"available": True, "body": target_body, "body_id": body_id,
+                "world_position_m": position.tolist(), "source": "simulator_body_pose_diagnostic_only"}
+    except Exception as exc:
+        return {"available": False, "body": target_body,
+                "error": f"{type(exc).__name__}: {exc}",
+                "source": "simulator_body_pose_diagnostic_only"}
+
+
+def _save_reference_comparison_overlay(
+    *, observer: ObjectRelativePerceptionObserver, before: dict[str, Any] | None,
+    after: dict[str, Any] | None, predicted_projection_px: Any, output_path: Path,
+) -> str | None:
+    if before is None or after is None:
+        return None
+    image = Image.fromarray(np.ascontiguousarray(after["image"], dtype=np.uint8), mode="RGB")
+    draw = ImageDraw.Draw(image)
+
+    def point(value: Any) -> tuple[float, float] | None:
+        try:
+            coords = np.asarray(value, dtype=float).reshape(2)
+        except (TypeError, ValueError):
+            return None
+        return (float(coords[0]), float(coords[1])) if np.all(np.isfinite(coords)) else None
+
+    reference = point(after["object_relative_state"].target_reference_point_px)
+    eef_before = point(before["object_relative_state"].eef_projection_px)
+    eef_after = point(after["object_relative_state"].eef_projection_px)
+    predicted = point(predicted_projection_px)
+    sam_centroid = point(after["object_relative_state"].target_centroid_px)
+
+    def marker(position: tuple[float, float] | None, color: tuple[int, int, int], shape: str):
+        if position is None:
+            return
+        x, y = position
+        r = 9
+        if shape == "diamond":
+            draw.polygon(((x, y-r), (x+r, y), (x, y+r), (x-r, y)), outline=color, fill=(20, 20, 20))
+        elif shape == "triangle":
+            draw.polygon(((x, y-r), (x+r, y+r), (x-r, y+r)), outline=color, fill=(20, 20, 20))
+        elif shape == "cross":
+            draw.line((x-r, y-r, x+r, y+r), fill=color, width=3)
+            draw.line((x-r, y+r, x+r, y-r), fill=color, width=3)
+        else:
+            draw.ellipse((x-r, y-r, x+r, y+r), outline=color, width=3)
+
+    entries = [
+        ("FIXED TARGET REFERENCE", (255, 215, 0), reference, "diamond"),
+        ("EEF BEFORE", (0, 190, 255), eef_before, "circle"),
+        ("EEF AFTER", (70, 255, 255), eef_after, "cross"),
+        ("PREDICTED EEF", (255, 0, 255), predicted, "triangle"),
+        ("SAM CENTROID: DIAGNOSTIC ONLY", (255, 60, 60), sam_centroid, "circle"),
+    ]
+    for label, color, position, shape in entries:
+        marker(position, color, shape)
+    legend_draw = ImageDraw.Draw(image)
+    for index, (label, color, _position, shape) in enumerate(entries):
+        y = 8 + index * 19
+        legend_draw.rectangle((6, y - 2, 205, y + 14), fill=(0, 0, 0), outline=(70, 70, 70))
+        if shape == "diamond":
+            legend_draw.polygon(((14, y+2), (19, y+7), (14, y+12), (9, y+7)), outline=color)
+        elif shape == "triangle":
+            legend_draw.polygon(((14, y+1), (19, y+12), (9, y+12)), outline=color)
+        elif shape == "cross":
+            legend_draw.line((9, y+2, 19, y+12), fill=color, width=2)
+            legend_draw.line((9, y+12, 19, y+2), fill=color, width=2)
+        else:
+            legend_draw.ellipse((9, y+2, 19, y+12), outline=color, width=2)
+        legend_draw.text((24, y), label, fill=color)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    image.save(output_path)
+    return str(output_path)
 
 
 def _configure_local_sam3_proxy_bypass(url: str) -> None:
@@ -142,6 +256,25 @@ def _run_trial(
 ) -> dict[str, Any]:
     trial_dir = run_dir / f"init_state_{init_state_index}"
     trial_dir.mkdir(parents=True, exist_ok=False)
+    artifacts_dir = trial_dir / "artifacts"
+    artifacts_dir.mkdir(parents=True, exist_ok=False)
+    _ensure_output_writable(trial_dir)
+    _ensure_output_writable(artifacts_dir)
+    _write_json(trial_dir / "TRIAL_SETUP_READY.json", {
+        "status": "TRIAL_SETUP_READY",
+        "init_state_index": init_state_index,
+        "trial_directory_writable": True,
+        "artifact_directory_writable": True,
+        "pre_action_ready_required_before_arbiter": True,
+    })
+    pre_settle: list[dict[str, Any]] = []
+    events: list[dict[str, Any]] = []
+    before_artifacts: dict[str, str] = {}
+    after_artifacts: dict[str, str] = {}
+    comparison_overlay: str | None = None
+    oracle_before: dict[str, Any] | None = None
+    oracle_after: dict[str, Any] | None = None
+    pre_action_ready_record: dict[str, Any] | None = None
     environment = LiberoEnvironmentAdapter.create(
         suite_name=SUITE,
         task_id=TASK_ID,
@@ -168,7 +301,6 @@ def _run_trial(
             min_eef_z_m=workspace[0],
             safe_lift_step_m=CONTROL_TICK_MM / 1000.0,
         )
-        pre_settle = []
         reset = True
         for _ in range(PRE_SETTLE_TICKS):
             outcome = run_v3_tick(
@@ -193,8 +325,55 @@ def _run_trial(
             target_phrase=TARGET_PHRASE,
             move_vectors=config["move_vectors"],
         )
-        arbiter = CountingArbiter()
-        events: list[dict[str, Any]] = []
+
+        def write_pre_action_ready(state, options, selection) -> None:
+            nonlocal oracle_before, pre_action_ready_record
+            _ensure_output_writable(trial_dir)
+            _ensure_output_writable(artifacts_dir)
+            if (state.object_relative_state is None
+                    or not state.object_relative_state.target_reference_valid
+                    or state.object_relative_state.target_reference_point_px is None):
+                raise RuntimeError("no valid frozen visual reference; alignment authorization blocked")
+            selected = next((option for option in options
+                             if option.option_id == selection.option_id), None)
+            if selected is None or selected.primitive.micro_motion_spec is None:
+                raise RuntimeError("selected alignment option has no bounded micro-motion spec")
+            if not observer.perception_history:
+                raise RuntimeError("pre-action perception artifacts are unavailable")
+            initial_frame = observer.perception_history[-1]
+            selected_direction = selected.primitive.micro_motion_spec.direction
+            before_artifacts.update(observer.save_visual_artifacts(
+                str(artifacts_dir), image=initial_frame["image"], prefix="before",
+                segmentation=initial_frame["segmentation"], resolution=initial_frame["resolution"],
+                selected_direction=selected_direction,
+            ))
+            oracle_before = _oracle_target_world_position(environment)
+            chosen = next((candidate for candidate in state.relevant_geometry.get("candidate_directions", [])
+                           if candidate.get("direction") == selected_direction and candidate.get("valid")), None)
+            pre_action_ready_record = {
+                "status": "PRE_ACTION_READY",
+                "init_state_index": init_state_index,
+                "task": f"{SUITE}:{TASK_ID}",
+                "frame_id": state.frame_id,
+                "selected_option": selection.option_id,
+                "direction": selected_direction,
+                "target_reference_px": state.object_relative_state.target_reference_point_px,
+                "target_reference_valid": state.object_relative_state.target_reference_valid,
+                "predicted_eef_projection_px": (chosen.get("hypothetical_projection_px")
+                                                 if chosen else None),
+                "before_artifacts": dict(before_artifacts),
+                "logger_writable": True,
+                "artifact_variables_initialized": True,
+                "oracle_target_pose_diagnostic_only": oracle_before,
+                "oracle_used_by_runtime": False,
+            }
+            marker_path = trial_dir / "PRE_ACTION_READY.json"
+            _write_json(marker_path, pre_action_ready_record)
+            written = json.loads(marker_path.read_text(encoding="utf-8"))
+            if written.get("status") != "PRE_ACTION_READY":
+                raise RuntimeError("PRE_ACTION_READY record failed read-back verification")
+
+        arbiter = CountingArbiter(before_authorize=write_pre_action_ready)
         backend = LiberoPrimitiveBackend(environment, controller, arbiter)
         runner = RuntimeV3Runner(
             observer=observer,
@@ -212,22 +391,21 @@ def _run_trial(
             max_steps=1,
             reset=False,
         )
+        oracle_after = _oracle_target_world_position(environment)
         event = events[0] if events else {}
         history = observer.perception_history
         initial = history[0] if history else None
         final = history[-1] if len(history) > 1 else None
-        if initial is not None:
+        if initial is not None and not before_artifacts:
             before_artifacts = observer.save_visual_artifacts(
-                str(trial_dir / "artifacts"), image=initial["image"], prefix="before",
+                str(artifacts_dir), image=initial["image"], prefix="before",
                 segmentation=initial["segmentation"], resolution=initial["resolution"],
                 selected_direction=(event.get("approved_action").primitive.micro_motion_spec.direction
                                     if event.get("approved_action") else None),
             )
-        else:
-            before_artifacts = {}
         if final is not None:
             after_artifacts = observer.save_visual_artifacts(
-                str(trial_dir / "artifacts"), image=final["image"], prefix="after",
+                str(artifacts_dir), image=final["image"], prefix="after",
                 segmentation=final["segmentation"], resolution=final["resolution"],
                 selected_direction=(event.get("approved_action").primitive.micro_motion_spec.direction
                                     if event.get("approved_action") else None),
@@ -240,22 +418,48 @@ def _run_trial(
         execution = getattr(execution_record, "result", None)
         before_state = initial.get("object_relative_state") if initial else None
         after_state = final.get("object_relative_state") if final else None
-        error_before = (before_state.image_error_norm_px
-                        if before_state is not None and before_state.target_identity_status == "ANCHORED"
-                        else None)
+        reference_point = (before_state.target_reference_point_px if before_state is not None else None)
+        reference_valid_before = bool(before_state and before_state.target_reference_valid)
+        reference_valid_after = bool(after_state and after_state.target_reference_valid)
+        error_before = frozen_reference_error(
+            reference_point,
+            before_state.eef_projection_px if before_state is not None else None,
+            reference_valid=reference_valid_before,
+        )
+        error_after = frozen_reference_error(
+            reference_point,
+            after_state.eef_projection_px if after_state is not None else None,
+            reference_valid=(reference_valid_before and reference_valid_after),
+        )
         post_identity_status = (final["segmentation"].identity_status if final else "TARGET_IDENTITY_LOST")
-        raw_error_after = (after_state.image_error_norm_px if after_state is not None else None)
-        verification = alignment_verification_metrics(
-            error_before, raw_error_after,
+        frozen_actual_improvement = (error_before - error_after
+                                     if error_before is not None and error_after is not None else None)
+        frozen_verification = {
+            "verification_status": "FROZEN_REFERENCE_VALID" if error_after is not None
+            else "FROZEN_REFERENCE_INVALID",
+            "error_after_px": error_after,
+            "actual_improvement_px": frozen_actual_improvement,
+            "alignment_improved": (error_after < error_before
+                                   if error_before is not None and error_after is not None else None),
+        }
+        dynamic_error_before = frozen_reference_error(
+            before_state.target_centroid_px if before_state is not None else None,
+            before_state.eef_projection_px if before_state is not None else None,
+        )
+        dynamic_error_after = frozen_reference_error(
+            after_state.target_centroid_px if after_state is not None else None,
+            after_state.eef_projection_px if after_state is not None else None,
+        )
+        dynamic_verification = alignment_verification_metrics(
+            dynamic_error_before, dynamic_error_after,
             identity_status=post_identity_status,
         )
-        error_after = verification["error_after_px"]
         expected_effect = event.get("approved_action").expected_effect if event.get("approved_action") else {}
         chosen_spec = (event.get("approved_action").primitive.micro_motion_spec
                        if event.get("approved_action") else None)
         predicted_after = expected_effect.get("predicted_image_error_after_px")
         predicted_improvement = expected_effect.get("predicted_improvement_px")
-        actual_improvement = verification["actual_improvement_px"]
+        actual_improvement = frozen_actual_improvement
         centroid_shift = None
         if (before_state is not None and after_state is not None
                 and before_state.target_centroid_px is not None
@@ -264,9 +468,10 @@ def _run_trial(
                 np.asarray(after_state.target_centroid_px, dtype=float)
                 - np.asarray(before_state.target_centroid_px, dtype=float)
             ))
-        prediction_error = (float(predicted_improvement) - actual_improvement
-                            if predicted_improvement is not None and actual_improvement is not None
-                            else None)
+        prediction_comparison = compare_alignment_improvements(
+            predicted_improvement_px=predicted_improvement,
+            actual_improvement_px=actual_improvement,
+        )
         segmentation_before = initial.get("segmentation") if initial else None
         segmentation_after = final.get("segmentation") if final else None
         calibration = initial.get("calibration") if initial else None
@@ -279,18 +484,35 @@ def _run_trial(
                                          if item.get("candidate_id") == selected_id), None)
         predicted_eef_shift = None
         observed_eef_shift = None
+        predicted_eef_projection = None
         geometry_consistent = None
         if before_state is not None and before_state.eef_projection_px is not None and chosen_spec is not None:
             chosen_candidate = next((item for item in (state_before.relevant_geometry.get("candidate_directions", [])
                                                         if state_before else [])
                                      if item.get("direction") == chosen_spec.direction and item.get("valid")), None)
             if chosen_candidate is not None:
-                predicted_eef_shift = (np.asarray(chosen_candidate["hypothetical_projection_px"], dtype=float)
+                predicted_eef_projection = list(chosen_candidate["hypothetical_projection_px"])
+                predicted_eef_shift = (np.asarray(predicted_eef_projection, dtype=float)
                                        - np.asarray(before_state.eef_projection_px, dtype=float)).tolist()
                 if after_state is not None and after_state.eef_projection_px is not None:
                     observed_eef_shift = (np.asarray(after_state.eef_projection_px, dtype=float)
                                           - np.asarray(before_state.eef_projection_px, dtype=float)).tolist()
                     geometry_consistent = bool(float(np.dot(predicted_eef_shift, observed_eef_shift)) > 0.0)
+        comparison_overlay = _save_reference_comparison_overlay(
+            observer=observer,
+            before=initial,
+            after=final,
+            predicted_projection_px=predicted_eef_projection,
+            output_path=artifacts_dir / "reference_comparison.png",
+        )
+        oracle_displacement_vector = None
+        oracle_displacement_norm = None
+        if (oracle_before and oracle_before.get("available") and oracle_after
+                and oracle_after.get("available")):
+            delta = (np.asarray(oracle_after["world_position_m"], dtype=float)
+                     - np.asarray(oracle_before["world_position_m"], dtype=float))
+            oracle_displacement_vector = delta.tolist()
+            oracle_displacement_norm = float(np.linalg.norm(delta))
         record = {
             "suite": SUITE,
             "task_id": TASK_ID,
@@ -346,6 +568,14 @@ def _run_trial(
                 "bbox_xyxy": observer.identity_anchor.bbox_xyxy,
                 "mask_area": observer.identity_anchor.mask_area,
             } if observer.identity_anchor is not None else None),
+            "target_reference_anchor": (_jsonable(initial.get("reference_anchor"))
+                                        if initial else None),
+            "target_reference_px": reference_point,
+            "target_reference_valid_before": reference_valid_before,
+            "target_reference_valid_after": reference_valid_after,
+            "target_reference_invalidation_reason": (
+                after_state.target_reference_invalidation_reason if after_state else None
+            ),
             "sam3_candidates_before": ([{
                 "candidate_id": item.candidate_id, "rank": item.rank,
                 "backend_index": item.backend_index, "score": item.score,
@@ -355,7 +585,9 @@ def _run_trial(
             "sam3_quality_score_before": (segmentation_before.quality_score if segmentation_before else None),
             "target_centroid_before_px": before_state.target_centroid_px if before_state else None,
             "eef_projection_before_px": before_state.eef_projection_px if before_state else None,
+            "error_before_frozen_px": error_before,
             "pixel_error_before": error_before,
+            "dynamic_sam_error_before_px": dynamic_error_before,
             "runtime_option": event.get("approved_action").option_id if event.get("approved_action") else None,
             "decision_owner": "runtime",
             "decision_reason": (state_before.relevant_geometry.get("object_relative_decision_reason")
@@ -368,6 +600,7 @@ def _run_trial(
             "chosen_physical_vector_xyz": chosen_spec.direction_unit if chosen_spec else None,
             "predicted_pixel_error_after": predicted_after,
             "predicted_improvement_px": predicted_improvement,
+            "predicted_eef_projection_after_px": predicted_eef_projection,
             "authorization_calls": arbiter.authorization_calls,
             "arbiter_approved_alignment_actions": arbiter.approval_count,
             "runner_actions": int(result.get("actions", 0)),
@@ -389,14 +622,46 @@ def _run_trial(
             "target_centroid_after_px": after_state.target_centroid_px if after_state else None,
             "target_centroid_shift_px": centroid_shift,
             "eef_projection_after_px": after_state.eef_projection_px if after_state else None,
+            "error_after_frozen_px": error_after,
             "pixel_error_after": error_after,
             "actual_improvement_px": actual_improvement,
-            "prediction_error_predicted_minus_actual_px": prediction_error,
-            **verification,
+            "frozen_reference_improvement_px": actual_improvement,
+            **frozen_verification,
+            "dynamic_sam_error_after_px": dynamic_error_after,
+            "dynamic_sam_improvement_px": dynamic_verification["actual_improvement_px"],
+            "dynamic_sam_alignment_improved": dynamic_verification["alignment_improved"],
+            "dynamic_sam_verification_status": dynamic_verification["verification_status"],
+            "prediction_residual_actual_minus_predicted_px": prediction_comparison[
+                "prediction_residual_actual_minus_predicted_px"],
             "predicted_eef_pixel_shift": predicted_eef_shift,
             "observed_eef_pixel_shift": observed_eef_shift,
             "geometry_direction_consistent": geometry_consistent,
-            "artifacts": {"before": before_artifacts, "after": after_artifacts},
+            "pre_action_ready": bool(pre_action_ready_record),
+            "pre_action_ready_record": (str(trial_dir / "PRE_ACTION_READY.json")
+                                         if pre_action_ready_record else None),
+            "oracle_target_motion_diagnostic": {
+                "target_body": "salad_dressing_1_main",
+                "before_world_position_m": (oracle_before or {}).get("world_position_m"),
+                "after_world_position_m": (oracle_after or {}).get("world_position_m"),
+                "displacement_vector_m": oracle_displacement_vector,
+                "displacement_norm_m": oracle_displacement_norm,
+                "before_available": bool(oracle_before and oracle_before.get("available")),
+                "after_available": bool(oracle_after and oracle_after.get("available")),
+                "used_by_runtime": False,
+                "fed_to_runtime_state": False,
+                "fed_to_option_generator": False,
+                "fed_to_arbiter": False,
+                "fed_to_executor": False,
+                "fed_to_qwen": False,
+            },
+            "camera_unchanged": bool(initial and final
+                                     and initial.get("camera_signature") == final.get("camera_signature")),
+            "reference_invalidation_signals_before": (
+                initial.get("reference_invalidation_signals") if initial else None),
+            "reference_invalidation_signals_after": (
+                final.get("reference_invalidation_signals") if final else None),
+            "artifacts": {"before": before_artifacts, "after": after_artifacts,
+                          "reference_comparison": comparison_overlay},
             "source_changed_by_resize": False,
         }
         _write_json(trial_dir / "trial.json", record)
@@ -406,9 +671,14 @@ def _run_trial(
 
 
 def _summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    valid = [row for row in rows if row.get("same_target_identity")
-             and row.get("pixel_error_before") is not None and row.get("pixel_error_after") is not None]
-    improved = [row for row in valid if row.get("alignment_improved")]
+    frozen_valid = [row for row in rows if row.get("target_reference_valid_before")
+                    and row.get("target_reference_valid_after")
+                    and row.get("error_before_frozen_px") is not None
+                    and row.get("error_after_frozen_px") is not None]
+    dynamic_valid = [row for row in rows if row.get("dynamic_sam_improvement_px") is not None]
+    improved = [row for row in frozen_valid if row.get("alignment_improved")]
+    dynamic_improved = [row for row in dynamic_valid
+                        if row.get("dynamic_sam_alignment_improved") is True]
 
     def mean(group: list[dict[str, Any]], key: str):
         values = [float(row[key]) for row in group if row.get(key) is not None]
@@ -422,28 +692,43 @@ def _summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "identity_retained_count": sum(bool(row.get("identity_retained")) for row in rows),
         "identity_retention_rate": (sum(bool(row.get("identity_retained")) for row in rows) / len(rows)
                                      if rows else None),
-        "alignment_evaluable_trials": len(valid),
+        "alignment_evaluable_trials": len(frozen_valid),
         "alignment_improved_count": len(improved),
-        "alignment_improvement_rate_among_evaluable": len(improved) / len(valid) if valid else None,
-        "conditional_alignment_improvement_rate": len(improved) / len(valid) if valid else None,
-        "mean_error_before_px_among_evaluable": mean(valid, "pixel_error_before"),
-        "mean_error_after_px_among_evaluable": mean(valid, "pixel_error_after"),
-        "mean_actual_improvement_px": mean(valid, "actual_improvement_px"),
+        "alignment_improvement_rate_among_evaluable": len(improved) / len(frozen_valid) if frozen_valid else None,
+        "frozen_reference_success_rate": len(improved) / len(frozen_valid) if frozen_valid else None,
+        "mean_error_before_frozen_px": mean(frozen_valid, "error_before_frozen_px"),
+        "mean_error_after_frozen_px": mean(frozen_valid, "error_after_frozen_px"),
+        "mean_actual_improvement_px": mean(frozen_valid, "frozen_reference_improvement_px"),
+        "dynamic_sam_evaluable_trials": len(dynamic_valid),
+        "dynamic_sam_success_count": len(dynamic_improved),
+        "dynamic_sam_success_rate": len(dynamic_improved) / len(dynamic_valid) if dynamic_valid else None,
+        "mean_dynamic_sam_improvement_px": mean(dynamic_valid, "dynamic_sam_improvement_px"),
         "mean_predicted_improvement_px": mean(rows, "predicted_improvement_px"),
-        "mean_prediction_error_predicted_minus_actual_px": mean(valid, "prediction_error_predicted_minus_actual_px"),
+        "mean_prediction_residual_actual_minus_predicted_px": mean(
+            frozen_valid, "prediction_residual_actual_minus_predicted_px"),
         "geometry_direction_consistency_count": sum(row.get("geometry_direction_consistent") is True for row in rows),
+        "pre_action_ready_count": sum(row.get("pre_action_ready") is True for row in rows),
+        "oracle_motion_diagnostic_available_count": sum(
+            row.get("oracle_target_motion_diagnostic", {}).get("before_available")
+            and row.get("oracle_target_motion_diagnostic", {}).get("after_available") for row in rows),
     }
 
 
 def main() -> int:
     args = _parser().parse_args()
-    if args.camera_resolution not in {512, 768}:
-        raise SystemExit("--camera-resolution must match an audited source renderer size: 512 or 768")
+    if args.camera_resolution != 512:
+        raise SystemExit("this phase is frozen to direct 512x512 source rendering")
     config = load_yaml(args.config)
     _configure_local_sam3_proxy_bypass(args.sam3_url)
     if config.get("libero_dir"):
         os.environ["LIBERO_DIR"] = str(config["libero_dir"])
     run_dir = _new_run_dir(args.output_dir)
+    _ensure_output_writable(run_dir)
+    _write_json(run_dir / "RUN_SETUP_READY.json", {
+        "status": "RUN_SETUP_READY", "branch": "runtime-v3",
+        "camera_resolution": args.camera_resolution,
+        "logger_writable": True, "oracle_used_by_runtime": False,
+    })
     workspace = (0.02, 0.60)
     sam3 = Sam3Client(url=args.sam3_url, python=args.sam3_python,
                       timeout_s=args.sam3_timeout_s, max_attempts=1)
@@ -471,7 +756,9 @@ def main() -> int:
                     )
             except Exception as exc:
                 blockers.append(f"init_state_{init_state_index}: {type(exc).__name__}: {exc}")
-                _write_json(run_dir / f"init_state_{init_state_index}" / "failure.json", {
+                failure_dir = run_dir / f"init_state_{init_state_index}"
+                failure_dir.mkdir(parents=True, exist_ok=True)
+                _write_json(failure_dir / "failure.json", {
                     "init_state_index": init_state_index,
                     "error": f"{type(exc).__name__}: {exc}",
                 })
@@ -483,7 +770,7 @@ def main() -> int:
         "status": ("COMPLETED" if len(rows) == len(INIT_STATES) and not blockers
                    else "BLOCKED" if blockers else "PARTIAL"),
         "branch": "runtime-v3",
-        "baseline_commit": "d8b52dbb5ddaa0f4417aa6a0ee0de4b97ab80ba1",
+        "baseline_commit": "030f20fdca1385adb93f281560db1ffa78e8cba3",
         "suite": SUITE,
         "task_id": TASK_ID,
         "target_phrase": TARGET_PHRASE,
@@ -499,7 +786,7 @@ def main() -> int:
         "blockers": blockers,
         "legacy_config_modified": False,
         "robot_actions_from_qwen": 0,
-        "oracle_diagnostic_only": False,
+        "oracle_diagnostic_only": True,
         "oracle_used_by_runtime": False,
     }
     _write_json(run_dir / "summary.json", summary_record)
