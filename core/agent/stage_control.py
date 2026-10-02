@@ -65,6 +65,20 @@ class Controller:
             return None
         return reviewer(**kwargs)
 
+    def resolve_instance(self, **kwargs):
+        """Delegate a bounded instance-ID choice used only on ambiguity."""
+        resolver = getattr(self.agent, "resolve_instance", None)
+        if not callable(resolver):
+            return None
+        return resolver(**kwargs)
+
+    def resolve_pregrasp(self, **kwargs):
+        """Delegate one bounded dual-view semantic pregrasp decision."""
+        resolver = getattr(self.agent, "resolve_pregrasp", None)
+        if not callable(resolver):
+            return None
+        return resolver(**kwargs)
+
 
 @dataclass(frozen=True)
 class StageControlSuite:

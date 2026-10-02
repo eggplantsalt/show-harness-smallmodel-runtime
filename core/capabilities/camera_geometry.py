@@ -71,8 +71,8 @@ def project_point(
     width = int(calibration.width)
     focal = (height / 2.0) / np.tan(np.deg2rad(float(calibration.fovy_deg)) / 2.0)
     raw_x = width / 2.0 + focal * float(point_camera[0]) / -float(point_camera[2])
-    # MuJoCo's camera y basis points upward; image row coordinates point down.
-    raw_y = height / 2.0 + focal * float(point_camera[1]) / -float(point_camera[2])
+    # MuJoCo's camera +Y points up while image rows point down.
+    raw_y = height / 2.0 - focal * float(point_camera[1]) / -float(point_camera[2])
     x, y, output_width, output_height = _transform_pixel(
         raw_x,
         raw_y,
@@ -89,6 +89,68 @@ def project_point(
         "in_frame": bool(0.0 <= x < output_width and 0.0 <= y < output_height),
         "source": "proprioception_camera_calibration",
     }
+
+
+def opencv_camera_points_to_world(
+    points_camera: np.ndarray,
+    *,
+    camera_to_world: np.ndarray,
+    position_world: np.ndarray,
+    rotation_degrees: int = 0,
+    flip: str = "none",
+) -> np.ndarray:
+    """Convert OpenCV camera points (x right, y down, z forward) to world.
+
+    MuJoCo camera coordinates use x right, y up, z backward. ``points_camera``
+    must correspond to the oriented image passed to the model; this transform
+    explicitly undoes the configured image rotation/flip before changing basis.
+    """
+    points = np.asarray(points_camera, dtype=float).reshape(-1, 3)
+    rotation = np.asarray(camera_to_world, dtype=float).reshape(3, 3)
+    position = np.asarray(position_world, dtype=float).reshape(3)
+    if not np.all(np.isfinite(points)) or not np.all(np.isfinite(rotation)) or not np.all(np.isfinite(position)):
+        raise ValueError("camera points and calibration must be finite")
+    # Map model-image axes back through the same rotation/flip used by
+    # prepare_view, then convert raw OpenCV axes to MuJoCo camera axes.
+    k = (int(rotation_degrees) % 360) // 90
+    view_to_raw = {
+        0: np.array([[1.0, 0.0], [0.0, 1.0]]),
+        1: np.array([[0.0, -1.0], [1.0, 0.0]]),
+        2: np.array([[-1.0, 0.0], [0.0, -1.0]]),
+        3: np.array([[0.0, 1.0], [-1.0, 0.0]]),
+    }[k]
+    mode = str(flip or "none").lower()
+    view_flip = np.diag([
+        -1.0 if mode in {"horizontal", "both"} else 1.0,
+        -1.0 if mode in {"vertical", "both"} else 1.0,
+    ])
+    raw_to_view = view_flip @ view_to_raw.T
+    view_to_raw = raw_to_view.T
+    view_opencv_to_raw = np.eye(3, dtype=float)
+    view_opencv_to_raw[:2, :2] = view_to_raw
+    opencv_to_mujoco_camera = np.diag([1.0, -1.0, -1.0]) @ view_opencv_to_raw
+    camera_mujoco = (opencv_to_mujoco_camera @ points.T).T
+    return (rotation @ camera_mujoco.T).T + position
+
+
+def camera_point_roundtrip_error(
+    calibration: CameraCalibration,
+    points_world: np.ndarray,
+    pixels_view: np.ndarray,
+) -> np.ndarray:
+    """Pixel reprojection residuals in the prepared policy-image coordinates."""
+    points = np.asarray(points_world, dtype=float).reshape(-1, 3)
+    pixels = np.asarray(pixels_view, dtype=float).reshape(-1, 2)
+    if len(points) != len(pixels):
+        raise ValueError("world points and source pixels must have matching lengths")
+    errors = np.full(len(points), np.inf, dtype=float)
+    for index, (point, pixel) in enumerate(zip(points, pixels)):
+        projection = project_point(calibration, point)
+        if projection is None:
+            continue
+        projected = np.asarray(projection["pixel_xy"], dtype=float)
+        errors[index] = float(np.linalg.norm(projected - pixel))
+    return errors
 
 
 def backproject_pixel_to_plane(
@@ -132,7 +194,7 @@ def backproject_pixel_to_plane(
 
     focal = (height / 2.0) / np.tan(np.deg2rad(float(calibration.fovy_deg)) / 2.0)
     point_camera = np.array(
-        [(raw_x - width / 2.0) / focal, (raw_y - height / 2.0) / focal, -1.0],
+        [(raw_x - width / 2.0) / focal, -(raw_y - height / 2.0) / focal, -1.0],
         dtype=float,
     )
     position = np.asarray(calibration.position_world, dtype=float).reshape(3)
@@ -188,7 +250,7 @@ def estimate_vertical_line_height(
 
     focal = (height / 2.0) / np.tan(np.deg2rad(float(calibration.fovy_deg)) / 2.0)
     ray_camera = np.array(
-        [(raw_x - width / 2.0) / focal, (raw_y - height / 2.0) / focal, -1.0],
+        [(raw_x - width / 2.0) / focal, -(raw_y - height / 2.0) / focal, -1.0],
         dtype=float,
     )
     position = np.asarray(calibration.position_world, dtype=float).reshape(3)

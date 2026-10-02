@@ -1,0 +1,12 @@
+defaults:
+  - robot_libero_clean_qwen3vl_v21_thinking_repro.yaml
+
+# Resolution-only comparison against the frozen 256x256 V2.1 reproduction.
+# Camera intrinsics are regenerated from LIBERO's same FOV at the new raster
+# size; all task, model, runtime and spatial settings are inherited unchanged.
+research_profile: clean_qwen3vl_v21_thinking_frozen_reproduction_512
+log_dir: /root/autodl-tmp/Show-Harness/rollouts/v21_frozen_reproduction_thinking_512
+camera_height: 512
+camera_width: 512
+agentview_square_size: 512
+wrist_square_size: 512

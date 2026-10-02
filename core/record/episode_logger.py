@@ -100,10 +100,17 @@ class EpisodeLogger:
         self.run_dir = base_dir / date_stamp / f"task_{task_id}" / time_stamp
         self.agentview_dir = self.run_dir / "images" / "agentview"
         self.wrist_dir = self.run_dir / "images" / "wrist"
+        self.raw_agentview_dir = self.run_dir / "images" / "raw_agentview"
+        self.raw_wrist_dir = self.run_dir / "images" / "raw_wrist"
+        self.provider_overlay_dir = self.run_dir / "images" / "provider_overlay"
+        self.qwen_input_dir = self.run_dir / "images" / "qwen_input"
         self.run_dir.mkdir(parents=True, exist_ok=True)
         self._steps_path = self.run_dir / "steps.jsonl"
         self._steps_file = self._steps_path.open("w", encoding="utf-8")
+        self._events_path = self.run_dir / "events.jsonl"
+        self._events_file = self._events_path.open("w", encoding="utf-8")
         self._steps_json_path = self.run_dir / "steps.json"
+        self._metadata_cache: Optional[dict[str, Any]] = None
         # Full per-step records with the complete (un-truncated) reasoning, dumped to
         # steps.json at close; steps.jsonl keeps the compact, reasoning-truncated form.
         self._full_records: list[dict[str, Any]] = []
@@ -120,32 +127,67 @@ class EpisodeLogger:
             fps=min(30.0, max(0.5, float(video_fps))),
         )
 
-    def write_metadata(self, data: dict[str, Any]) -> None:
-        with (self.run_dir / "metadata.json").open("w", encoding="utf-8") as f:
-            json.dump(
-                _jsonable(_redact_sensitive_metadata(data)), f, indent=2, sort_keys=True
+    def _ensure_run_dir(self) -> None:
+        """Recover an externally removed, not-yet-started episode directory.
+
+        Long planner/service startup leaves a short interval where an automated
+        rollout cleanup can remove a directory with no image frames. Recreate
+        the directory and stream handles instead of losing the whole episode.
+        Once video frames exist, disappearance is a hard logging fault because
+        silently recreating it would produce an incomplete experimental record.
+        """
+        if self.run_dir.is_dir():
+            return
+        if getattr(self, "video", None) is not None and self.video.frame_count:
+            raise RuntimeError(
+                f"episode log directory disappeared after frames were written: {self.run_dir}"
             )
+        self.run_dir.mkdir(parents=True, exist_ok=True)
+        for name in ("_steps_file", "_events_file"):
+            stream = getattr(self, name, None)
+            if stream is not None and not stream.closed:
+                stream.close()
+        self._steps_file = self._steps_path.open("a", encoding="utf-8")
+        self._events_file = self._events_path.open("a", encoding="utf-8")
+        if getattr(self, "video", None) is not None:
+            self.video = StreamingVideoWriter(
+                self.run_dir / "rollout_live.mp4", fps=self.video.fps
+            )
+        if self._metadata_cache is not None:
+            with (self.run_dir / "metadata.json").open("w", encoding="utf-8") as f:
+                json.dump(self._metadata_cache, f, indent=2, sort_keys=True)
+
+    def write_metadata(self, data: dict[str, Any]) -> None:
+        self._metadata_cache = _jsonable(_redact_sensitive_metadata(data))
+        self._ensure_run_dir()
+        with (self.run_dir / "metadata.json").open("w", encoding="utf-8") as f:
+            json.dump(self._metadata_cache, f, indent=2, sort_keys=True)
 
     def write_calibration(self, data: dict[str, Any]) -> None:
+        self._ensure_run_dir()
         with (self.run_dir / "calibration.json").open("w", encoding="utf-8") as f:
             json.dump(_jsonable(data), f, indent=2, sort_keys=True)
 
     def write_summary(self, data: dict[str, Any]) -> None:
+        self._ensure_run_dir()
         with (self.run_dir / "summary.json").open("w", encoding="utf-8") as f:
             json.dump(_jsonable(data), f, indent=2, sort_keys=True)
 
     def write_plan(self, data: dict[str, Any]) -> None:
+        self._ensure_run_dir()
         with (self.run_dir / "subgoals.json").open("w", encoding="utf-8") as f:
             json.dump(_jsonable(data), f, indent=2, sort_keys=True)
 
     def write_planner_diagnostics(self, data: dict[str, Any]) -> None:
         """Persist planner routes/errors without mixing them into the plan contract."""
+        self._ensure_run_dir()
         with (self.run_dir / "planner_diagnostics.json").open(
             "w", encoding="utf-8"
         ) as f:
             json.dump(_jsonable(data), f, indent=2, sort_keys=True)
 
     def save_planner_prompt(self, attempt: int, prompt: str) -> None:
+        self._ensure_run_dir()
         prompts_dir = self.run_dir / "planner_prompts"
         prompts_dir.mkdir(parents=True, exist_ok=True)
         (prompts_dir / f"attempt_{int(attempt):02d}.txt").write_text(
@@ -161,6 +203,7 @@ class EpisodeLogger:
     ) -> None:
         """``wrist`` is one frame (single-arm), or a [left, right] pair (dual-arm) --
         the pair is stored side by side and rendered as separate analysis panels."""
+        self._ensure_run_dir()
         agentview_path = self.agentview_dir / f"{step_idx:04d}.png"
         save_png(agentview_path, agentview)
         record = dict(record)
@@ -180,14 +223,53 @@ class EpisodeLogger:
             + "\n"
         )
         self._steps_file.flush()
+        capability = record.get("capability")
+        runtime = (
+            capability.get("verified_runtime")
+            if isinstance(capability, dict)
+            else None
+        )
+        event = runtime.get("event") if isinstance(runtime, dict) else None
+        if isinstance(event, dict):
+            self.log_event(event)
         self.video.append(
             _make_analysis_frame(agentview=agentview, wrist=wrist, record=record)
         )
 
     def log_debug_payload(self, step_idx: int, payload: dict[str, Any]) -> None:
+        self._ensure_run_dir()
         self.debug_dir.mkdir(parents=True, exist_ok=True)
         with (self.debug_dir / f"{step_idx:04d}.json").open("w", encoding="utf-8") as f:
             json.dump(_jsonable(payload), f, indent=2, sort_keys=True)
+
+    def save_visual_artifacts(
+        self,
+        step_idx: int,
+        *,
+        raw_agentview: Optional[np.ndarray],
+        raw_wrist: Optional[np.ndarray],
+        provider_overlay: Optional[np.ndarray],
+        qwen_input: Optional[np.ndarray] = None,
+    ) -> None:
+        """Persist raw/provider/Qwen inputs separately from the UI composite."""
+        self._ensure_run_dir()
+        if raw_agentview is not None:
+            save_png(self.raw_agentview_dir / f"{int(step_idx):04d}.png", raw_agentview)
+        if raw_wrist is not None:
+            save_png(self.raw_wrist_dir / f"{int(step_idx):04d}.png", raw_wrist)
+        if provider_overlay is not None:
+            save_png(self.provider_overlay_dir / f"{int(step_idx):04d}.png", provider_overlay)
+        if qwen_input is not None:
+            save_png(self.qwen_input_dir / f"{int(step_idx):04d}.png", qwen_input)
+
+    def log_event(self, event: dict[str, Any]) -> None:
+        """Append one machine-readable VCR transition independently of step logs."""
+        self._ensure_run_dir()
+        self._events_file.write(
+            json.dumps(_jsonable(event), separators=(",", ":"), ensure_ascii=False)
+            + "\n"
+        )
+        self._events_file.flush()
 
     def save_controller_prompt(
         self, step_idx: int, prompt: str, media: Optional[list[dict]] = None
@@ -203,6 +285,7 @@ class EpisodeLogger:
         ``images/`` -- so the log proves the frame on disk IS the frame the model saw
         (``verified`` / ``MISMATCH`` / ``no file``) rather than merely naming a plausible path.
         """
+        self._ensure_run_dir()
         prompts_dir = self.run_dir / "controller_prompts"
         prompts_dir.mkdir(parents=True, exist_ok=True)
         lines = [f"# step {step_idx:04d} controller request"]
@@ -299,7 +382,9 @@ class EpisodeLogger:
         return "verified" if actual == digest else f"MISMATCH saved={actual}"
 
     def close(self, success: bool, fps: float) -> Path:
+        self._ensure_run_dir()
         self._steps_file.close()
+        self._events_file.close()
         with self._steps_json_path.open("w", encoding="utf-8") as f:
             json.dump(self._full_records, f, indent=2, ensure_ascii=False)
         video_path = self.run_dir / (

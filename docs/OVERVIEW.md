@@ -6,6 +6,9 @@
 
 ## 文档导航
 
+- [V2.2 当前实验记录](revolution/progress.md)
+- [V2.2 总体路线](revolution/route.md)
+- [V2.1 Adaptive Capability Harness 计划](revolution/plan02.md)
 - [Qwen8B LIBERO 实验进度与换 Session 交接（2026-09-27）](show_harness_qwen8b_progress_2026-09-27.zh-CN.md)
 - [新手复现与二次开发教程](BEGINNER_GUIDE.md)
 - [第一部分：项目架构分析](#第一部分项目架构分析)

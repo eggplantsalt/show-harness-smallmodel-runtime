@@ -23,6 +23,9 @@ def test_active_approach_completion_requires_fresh_aligned_evidence() -> None:
         "geometry": {
             "target_minus_eef_px": [-2.0, 8.0],
             "alignment_ready": True,
+            # Completion now requires the generic configured final-height band;
+            # image alignment alone is not sufficient.
+            "eef_height_m": 0.12,
         },
     }
 

@@ -10,6 +10,8 @@ Only the physical execution backend is RoboLab-specific.
 from __future__ import annotations
 
 import time
+import hashlib
+from collections import deque
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -17,6 +19,8 @@ import numpy as np
 
 from core.action_units import MOVE_ATOMS
 from core.record.images import prepare_view
+from core.runtime_v2.spatial import triangulate_metric_points_checked
+from core.runtime_v2.types import SpatialHealth, SpatialToolResult
 from core.sim.mvtoken_robolab_runner import (
     DONE_TOKEN,
     GRASP_TOKEN,
@@ -41,6 +45,62 @@ STOP_TOKEN = "STOP"
 EMPTY_GRASP_LABEL = "GRASP(empty)"
 
 
+def _should_end_after_verified_grasp(runtime: Any, verified_grasp: bool) -> bool:
+    return bool(
+        verified_grasp
+        and getattr(runtime, "placement_v22_enabled", False)
+        and getattr(runtime, "grasp_verification_only", False)
+    )
+
+
+def _save_runtime_memory_frame(
+    logger: Any,
+    runtime: Any,
+    frame_id: int,
+    *,
+    raw_agentview: Optional[np.ndarray],
+    raw_wrist: Optional[np.ndarray],
+) -> tuple[Optional[dict[str, Optional[str]]], bool]:
+    """Persist raw views before VCR stores their references or asks Qwen.
+
+    These refs are episode-local paths into the logger's raw image tree. A
+    missing view stays missing so the memory panel builder can fail closed.
+    """
+    if getattr(runtime, "visual_memory", None) is None:
+        return None, False
+    save = getattr(logger, "save_visual_artifacts", None)
+    if not callable(save) or raw_agentview is None:
+        return None, False
+    save(
+        frame_id,
+        raw_agentview=raw_agentview,
+        raw_wrist=raw_wrist,
+        provider_overlay=None,
+    )
+    refs: dict[str, Optional[str]] = {
+        "agentview": f"images/raw_agentview/{int(frame_id):04d}.png",
+        "wrist": (
+            f"images/raw_wrist/{int(frame_id):04d}.png"
+            if raw_wrist is not None else None
+        ),
+    }
+    return refs, True
+
+
+def _reset_runtime_episode(runtime: Any, logger: Any) -> None:
+    """Reset VCR memory into this logger's unique episode namespace."""
+    reset = getattr(runtime, "reset", None)
+    if not callable(reset):
+        return
+    if (
+        getattr(runtime, "visual_memory", None) is not None
+        or bool(getattr(runtime, "placement_v22_enabled", False))
+    ):
+        reset(episode_id=str(logger.run_dir.resolve()))
+    else:
+        reset()
+
+
 @dataclass
 class SimAtomicStepResult:
     token: str
@@ -54,6 +114,64 @@ class SimAtomicStepResult:
     grasp_empty: bool = False
     done: bool = False
     note: str = ""
+
+
+def _track_v22_target_views(
+    *,
+    tracker: Any,
+    stage: str,
+    capability_evidence: dict[str, Any],
+    camera_images: dict[str, Any],
+    frame_id: int,
+    instance_id: Optional[str],
+    grasp_epoch: int,
+) -> dict[str, dict[str, Any]]:
+    """Update independent target streams for visible approach/grasp cameras."""
+    if (
+        not callable(tracker)
+        or not instance_id
+        or str(stage).upper() not in {"APPROACH", "GRASP"}
+    ):
+        return {}
+    results: dict[str, dict[str, Any]] = {}
+    primary_camera = str(capability_evidence.get("camera", "")).lower()
+    primary_image = camera_images.get(primary_camera)
+    if primary_camera in {"agentview", "wrist"} and primary_image is not None:
+        result = tracker(
+            image=primary_image,
+            mask=capability_evidence.get("mask"),
+            camera=primary_camera,
+            frame_id=frame_id,
+            instance_id=instance_id,
+            grasp_epoch=grasp_epoch,
+        )
+        if isinstance(result, dict):
+            results[primary_camera] = result
+
+    secondary = capability_evidence.get("secondary_view")
+    if isinstance(secondary, dict):
+        secondary_camera = str(secondary.get("camera", "")).lower()
+        secondary_image = camera_images.get(secondary_camera)
+        if (
+            secondary_camera in {"agentview", "wrist"}
+            and secondary_camera != primary_camera
+            and secondary_image is not None
+        ):
+            try:
+                secondary_age = int(secondary.get("age_frames", 0) or 0)
+            except (TypeError, ValueError):
+                secondary_age = 1
+            result = tracker(
+                image=secondary_image,
+                mask=secondary.get("mask") if secondary_age == 0 else None,
+                camera=secondary_camera,
+                frame_id=frame_id,
+                instance_id=instance_id,
+                grasp_epoch=grasp_epoch,
+            )
+            if isinstance(result, dict):
+                results[secondary_camera] = result
+    return results
 
 
 def _descend_travel(
@@ -184,6 +302,22 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
             raw_held = capability_evidence.get("held_object")
             if isinstance(raw_held, dict):
                 held = dict(raw_held)
+            locked_offset = getattr(
+                self.verified_runtime, "placement_object_to_gripper_xyz", None
+            )
+            if held is None:
+                held = {}
+            if isinstance(locked_offset, (list, tuple)) and len(locked_offset) >= 3:
+                held["object_to_gripper_xyz"] = [float(value) for value in locked_offset[:3]]
+            locked_points = getattr(
+                self.verified_runtime, "placement_object_points_gripper", ()
+            )
+            if isinstance(locked_points, (list, tuple)) and locked_points:
+                held["object_points_gripper"] = [
+                    [float(value) for value in point[:3]]
+                    for point in locked_points[:2048]
+                    if isinstance(point, (list, tuple)) and len(point) >= 3
+                ]
             alignment = capability_evidence.get("held_object_alignment")
             if isinstance(alignment, dict):
                 if held is None:
@@ -200,12 +334,33 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                 ):
                     if key in alignment:
                         held[key] = alignment[key]
-            opening_bbox = capability_evidence.get("bbox_xyxy")
+            opening_mask = capability_evidence.get("opening_mask")
+            opening_mask_bbox = (
+                opening_mask.get("bbox_xyxy")
+                if isinstance(opening_mask, dict)
+                else None
+            )
+            # SAM3 may fall back to a container mask while still returning a
+            # valid auxiliary opening mask.  The two masks have different
+            # roles: derive the placement bbox from the opening mask and keep
+            # the container bbox only as an outer collision/context cue.
+            opening_bbox = opening_mask_bbox or capability_evidence.get("bbox_xyxy")
             outer_bbox = capability_evidence.get("outer_destination_bbox_xyxy")
             if opening_bbox is not None or outer_bbox is not None:
+                opening_evidence = (
+                    opening_mask
+                    if isinstance(opening_mask, dict)
+                    else (
+                        capability_evidence.get("mask")
+                        if not bool(getattr(plugin, "placement_v22_enabled", False))
+                        else None
+                    )
+                )
                 destination = {
                     "bbox_xyxy": outer_bbox or opening_bbox,
                     "opening_bbox_xyxy": opening_bbox or outer_bbox,
+                    "opening_mask": opening_evidence,
+                    "outer_mask": capability_evidence.get("mask"),
                     "confidence": capability_evidence.get("confidence", 0.0),
                     "source": capability_evidence.get("source", "visual_harness"),
                 }
@@ -366,6 +521,8 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
         # Relation snapshot for a mechanically empty GRASP.  A later close must
         # be based on a changed visual hypothesis, not the same projected pose.
         self._grasp_retry_anchor: dict[str, tuple[float, float]] | None = None
+        self._pending_grasp_pre_action: Optional[dict[str, Any]] = None
+        self._active_frame_id: Optional[int] = None
 
     # ------------------------------------------------------------------
     # Physical adapter
@@ -384,6 +541,25 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
             return self.physical_up_step_m, "up"
 
         plugin = self.variable_step_plugin
+
+        # Transport is a long-horizon route, not the final grasp servo.  Once
+        # the EEF is safely above the table, use the configured embodiment
+        # coarse translation for horizontal route atoms; retain fine motion for
+        # vertical/contact moves.  This keeps the route within its bounded
+        # option budget without introducing an object- or scene-specific
+        # distance rule.
+        if (
+            plugin is not None
+            and bool(getattr(plugin, "enabled", False))
+            and str(getattr(self, "_current_stage", "")).upper() == "TRANSPORT"
+            and token in {"MV_FWD", "MV_BACK", "MV_LEFT", "MV_RIGHT"}
+        ):
+            try:
+                height = float(self._fingertip_position(pre_pose)[2])
+                if height - float(self.table_height_m) > 0.12:
+                    return max(self.physical_fine_step_m, float(plugin.coarse_step_m)), "coarse_transport"
+            except (TypeError, ValueError, AttributeError):
+                pass
 
         if (
             plugin is None
@@ -419,6 +595,7 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
         obs: dict,
         *,
         target_in_wrist: Optional[bool],
+        step_override_m: Optional[float] = None,
     ) -> tuple[
         dict,
         bool,
@@ -471,6 +648,9 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                     pre_pose=pre_pose,
                 )
             )
+            if step_override_m is not None and token == "MV_UP":
+                physical_step_m = max(0.001, float(step_override_m))
+                step_kind = "bounded_runtime_lift"
 
             command_step_m = (
                 physical_step_m
@@ -569,9 +749,16 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
             self.empty_width_m,
             self.gripper_close_threshold_m,
         )
+        v22_enabled = bool(
+            getattr(self.verified_runtime, "placement_v22_enabled", False)
+        )
         grasp_empty = bool(
             token == GRASP_TOKEN
             and gripper_closed
+            # In V2.2 aperture is diagnostic evidence only.  It varies with
+            # object shape and contact load, so it cannot veto a semantic grasp
+            # candidate by itself.
+            and not v22_enabled
             and width_m <= mechanical_empty_threshold
         )
 
@@ -767,7 +954,9 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
         if not callable(verifier):
             return None
         agentview, wrist = self._images(obs)
-        return verifier(
+        before = self._pending_grasp_pre_action or {}
+        v22 = bool(getattr(self.verified_runtime, "placement_v22_enabled", False))
+        verify_kwargs = dict(
             task=self.task_description,
             target=str(getattr(subgoal, "target", "")),
             affordance=str(getattr(subgoal, "affordance", "")),
@@ -775,15 +964,258 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
             wrist_image=wrist,
             debug=self.debug,
         )
+        if v22:
+            verify_kwargs.update(
+                before_agentview_image=before.get("agentview"),
+                before_wrist_image=before.get("wrist"),
+                before_frame_id=before.get("frame_id"),
+                after_frame_id=self._active_frame_id,
+                reasoning_enabled=True,
+            )
+        return verifier(
+            **verify_kwargs,
+        )
 
-    def _verify_place_visually(self, *, subgoal, obs) -> dict[str, Any] | None:
+    def _resolve_runtime_critical_decision(
+        self,
+        *,
+        request: dict[str, Any],
+        subgoal: Any,
+        obs: Any,
+        agentview: np.ndarray,
+        placement_evidence: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
+        """Ask Qwen only for the enumerated semantic choice requested by VCR-v2."""
+        kind = str(request.get("kind") or "").upper()
+        if kind == "VERIFY_HOLD":
+            result = self._verify_grasp_visually(subgoal=subgoal, obs=obs) or {}
+            if bool(getattr(self.verified_runtime, "placement_v22_enabled", False)):
+                self._pending_grasp_pre_action = None
+            return {
+                "answer": str(result.get("decision") or "UNKNOWN").upper(),
+                "details": result,
+            }
+        if kind == "VERIFY_SEATED":
+            memory_panel = None
+            memory_meta = None
+            if bool(getattr(self.verified_runtime, "placement_v22_enabled", False)):
+                from core.runtime_v2.placement_memory import build_placement_panel
+
+                belief = request.get("belief") or {}
+                target_track = belief.get("target") or {}
+                try:
+                    memory_panel, memory_meta = build_placement_panel(
+                        self.logger.run_dir,
+                        list(request.get("visual_memory_bundle") or []),
+                        instance_id=str(target_track.get("instance_id") or ""),
+                        grasp_epoch=int(belief.get("grasp_epoch", -1)),
+                        current_frame=int(belief.get("frame_id", -1)),
+                        episode_id=str(self.logger.run_dir.resolve()),
+                    )
+                except (OSError, ValueError, KeyError, TypeError) as exc:
+                    return {"answer": "UNKNOWN", "details": {"error": f"placement memory unavailable: {exc}"}}
+                if str(getattr(self.verified_runtime, "placement_reflection_mode", "off")) != "off":
+                    self._critical_qwen_input = memory_panel
+            result = self._verify_place_visually(
+                subgoal=subgoal,
+                obs=obs,
+                placement_evidence=placement_evidence,
+                memory_panel=memory_panel,
+                memory_bundle=request.get("visual_memory_bundle"),
+                reflection_mode=str(getattr(self.verified_runtime, "placement_reflection_mode", "off")),
+                reflection_trigger=request.get("reflection_trigger"),
+                allowed_options=request.get("allowed_options") or (),
+            ) or {}
+            if memory_meta is not None:
+                result["memory_input"] = memory_meta
+            relation = str(result.get("relation") or "").upper()
+            remember_decision = getattr(getattr(self.verified_runtime, "visual_memory", None), "record_decision", None)
+            belief = request.get("belief") if isinstance(request.get("belief"), dict) else {}
+            target_track = belief.get("target") if isinstance(belief.get("target"), dict) else {}
+            if callable(remember_decision):
+                remember_decision(
+                    instance_id=target_track.get("instance_id"),
+                    grasp_epoch=int(belief.get("grasp_epoch", -1)),
+                    frame_id=int(belief.get("frame_id", -1)),
+                    route_epoch=int(belief.get("route_epoch", -1)),
+                    relation=relation or "UNKNOWN",
+                    reasoning=str(result.get("reasoning") or ""),
+                    scene_description={
+                        key: result.get(key)
+                        for key in (
+                            "evidence_for", "evidence_against", "missing_observation",
+                            "expected_effect", "failure_condition", "scene_description",
+                        )
+                        if key in result
+                    },
+                    evidence_for=list(result.get("evidence_for") or []),
+                    evidence_against=list(result.get("evidence_against") or []),
+                    missing_observation=str(result.get("missing_observation") or ""),
+                    expected_effect=str(result.get("expected_effect") or ""),
+                    failure_condition=str(result.get("failure_condition") or ""),
+                )
+            return {
+                "answer": relation or str(result.get("decision") or "UNKNOWN").upper(),
+                "details": result,
+            }
+        if kind == "SELECT_INSTANCE":
+            resolver = getattr(self.controls.controller, "resolve_instance", None)
+            if not callable(resolver):
+                return {"answer": "UNKNOWN", "reason": "resolver unavailable"}
+            live_agentview, live_wrist = self._images(obs)
+            candidate_camera = str(request.get("camera") or "agentview").lower()
+            candidate_image = (
+                live_wrist
+                if candidate_camera == "wrist" and live_wrist is not None
+                else live_agentview
+            )
+            result = resolver(
+                task=self.task_description,
+                target=str(getattr(subgoal, "target", "")),
+                candidates=request.get("candidates") or [],
+                agentview_image=candidate_image,
+                other_view_image=(
+                    live_agentview
+                    if candidate_camera == "wrist"
+                    else live_wrist
+                ),
+                candidate_camera=candidate_camera,
+                debug=self.debug,
+            ) or {}
+            return {
+                "answer": str(result.get("selected") or "UNKNOWN").upper(),
+                "details": result,
+            }
+        if kind == "PREGRASP_DECISION":
+            resolver = getattr(self.controls.controller, "resolve_pregrasp", None)
+            if not callable(resolver):
+                return {"answer": "UNKNOWN", "reason": "pregrasp resolver unavailable"}
+            live_agentview, live_wrist = self._images(obs)
+            memory_panel = None
+            memory_meta = None
+            crop_meta = None
+            placement_v22 = bool(
+                getattr(self.verified_runtime, "placement_v22_enabled", False)
+            )
+            crop_enabled = bool(
+                getattr(self.verified_runtime, "pregrasp_target_crop_enabled", False)
+            )
+            memory_bundle = list(request.get("visual_memory_bundle") or [])
+            if memory_bundle:
+                from core.runtime_v2.placement_memory import build_visual_memory_panel
+                from core.vlm.roles import append_fresh_pregrasp_target_crop
+
+                belief = request.get("belief") or {}
+                target_track = belief.get("target") or {}
+                try:
+                    memory_panel, memory_meta = build_visual_memory_panel(
+                        self.logger.run_dir,
+                        memory_bundle,
+                        instance_id=str(target_track.get("instance_id") or ""),
+                        grasp_epoch=int(belief.get("grasp_epoch", -1)),
+                        current_frame=int(belief.get("frame_id", -1)),
+                        episode_id=str(self.logger.run_dir.resolve()),
+                    )
+                except (OSError, ValueError, KeyError, TypeError) as exc:
+                    return {
+                        "answer": "UNKNOWN",
+                        "details": {
+                            "reason": f"same-episode visual memory unavailable: {exc}",
+                        },
+                    }
+                if tuple(memory_meta.get("frame_ids", ())) != tuple(request.get("evidence_frame_ids") or ()):
+                    return {
+                        "answer": "UNKNOWN",
+                        "details": {
+                            "reason": "memory panel frame ids do not match runtime evidence contract",
+                            "memory_audit": memory_meta,
+                        },
+                    }
+                if crop_enabled:
+                    memory_panel, crop_meta = append_fresh_pregrasp_target_crop(
+                        memory_panel,
+                        target_track,
+                        int(belief.get("frame_id", -1)),
+                        agentview_image=live_agentview,
+                        wrist_image=live_wrist,
+                    )
+                    if crop_meta is not None:
+                        memory_meta["target_crop"] = crop_meta
+                        memory_meta["sent_panel_sha256"] = hashlib.sha256(
+                            np.asarray(memory_panel).tobytes()
+                        ).hexdigest()
+                        memory_meta["sent_panel_shape"] = list(np.asarray(memory_panel).shape)
+                self._critical_qwen_input = memory_panel
+            else:
+                from core.vlm.roles import _make_pregrasp_temporal_panel
+                self._critical_qwen_input = _make_pregrasp_temporal_panel(
+                    live_agentview, live_wrist,
+                    getattr(self, "_previous_agentview", None),
+                    getattr(self, "_previous_wrist", None),
+                )
+                crop_meta = None
+            result = resolver(
+                task=self.task_description,
+                target=str(getattr(subgoal, "target", "")),
+                affordance=str(getattr(subgoal, "affordance", "")),
+                allowed_actions=request.get("allowed_answers") or [],
+                runtime_reason=str(request.get("reason") or ""),
+                agentview_image=live_agentview,
+                wrist_image=live_wrist,
+                previous_agentview_image=getattr(self, "_previous_agentview", None),
+                previous_wrist_image=getattr(self, "_previous_wrist", None),
+                spatial_belief=request.get("spatial_belief"),
+                visual_alignment=request.get("visual_alignment"),
+                executed_action=getattr(self, "_previous_executed_action", None),
+                visual_memory=request.get("visual_memory_refs") or (),
+                visual_memory_bundle=memory_bundle,
+                reflection_mode=str(request.get("reflection_mode") or "off"),
+                reflection_trigger=(
+                    str(request.get("reflection_trigger"))
+                    if request.get("reflection_trigger") else None
+                ),
+                allow_visual_grasp_without_spatial=(
+                    placement_v22
+                    and not bool(getattr(self.verified_runtime, "require_spatial_ready_for_grasp", True))
+                ),
+                prebuilt_memory_panel=memory_panel,
+                target_roi_included=bool(crop_meta),
+                current_frame_id=int((request.get("belief") or {}).get("frame_id", -1)),
+                previous_frame_id=(
+                    int(self._previous_frame_id)
+                    if self._previous_frame_id is not None
+                    and int(self._previous_frame_id) in set(request.get("evidence_frame_ids") or ())
+                    else None
+                ),
+                debug=self.debug,
+            ) or {}
+            if memory_meta is not None:
+                result["memory_audit"] = memory_meta
+            return {
+                "answer": str(result.get("selected") or "UNKNOWN").upper(),
+                "details": result,
+            }
+        return {"answer": "UNKNOWN", "reason": f"unsupported critical kind {kind}"}
+
+    def _verify_place_visually(
+        self,
+        *,
+        subgoal,
+        obs,
+        placement_evidence: Optional[dict[str, Any]] = None,
+        memory_panel: Optional[np.ndarray] = None,
+        memory_bundle: Optional[list[dict[str, Any]]] = None,
+        reflection_mode: str = "off",
+        reflection_trigger: Optional[str] = None,
+        allowed_options: Optional[tuple[str, ...] | list[str]] = None,
+    ) -> dict[str, Any] | None:
         """Run one low-position placement confirmation through the high-level Agent."""
         controller = getattr(getattr(self, "controls", None), "controller", None)
         verifier = getattr(controller, "verify_place", None)
         if not callable(verifier):
             return None
         agentview, wrist = self._images(obs)
-        return verifier(
+        verify_kwargs = dict(
             task=self.task_description,
             target=str(getattr(subgoal, "target", "")),
             affordance=str(getattr(subgoal, "affordance", "")),
@@ -791,6 +1223,18 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
             wrist_image=wrist,
             debug=self.debug,
         )
+        if bool(getattr(self.verified_runtime, "placement_v22_enabled", False)):
+            verify_kwargs["placement_v22"] = True
+            if isinstance(placement_evidence, dict):
+                verify_kwargs["placement_evidence"] = placement_evidence
+            verify_kwargs.update(
+                memory_panel=memory_panel,
+                memory_bundle=memory_bundle,
+                reflection_mode=reflection_mode,
+                reflection_trigger=reflection_trigger,
+                allowed_options=allowed_options,
+            )
+        return verifier(**verify_kwargs)
 
     def _review_place_alignment(
         self, *, subgoal, obs, recent_moves: str = ""
@@ -877,6 +1321,177 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
     # Main loop
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _projection_from_calibration(meta: dict[str, Any]) -> Optional[np.ndarray]:
+        """Build a metric world-to-image projection for active parallax."""
+        try:
+            width = int(meta["width"])
+            height = int(meta["height"])
+            fovy = float(meta["fovy_deg"])
+            position = np.asarray(meta["position_world"], dtype=float).reshape(3)
+            camera_to_world = np.asarray(meta["camera_to_world"], dtype=float).reshape(3, 3)
+            if width <= 0 or height <= 0 or not np.all(np.isfinite(position)):
+                return None
+            focal = (height / 2.0) / np.tan(np.deg2rad(fovy) / 2.0)
+            intrinsic = np.asarray(
+                [[focal, 0.0, width / 2.0], [0.0, focal, height / 2.0], [0.0, 0.0, 1.0]],
+                dtype=float,
+            )
+            # Camera geometry uses MuJoCo's camera-forward -Z convention.
+            world_to_forward = np.diag([1.0, -1.0, -1.0]) @ camera_to_world.T
+            return intrinsic @ np.column_stack((world_to_forward, -world_to_forward @ position))
+        except (TypeError, ValueError, KeyError, IndexError, FloatingPointError):
+            return None
+
+    @staticmethod
+    def _raw_pixels_from_view(
+        pixels: np.ndarray, meta: dict[str, Any]
+    ) -> Optional[np.ndarray]:
+        """Undo the exact post-render rotation/flip used by ``prepare_view``."""
+        try:
+            width = int(meta["width"])
+            height = int(meta["height"])
+            values = np.asarray(pixels, dtype=float).reshape(-1, 2).copy()
+            output_width = width if int(meta.get("rotation_degrees", 0)) % 180 == 0 else height
+            output_height = height if int(meta.get("rotation_degrees", 0)) % 180 == 0 else width
+            mode = str(meta.get("flip", "none")).lower()
+            if mode in {"vertical", "both"}:
+                values[:, 1] = output_height - 1 - values[:, 1]
+            if mode in {"horizontal", "both"}:
+                values[:, 0] = output_width - 1 - values[:, 0]
+            k = (int(meta.get("rotation_degrees", 0)) % 360) // 90
+            x = values[:, 0].copy()
+            y = values[:, 1].copy()
+            if k == 1:
+                values[:, 0], values[:, 1] = width - 1 - y, x
+            elif k == 2:
+                values[:, 0], values[:, 1] = width - 1 - x, height - 1 - y
+            elif k == 3:
+                values[:, 0], values[:, 1] = y, height - 1 - x
+            return values if np.all(np.isfinite(values)) else None
+        except (TypeError, ValueError, KeyError, IndexError):
+            return None
+
+    def _active_parallax_result(
+        self,
+        *,
+        capability_evidence: dict[str, Any],
+        geometry_context: dict[str, Any],
+        frame_id: int,
+        instance_id: Optional[str],
+        grasp_epoch: int,
+        eef_xyz: tuple[float, float, float],
+        tracked_points: Optional[dict[str, Any]] = None,
+    ) -> Optional[SpatialToolResult]:
+        """Triangulate only CoTracker correspondences from a free target mask."""
+        if str(capability_evidence.get("camera", "")).lower() != "wrist":
+            return None
+        runtime_belief = getattr(self.verified_runtime, "belief", None)
+        held = getattr(runtime_belief, "held", None)
+        if str(getattr(getattr(held, "truth", None), "value", "")).upper() == "TRUE":
+            return None
+        meta = geometry_context.get("wrist", {}).get("camera_calibration", {})
+        if not isinstance(meta, dict):
+            return None
+        projection = self._projection_from_calibration(meta)
+        if projection is None:
+            return None
+        epoch = int(grasp_epoch)
+        if getattr(self, "_parallax_epoch", None) != epoch:
+            self._parallax_epoch = epoch
+            self._parallax_history = deque(maxlen=32)
+            self._parallax_world_history = deque(maxlen=5)
+        current = {
+            "frame_id": int(frame_id),
+            "instance_id": instance_id,
+            "projection": projection,
+            "eef": np.asarray(eef_xyz, dtype=float),
+        }
+        history = list(getattr(self, "_parallax_history", ()))
+        if not history or int(history[-1].get("frame_id", -1)) != int(frame_id):
+            self._parallax_history.append(current)
+        tracking = tracked_points if isinstance(tracked_points, dict) else {}
+        if str(tracking.get("health", "")).upper() != "VALID":
+            return None
+        query_frame = tracking.get("query_frame_id")
+        prior = next(
+            (item for item in history if int(item.get("frame_id", -1)) == int(query_frame or -1)),
+            None,
+        )
+        if prior is None or prior.get("instance_id") != instance_id:
+            return None
+
+        def camera_center(value: Any) -> Optional[np.ndarray]:
+            try:
+                _, _, vt = np.linalg.svd(np.asarray(value, dtype=float).reshape(3, 4))
+                homogeneous = vt[-1]
+                if abs(float(homogeneous[3])) <= 1e-9:
+                    return None
+                return homogeneous[:3] / homogeneous[3]
+            except (TypeError, ValueError, np.linalg.LinAlgError):
+                return None
+
+        center_a = camera_center(prior["projection"])
+        center_b = camera_center(current["projection"])
+        if center_a is None or center_b is None:
+            return None
+        baseline = float(np.linalg.norm(center_a - center_b))
+        if baseline < 0.006:
+            return None
+        raw_query = self._raw_pixels_from_view(
+            np.asarray(tracking.get("query_points_xy"), dtype=float), meta
+        )
+        raw_current = self._raw_pixels_from_view(
+            np.asarray(tracking.get("current_points_xy"), dtype=float), meta
+        )
+        if raw_query is None or raw_current is None or raw_query.shape != raw_current.shape:
+            return None
+        checked = triangulate_metric_points_checked(
+            raw_query,
+            raw_current,
+            prior["projection"],
+            current["projection"],
+            min_correspondences=4,
+            max_reprojection_error_px=3.0,
+        )
+        if checked is None:
+            return None
+        center = np.asarray(checked["center_world"], dtype=float)
+        surface_spread = float(checked["surface_spread_m"])
+        reprojection_error = float(checked["median_reprojection_error_px"])
+        table_z = float(self.table_height_m)
+        eef = np.asarray(current["eef"], dtype=float)
+        if (
+            not np.all(np.isfinite(center))
+            or not np.isfinite(surface_spread)
+            or not (table_z - 0.04 <= float(center[2]) <= float(eef[2]) + 0.08)
+        ):
+            return None
+        self._parallax_world_history.append(center)
+        robust_center = np.median(np.stack(list(self._parallax_world_history)), axis=0)
+        relative = robust_center - eef
+        focal = max(float(np.linalg.norm(np.asarray(projection)[0, :3])), 1.0)
+        depth = max(float(np.linalg.norm(robust_center - center_b)), 0.01)
+        sigma_m = max(0.003, (depth * depth / (focal * baseline)) * max(reprojection_error, 0.75))
+        return SpatialToolResult(
+            source="active_parallax",
+            instance_id=instance_id,
+            frame_id=frame_id,
+            target_points_world=(tuple(float(v) for v in robust_center),),
+            target_to_gripper_xyz=tuple(float(v) for v in relative),
+            uncertainty_std_m=(sigma_m,) * 3,
+            confidence=float(np.clip(1.0 - reprojection_error / 3.0, 0.0, 1.0)),
+            health=SpatialHealth.VALID,
+            diagnostics={
+                "query_frame_id": int(query_frame),
+                "correspondence_count": int(checked["valid_correspondences"]),
+                "baseline_m": baseline,
+                "surface_spread_m": surface_spread,
+                "median_reprojection_error_px": reprojection_error,
+                "estimated_uncertainty_m": sigma_m,
+            },
+        )
+
     def run(self) -> EpisodeResult:
         reset_history = getattr(self.agent, "reset", None)
         if callable(reset_history):
@@ -911,6 +1526,16 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
         chunk_queue: list[str] = []
         self._reacquire_required = False
         self._grasp_retry_anchor = None
+        self._previous_agentview = None
+        self._previous_wrist = None
+        self._previous_frame_id = None
+        self._previous_executed_action = None
+        self._pending_grasp_pre_action = None
+        self._active_frame_id = None
+        self._parallax_epoch = None
+        self._parallax_history = deque(maxlen=8)
+        self._current_stage = ""
+        self._last_anyplace_shadow_frame = -10_000
 
         if self.visual_route_plugin is not None:
             reset_route = getattr(self.visual_route_plugin, "reset", None)
@@ -925,9 +1550,10 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
         if self.visual_harness is not None:
             self.visual_harness.reset()
         if self.verified_runtime is not None:
-            reset_runtime = getattr(self.verified_runtime, "reset", None)
-            if callable(reset_runtime):
-                reset_runtime()
+            # V2.1 and V2.2 both use current-episode visual memory. Bind every
+            # VCR memory instance to this unique logger directory so panel
+            # resolution verifies the same episode that wrote the raw frames.
+            _reset_runtime_episode(self.verified_runtime, self.logger)
 
         try:
             agentview, wrist = self._images(obs)
@@ -1045,6 +1671,7 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                 subgoal = subgoals[
                     current_index
                 ]
+                self._active_frame_id = int(step_idx)
 
                 subgoal_step = (
                     step_idx
@@ -1070,6 +1697,19 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                 agentview, wrist = (
                     self._images(obs)
                 )
+                # Keep the detector/runtime input immutable.  Route overlays are
+                # useful to the Agent and video, but must never feed back into
+                # instance association or appearance descriptors.
+                raw_agentview = agentview
+                raw_wrist = wrist
+                self._critical_qwen_input = None
+                image_refs, raw_frames_saved_early = _save_runtime_memory_frame(
+                    self.logger,
+                    self.verified_runtime,
+                    step_idx,
+                    raw_agentview=raw_agentview,
+                    raw_wrist=raw_wrist,
+                )
 
                 capability_evidence = {}
                 capability_context = ""
@@ -1080,6 +1720,7 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                 transport_rollback_index = None
                 route_holding_arbiter: dict[str, Any] = {}
                 holding_recovery_arbiter: list[dict[str, Any]] = []
+                runtime_rollback_index: Optional[int] = None
                 route_held_evidence: Optional[dict[str, Any]] = None
                 route_destination_evidence: Optional[dict[str, Any]] = None
                 held_target, held_affordance = self._held_target_for(
@@ -1108,10 +1749,309 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                     )
                     capability_context = self.visual_harness.prompt_context()
 
-                # Phase-1 capability offloading.  The runtime sees only the
-                # same perception/proprioception evidence already exposed by
-                # VisualHarness.  It cannot change the semantic task/stage.
-                if self.verified_runtime is not None:
+                # Ambiguous SAM3 detections still carry per-candidate masks.
+                # Resolve those masks only through the existing same-camera
+                # target track; never compare AgentView and Wrist pixels.
+                transient_candidate_masks = {}
+                if isinstance(capability_evidence, dict):
+                    transient_candidate_masks = capability_evidence.pop(
+                        "_transient_candidate_masks_by_camera", {}
+                    )
+                secondary_view = (
+                    capability_evidence.get("secondary_view")
+                    if isinstance(capability_evidence, dict)
+                    else None
+                )
+                secondary_association = None
+                secondary_target_mask = None
+                preview_secondary = getattr(
+                    self.verified_runtime,
+                    "associate_secondary_target_view",
+                    None,
+                )
+                if (
+                    callable(preview_secondary)
+                    and isinstance(secondary_view, dict)
+                    and str(getattr(subgoal, "motion", "")).upper() == "GRASP"
+                ):
+                    secondary_camera = str(secondary_view.get("camera") or "").lower()
+                    secondary_image = {
+                        "agentview": raw_agentview,
+                        "wrist": raw_wrist,
+                    }.get(secondary_camera)
+                    secondary_association = preview_secondary(
+                        evidence={**secondary_view, "stage": "GRASP"},
+                        image=secondary_image,
+                        camera=secondary_camera,
+                        frame_id=step_idx,
+                        commit=False,
+                    )
+                    if secondary_association.get("health") == "VALID":
+                        secondary_view["bbox_xyxy"] = secondary_association.get(
+                            "bbox_xyxy"
+                        )
+                        secondary_view["visible"] = True
+                        secondary_view["instance_association"] = secondary_association
+                        # Preserve a camera-local EEF projection for the
+                        # separately associated view.  This lets V2.1 expose a
+                        # bounded image-space correction when metric geometry
+                        # is unavailable, without mixing Wrist and AgentView
+                        # pixels or trusting an unassociated detector proposal.
+                        secondary_camera_geometry = (
+                            geometry_context.get(secondary_camera, {})
+                            if isinstance(geometry_context, dict)
+                            else {}
+                        )
+                        secondary_bbox = secondary_association.get("bbox_xyxy")
+                        eef_pixel = secondary_camera_geometry.get("pixel_xy")
+                        direction_map = secondary_camera_geometry.get(
+                            "screen_direction_to_token"
+                        )
+                        if (
+                            isinstance(secondary_bbox, (list, tuple))
+                            and len(secondary_bbox) == 4
+                            and isinstance(eef_pixel, (list, tuple))
+                            and len(eef_pixel) == 2
+                            and isinstance(direction_map, dict)
+                            and bool(secondary_camera_geometry.get("valid", False))
+                            and bool(secondary_camera_geometry.get("in_frame", False))
+                        ):
+                            x1, y1, x2, y2 = (
+                                float(value) for value in secondary_bbox
+                            )
+                            dx = (x1 + x2) / 2.0 - float(eef_pixel[0])
+                            dy = (y1 + y2) / 2.0 - float(eef_pixel[1])
+                            horizontal = str(
+                                direction_map.get("right" if dx > 0 else "left", "")
+                            ).upper()
+                            vertical = str(
+                                direction_map.get("down" if dy > 0 else "up", "")
+                            ).upper()
+                            secondary_view["geometry"] = {
+                                "valid": True,
+                                "in_frame": True,
+                                "frame_id": int(step_idx),
+                                "camera": secondary_camera,
+                                "pixel_xy": list(eef_pixel),
+                                "target_center_xy": [
+                                    (x1 + x2) / 2.0,
+                                    (y1 + y2) / 2.0,
+                                ],
+                                "target_minus_eef_px": [dx, dy],
+                                "calibrated_correction_candidates": {
+                                    "horizontal": horizontal,
+                                    "vertical": vertical,
+                                },
+                                "screen_direction_to_token": dict(direction_map),
+                                "camera_calibration": secondary_camera_geometry.get(
+                                    "camera_calibration"
+                                ),
+                            }
+                        candidate_rows = (
+                            transient_candidate_masks.get(secondary_camera, [])
+                            if isinstance(transient_candidate_masks, dict)
+                            else []
+                        )
+                        selected_box = secondary_association.get("bbox_xyxy")
+                        for row in candidate_rows:
+                            if not isinstance(row, dict) or not isinstance(row.get("mask"), dict):
+                                continue
+                            try:
+                                same_box = np.allclose(
+                                    np.asarray(row.get("bbox_xyxy"), dtype=float),
+                                    np.asarray(selected_box, dtype=float),
+                                    rtol=0.0,
+                                    atol=1e-3,
+                                )
+                            except (TypeError, ValueError):
+                                same_box = False
+                            if same_box:
+                                secondary_target_mask = row["mask"]
+                                break
+                        if secondary_target_mask is not None:
+                            secondary_view["mask"] = secondary_target_mask
+                            capability_evidence["secondary_target_mask_audit"] = {
+                                "camera": secondary_camera,
+                                "frame_id": int(step_idx),
+                                "instance_id": secondary_association.get("instance_id"),
+                                "bbox_xyxy": selected_box,
+                                "area_px": secondary_target_mask.get("area_px"),
+                                "source": "sam3_mask_temporally_associated",
+                            }
+
+                # Keep one online CoTracker stream per camera for the selected
+                # target throughout approach and grasp. The mask is only used
+                # to seed that camera's point queries; later frames can continue
+                # the same stream without mixing AgentView and Wrist pixels.
+                runtime_belief = getattr(self.verified_runtime, "belief", None)
+                target_track = getattr(runtime_belief, "target", None)
+                target_instance_id = getattr(target_track, "instance_id", None)
+                grasp_epoch = int(getattr(runtime_belief, "grasp_epoch", 0) or 0)
+                track_visual_points = getattr(
+                    self.verified_runtime, "track_visual_points", None
+                )
+                track_points_by_camera = (
+                    _track_v22_target_views(
+                        tracker=track_visual_points,
+                        stage=str(getattr(subgoal, "motion", "")),
+                        capability_evidence=capability_evidence,
+                        camera_images={
+                            "agentview": raw_agentview,
+                            "wrist": raw_wrist,
+                        },
+                        frame_id=step_idx,
+                        instance_id=target_instance_id,
+                        grasp_epoch=grasp_epoch,
+                    )
+                    if isinstance(capability_evidence, dict)
+                    else {}
+                )
+                if track_points_by_camera:
+                    capability_evidence["visual_point_tracks_by_camera"] = (
+                        track_points_by_camera
+                    )
+                    primary_camera = str(
+                        capability_evidence.get("camera", "")
+                    ).lower()
+                    if primary_camera in track_points_by_camera:
+                        capability_evidence["visual_point_tracks"] = (
+                            track_points_by_camera[primary_camera]
+                        )
+
+                # Optional V2.1 spatial providers are queried only at the
+                # bounded pregrasp decision point.  Their result is evidence,
+                # never a direct action or success write.
+                spatial_infer = getattr(self.verified_runtime, "infer_spatial", None)
+                if (
+                    callable(spatial_infer)
+                    and str(getattr(subgoal, "motion", "")).upper() == "GRASP"
+                    # MoGe/active-parallax evidence is only trusted from the
+                    # eye-in-hand view in this profile.  Fixed AgentView has a
+                    # different projective scale and its fallback monocular
+                    # depth is not a metric grasp residual.  Keep the last
+                    # fresh Wrist belief while AgentView remains useful for
+                    # semantic visibility and target identity.
+                    and str(capability_evidence.get("camera", "")).lower() == "wrist"
+                    and isinstance(capability_evidence.get("bbox_xyxy"), (list, tuple))
+                    and isinstance(capability_evidence.get("mask"), dict)
+                ):
+                    spatial_image = raw_wrist
+                    track_points = track_points_by_camera.get("wrist")
+                    parallax = self._active_parallax_result(
+                        capability_evidence=capability_evidence,
+                        geometry_context=geometry_context,
+                        frame_id=step_idx,
+                        instance_id=getattr(target_track, "instance_id", None),
+                        grasp_epoch=int(getattr(runtime_belief, "grasp_epoch", 0) or 0),
+                        eef_xyz=tuple(
+                            float(value)
+                            for value in self._fingertip_position(self._tcp(obs))[:3]
+                        ),
+                        tracked_points=track_points,
+                    )
+                    spatial_belief = spatial_infer(
+                        image=spatial_image,
+                        bbox_xyxy=tuple(capability_evidence.get("bbox_xyxy")) if isinstance(capability_evidence.get("bbox_xyxy"), (list, tuple)) and len(capability_evidence.get("bbox_xyxy")) == 4 else None,
+                        frame_id=step_idx,
+                        instance_id=(
+                            getattr(getattr(self.verified_runtime, "belief", None), "target", None).instance_id
+                            if getattr(getattr(self.verified_runtime, "belief", None), "target", None) is not None
+                            else None
+                        ),
+                        camera_calibration=(
+                            geometry_context.get(str(capability_evidence.get("camera", "agentview")).lower(), {}).get("camera_calibration", {})
+                            if isinstance(geometry_context, dict)
+                            else {}
+                        ),
+                        eef_xyz=tuple(float(value) for value in self._fingertip_position(self._tcp(obs))[:3]),
+                        extra_results=([parallax] if parallax is not None else None),
+                        instance_mask=capability_evidence.get("mask"),
+                    )
+                    if isinstance(capability_evidence, dict):
+                        capability_evidence["spatial_belief"] = spatial_belief
+
+                # V2.1 can optionally use a fresh, identity-associated
+                # AgentView mask for MoGe.  The provider still has to pass its
+                # calibrated pixel/world reprojection checks in infer_spatial;
+                # this is evidence only and never directly authorizes a close.
+                secondary_bbox = (
+                    secondary_association.get("bbox_xyxy")
+                    if isinstance(secondary_association, dict)
+                    and secondary_association.get("health") == "VALID"
+                    else None
+                )
+                if (
+                    callable(spatial_infer)
+                    and bool(
+                        getattr(
+                            self.verified_runtime,
+                            "allow_agentview_identity_fallback",
+                            False,
+                        )
+                    )
+                    and str(getattr(subgoal, "motion", "")).upper() == "GRASP"
+                    and isinstance(secondary_bbox, (list, tuple))
+                    and len(secondary_bbox) == 4
+                    and isinstance(secondary_target_mask, dict)
+                    and raw_agentview is not None
+                ):
+                    agentview_calibration = (
+                        geometry_context.get("agentview", {}).get(
+                            "camera_calibration", {}
+                        )
+                        if isinstance(geometry_context, dict)
+                        else {}
+                    )
+                    secondary_spatial = spatial_infer(
+                        image=raw_agentview,
+                        bbox_xyxy=tuple(float(value) for value in secondary_bbox),
+                        frame_id=step_idx,
+                        instance_id=(
+                            secondary_association.get("instance_id")
+                            if isinstance(secondary_association, dict)
+                            else None
+                        ),
+                        camera_calibration=agentview_calibration,
+                        eef_xyz=tuple(
+                            float(value)
+                            for value in self._fingertip_position(self._tcp(obs))[:3]
+                        ),
+                        instance_mask=secondary_target_mask,
+                    )
+                    capability_evidence["secondary_spatial_belief"] = {
+                        **secondary_spatial,
+                        "camera": "agentview",
+                    }
+                    if (
+                        str(secondary_spatial.get("health", "")).upper() == "VALID"
+                        and int(secondary_spatial.get("frame_id", -1)) == int(step_idx)
+                        and str(secondary_spatial.get("instance_id") or "")
+                        == str(secondary_association.get("instance_id") or "")
+                        and str(
+                            (capability_evidence.get("spatial_belief") or {}).get(
+                                "health", "UNKNOWN"
+                            )
+                        ).upper()
+                        != "VALID"
+                    ):
+                        capability_evidence["spatial_belief"] = secondary_spatial
+
+                # Candidate RLE is transient input to CoTracker/MoGe. Keep only
+                # its compact provenance audit in serialized step evidence.
+                if isinstance(secondary_view, dict):
+                    secondary_view.pop("mask", None)
+
+                # V1's Phase-1 runtime keeps its original position in the loop.
+                # VCR-v2 implements ``observe_frame`` and is deferred until the
+                # route plugin has added its verified transport residuals below.
+                runtime_observe_frame = (
+                    getattr(self.verified_runtime, "observe_frame", None)
+                    if self.verified_runtime is not None
+                    else None
+                )
+                if self.verified_runtime is not None and not callable(
+                    runtime_observe_frame
+                ):
                     verified_runtime_decision = self.verified_runtime.observe(
                         stage=str(subgoal.motion),
                         evidence=(
@@ -1149,6 +2089,45 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                     )
                     route_held_evidence = route_held
                     route_destination_evidence = route_destination
+                    # CoTracker's online window is 16 frames with an 8-frame
+                    # update cadence. A short GRASP subgoal often ends before
+                    # its first useful correspondence, so continue the held
+                    # instance stream through TRANSPORT using its fresh
+                    # AgentView mask. Tracks are logged as visual motion
+                    # evidence; they do not create metric geometry or actions.
+                    runtime_belief = getattr(self.verified_runtime, "belief", None)
+                    target_track = getattr(runtime_belief, "target", None)
+                    track_visual_points = getattr(
+                        self.verified_runtime, "track_visual_points", None
+                    )
+                    if (
+                        str(getattr(subgoal, "motion", "")).upper() == "TRANSPORT"
+                        and bool(getattr(self.verified_runtime, "placement_v22_enabled", False))
+                        and route_held is not None
+                        and target_track is not None
+                        and callable(track_visual_points)
+                    ):
+                        track_result = track_visual_points(
+                            image=raw_agentview,
+                            mask=route_held.get("mask"),
+                            camera="agentview",
+                            frame_id=step_idx,
+                            instance_id=getattr(target_track, "instance_id", None),
+                            grasp_epoch=int(getattr(runtime_belief, "grasp_epoch", 0) or 0),
+                        )
+                        if isinstance(track_result, dict):
+                            track_summary = {
+                                key: track_result.get(key)
+                                for key in (
+                                    "health", "camera", "query_frame_id", "frame_id",
+                                    "visible_count", "inference_latency_s",
+                                )
+                                if key in track_result
+                            }
+                            motion_summary = track_result.get("motion_summary")
+                            if isinstance(motion_summary, dict):
+                                track_summary.update(motion_summary)
+                            capability_evidence["held_point_track_summary"] = track_summary
                     route_output = self.visual_route_plugin.update(
                         agentview=agentview,
                         wrist=wrist,
@@ -1178,6 +2157,24 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                             capability_context += route_context
                         route_evidence = route_output.get("evidence")
                         if isinstance(route_evidence, dict):
+                            # Placement geometry may be usable while the held
+                            # object spatial providers disagree, but that
+                            # disagreement must still be visible to VCR. It
+                            # converts the shared belief to UNKNOWN and blocks
+                            # motion rather than letting a stale route residual
+                            # authorize a correction.
+                            placement_belief = route_evidence.get("placement_belief")
+                            spatial_belief = capability_evidence.get("spatial_belief")
+                            if isinstance(placement_belief, dict) and isinstance(spatial_belief, dict):
+                                conflicts = list(placement_belief.get("conflicts") or [])
+                                provider_conflicts = spatial_belief.get("conflicting_sources")
+                                health = str(spatial_belief.get("health") or "").upper()
+                                if isinstance(provider_conflicts, (list, tuple)):
+                                    conflicts.extend(str(value) for value in provider_conflicts)
+                                if health in {"AMBIGUOUS", "STALE", "SENSOR_FAULT"}:
+                                    conflicts.append(f"spatial_health:{health}")
+                                if conflicts:
+                                    placement_belief["conflicts"] = sorted(set(conflicts))
                             capability_evidence["visual_route"] = route_evidence
                             holding_arbiter = route_evidence.get("holding_arbiter")
                             if isinstance(holding_arbiter, dict):
@@ -1193,6 +2190,179 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                         annotated_agentview = route_output.get("agentview")
                         if annotated_agentview is not None:
                             agentview = annotated_agentview
+
+                        # AnyPlace receives only parent/child point clouds in a
+                        # separate GPU1 subprocess.  Its candidates are logged
+                        # as shadow evidence and never enter the action path.
+                        shadow_infer = getattr(self.verified_runtime, "infer_placement_shadow", None)
+                        placement_shadow = route_evidence.get("placement_belief") if isinstance(route_evidence, dict) else None
+                        if (
+                            callable(shadow_infer)
+                            and bool(getattr(self.verified_runtime, "placement_v22_enabled", False))
+                            and isinstance(placement_shadow, dict)
+                            and step_idx - self._last_anyplace_shadow_frame >= 8
+                        ):
+                            parent_polygon = placement_shadow.get("opening_free_space_polygon_world")
+                            child_points = getattr(self.verified_runtime, "placement_object_points_gripper", ())
+                            try:
+                                eef_now = np.asarray(self._fingertip_position(self._tcp(obs)), dtype=float).reshape(3)
+                                child_world = [
+                                    (eef_now + np.asarray(point, dtype=float).reshape(3)).tolist()
+                                    for point in child_points
+                                    if isinstance(point, (list, tuple)) and len(point) >= 3
+                                ]
+                                parent_world = [
+                                    [float(value[0]), float(value[1]), float(placement_shadow.get("rim_plane_z_m"))]
+                                    for value in (parent_polygon or [])
+                                    if isinstance(value, (list, tuple)) and len(value) >= 2
+                                ]
+                            except (TypeError, ValueError, IndexError):
+                                child_world, parent_world = [], []
+                            if len(parent_world) >= 3 and child_world:
+                                capability_evidence["anyplace_shadow"] = shadow_infer(
+                                    parent_points=parent_world,
+                                    child_points=child_world,
+                                    frame_id=step_idx,
+                                    instance_id=getattr(getattr(self.verified_runtime, "belief", None).target, "instance_id", None)
+                                    if getattr(getattr(self.verified_runtime, "belief", None), "target", None) is not None
+                                    else None,
+                                )
+                                self._last_anyplace_shadow_frame = step_idx
+
+                if callable(runtime_observe_frame):
+                    try:
+                        runtime_eef = tuple(
+                            float(value)
+                            for value in self._fingertip_position(self._tcp(obs))[:3]
+                        )
+                    except (TypeError, ValueError, IndexError):
+                        runtime_eef = None
+                    verified_runtime_decision = runtime_observe_frame(
+                        stage=str(subgoal.motion),
+                        evidence=(
+                            capability_evidence
+                            if isinstance(capability_evidence, dict)
+                            else {}
+                        ),
+                        previous_action=(
+                            self.visual_harness.last_action
+                            if self.visual_harness is not None
+                            else None
+                        ),
+                        agentview=raw_agentview,
+                        wrist=raw_wrist,
+                        image_refs=image_refs,
+                        eef_xyz=runtime_eef,
+                        gripper_closed=(
+                            str(
+                                getattr(
+                                    self.controller.state,
+                                    "gripper_name",
+                                    "",
+                                )
+                            ).upper()
+                            == "CLOSE"
+                        ),
+                        gripper_width_m=current_gripper_width_m,
+                    )
+                    if isinstance(capability_evidence, dict):
+                        capability_evidence["verified_runtime"] = dict(
+                            verified_runtime_decision
+                        )
+                    critical_request = verified_runtime_decision.get(
+                        "critical_decision"
+                    )
+                    apply_critical = getattr(
+                        self.verified_runtime,
+                        "apply_critical_decision",
+                        None,
+                    )
+                    if isinstance(critical_request, dict) and callable(
+                        apply_critical
+                    ):
+                        critical_response = self._resolve_runtime_critical_decision(
+                            request=critical_request,
+                            subgoal=subgoal,
+                            obs=obs,
+                            agentview=raw_agentview,
+                            placement_evidence=(
+                                (capability_evidence.get("visual_route") or {}).get("placement_belief")
+                                if isinstance(capability_evidence, dict)
+                                and isinstance(capability_evidence.get("visual_route"), dict)
+                                else None
+                            ),
+                        )
+                        critical_commit = apply_critical(
+                            str(critical_response.get("answer") or "UNKNOWN"),
+                            details=critical_response.get("details") if isinstance(critical_response.get("details"), dict) else {},
+                        )
+                        if critical_commit.get("request_geometry_refresh") and self.visual_route_plugin is not None:
+                            request_refresh = getattr(self.visual_route_plugin, "request_geometry_refresh", None)
+                            if callable(request_refresh):
+                                request_refresh(str(critical_commit.get("semantic_option") or "agent_requested_refresh"))
+                        verified_runtime_decision["critical_response"] = (
+                            critical_response
+                        )
+                        verified_runtime_decision["critical_commit"] = critical_commit
+                        next_action = critical_commit.get("next_action")
+                        if next_action:
+                            verified_runtime_decision["action_token"] = str(
+                                next_action
+                            ).upper()
+                        rollback_stage = str(
+                            critical_commit.get("rollback_stage") or ""
+                        ).upper()
+                        if rollback_stage:
+                            for candidate_index in range(current_index, -1, -1):
+                                if str(
+                                    getattr(
+                                        subgoals[candidate_index],
+                                        "motion",
+                                        "",
+                                    )
+                                ).upper() == rollback_stage:
+                                    runtime_rollback_index = candidate_index
+                                    break
+                        runtime_event = verified_runtime_decision.get("event")
+                        if isinstance(runtime_event, dict):
+                            runtime_event["critical_response"] = critical_response
+                            runtime_event["critical_commit"] = critical_commit
+                            runtime_event["qwen_decision"] = critical_response
+                    if isinstance(capability_evidence, dict):
+                        capability_evidence["verified_runtime"] = dict(
+                            verified_runtime_decision
+                        )
+                    # Wrist and AgentView answer different spatial questions,
+                    # but a Wrist candidate must not drive pixel servoing when
+                    # the fixed view cannot corroborate the same target.  On
+                    # the next frame prefer the fixed camera so temporal
+                    # identity and world-XY evidence can recover; this is
+                    # especially important after a dropped object is beside a
+                    # receptacle, where the Wrist often sees a distractor or
+                    # the gripper itself.  The semantic Qwen decision already
+                    # made on this frame is retained in the event log.
+                    if (
+                        self.visual_harness is not None
+                        and str(getattr(subgoal, "motion", "")).upper() == "GRASP"
+                        and str(capability_evidence.get("camera", "")).lower() == "wrist"
+                    ):
+                        secondary_view = capability_evidence.get("secondary_view")
+                        secondary_unreliable = bool(
+                            isinstance(secondary_view, dict)
+                            and (
+                                not bool(secondary_view.get("visible", False))
+                                or str(secondary_view.get("source", "")).lower()
+                                in {"sam3_abstain", "unknown", ""}
+                            )
+                        )
+                        runtime_health = str(
+                            verified_runtime_decision.get("observation_health", "")
+                        ).upper()
+                        if secondary_unreliable or runtime_health in {
+                            "OCCLUDED",
+                            "AMBIGUOUS",
+                        }:
+                            self.visual_harness.stage_camera_override = "agentview"
 
                 # LIFT has a visual ambiguity that is specific to an eye-in-hand
                 # perspective: a carried object remains below the hand in the image
@@ -1246,13 +2416,18 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                         "horizontal motion. The Agent still decides the recovery."
                     )
 
+                v22_enabled = bool(
+                    getattr(self.verified_runtime, "placement_v22_enabled", False)
+                )
                 recovery_decision = (
-                    self._recovery_before(
+                    None
+                    if v22_enabled
+                    else self._recovery_before(
                         current_index=current_index,
                         subgoals=subgoals,
                     )
                 )
-                if self.recovery_plugin is not None:
+                if self.recovery_plugin is not None and not v22_enabled:
                     recovery_decision, arbitration = (
                         self.recovery_plugin.arbitrate_transport_holding(
                             recovery_decision,
@@ -1282,6 +2457,14 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                 response = None
                 target_in_wrist = None
                 open_loop = False
+                runtime_v2_blocks_commit = bool(
+                    verified_runtime_decision.get("runtime_version")
+                    and (
+                        verified_runtime_decision.get("observation_health") != "VALID"
+                        or verified_runtime_decision.get("critical_decision")
+                        or verified_runtime_decision.get("action_token") == STOP_TOKEN
+                    )
+                )
 
                 # A fresh, host-owned APPROACH completion is a stage transition, not a
                 # movement suggestion.  It must win over recovery/chunk heuristics; otherwise
@@ -1290,10 +2473,12 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                 if (
                     stage_completion_guard is not None
                     and stage_completion_guard.get("applied", False)
+                    and not verified_runtime_decision.get("runtime_version")
                     and not (
                         str(getattr(subgoal, "motion", "")).upper() == "APPROACH"
                         and self._reacquire_required
                     )
+                    and not runtime_v2_blocks_commit
                 ):
                     token = DONE_TOKEN
                     chunk_queue = []
@@ -1301,6 +2486,8 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                 elif (
                     grasp_agentview_guard is not None
                     and grasp_agentview_guard.get("applied", False)
+                    and not verified_runtime_decision.get("runtime_version")
+                    and not runtime_v2_blocks_commit
                 ):
                     token = GRASP_TOKEN
                     chunk_queue = []
@@ -1315,6 +2502,23 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                     token = str(
                         verified_runtime_decision["action_token"]
                     ).strip().upper()
+                    # Reuse the robot adapter's calibrated coarse/fine step
+                    # contract, but derive "far" from the runtime option rather
+                    # than asking Qwen for a wrist marker.  MOVE_TO_HOVER is the
+                    # only coarse horizontal option; precision and contact
+                    # options remain fine-grained.
+                    runtime_option = str(
+                        verified_runtime_decision.get("option") or ""
+                    ).upper()
+                    if runtime_option == "MOVE_TO_HOVER":
+                        target_in_wrist = False
+                    elif runtime_option in {
+                        "ALIGN_PREGRASP",
+                        "DESCEND_TO_GRASP",
+                        "ALIGN_OPENING",
+                        "DESCEND_TO_SEAT",
+                    }:
+                        target_in_wrist = True
                     chunk_queue = []
 
                 elif (
@@ -1475,7 +2679,9 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                     and verified_runtime_decision.get("action_token")
                 ):
                     reason = (
-                        "verified_runtime ALIGN: "
+                        "verified_runtime "
+                        + str(verified_runtime_decision.get("option", "OPTION"))
+                        + ": "
                         + str(verified_runtime_decision.get("reason", ""))
                     )
                 elif recovery_decision is not None:
@@ -1497,7 +2703,10 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                 alignment_forced = False
                 alignment_forced_action = None
                 stage_name = str(getattr(subgoal, "motion", "")).upper()
-                if stage_name == "PLACE":
+                if (
+                    not bool(getattr(self.verified_runtime, "placement_v22_enabled", False))
+                    and stage_name in {"PLACE", "TRANSPORT"}
+                ):
                     place_sid = str(getattr(subgoal, "sid", ""))
                     pending_recovery = self._place_verification_recovery_action
                     if pending_recovery in {
@@ -1563,6 +2772,7 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                 if bool(
                     self.visual_route_plugin is not None
                     and getattr(self.visual_route_plugin, "enabled", False)
+                    and not bool(getattr(self.verified_runtime, "placement_v22_enabled", False))
                 ):
                     visual_route_gate = self.visual_route_plugin.gate(
                         requested_token,
@@ -1638,7 +2848,11 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                         "state. Reassess the live views and choose the action for the current "
                         "stage; do not repeat a close while the gripper is already closed."
                     )
-                elif token == GRASP_TOKEN and self._grasp_retry_anchor is not None:
+                elif (
+                    token == GRASP_TOKEN
+                    and self._grasp_retry_anchor is not None
+                    and not verified_runtime_decision.get("runtime_version")
+                ):
                     current_relations = self._grasp_view_relations(capability_evidence)
                     comparable = False
                     changed = False
@@ -1797,6 +3011,7 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                 elif (
                     token == RELEASE_TOKEN
                     and stage_name_for_guard != "RELEASE"
+                    and not bool(getattr(self.verified_runtime, "placement_v22_enabled", False))
                     and not (
                         stage_name_for_guard == "TRANSPORT"
                         and transport_hold_lost
@@ -1837,6 +3052,7 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                     stage_name_for_guard == "APPROACH"
                     and token == DONE_TOKEN
                     and self._reacquire_required
+                    and not verified_runtime_decision.get("runtime_version")
                 ):
                     stage_action_guard = {
                         "blocked": True,
@@ -1858,6 +3074,11 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                     stage_name_for_guard == "APPROACH"
                     and token == "MV_DOWN"
                     and self._reacquire_required
+                    # VCR-v2 has already validated the current identity and
+                    # robot-only height band.  Its recovery option needs to
+                    # descend into HOVER; the legacy screen-parallax guard
+                    # would rewrite that descent into endless FWD/BACK moves.
+                    and not verified_runtime_decision.get("runtime_version")
                     and self.visual_harness is not None
                     and not bool(
                         getattr(self.visual_harness, "last_evidence", {})
@@ -1931,6 +3152,10 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                 intent_trace = route_trace.get("intent") or {}
                 route_plan_trace = route_trace.get("route") or {}
                 progress_trace = route_trace.get("progress") or {}
+                runtime_event = verified_runtime_decision.get("event")
+                if isinstance(runtime_event, dict):
+                    runtime_event["requested_action"] = requested_token
+                    runtime_event["executed_action"] = token
                 print(
                     "[zeroshot-robolab] "
                     f"step={step_idx:02d} "
@@ -1952,6 +3177,13 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                     flush=True,
                 )
 
+                self._current_stage = stage_name_for_guard
+                if token == GRASP_TOKEN:
+                    self._pending_grasp_pre_action = {
+                        "frame_id": int(step_idx),
+                        "agentview": np.asarray(raw_agentview).copy(),
+                        "wrist": None if raw_wrist is None else np.asarray(raw_wrist).copy(),
+                    }
                 (
                     obs,
                     terminated,
@@ -1963,7 +3195,63 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                     target_in_wrist=(
                         target_in_wrist
                     ),
+                    step_override_m=(
+                        float(
+                            verified_runtime_decision.get(
+                                "grasp_diagnostic_lift_step_m"
+                                if bool(verified_runtime_decision.get("grasp_diagnostic_lift"))
+                                else "reobserve_lift_step_m"
+                            )
+                        )
+                        if token == "MV_UP"
+                        and (
+                            bool(verified_runtime_decision.get("grasp_diagnostic_lift"))
+                            or bool(verified_runtime_decision.get("reobserve_for_view"))
+                        )
+                        else None
+                    ),
                 )
+
+                # The controller/route guards may rewrite the requested token.
+                # VCR-v2 learns only this adapter receipt, never the stale request.
+                runtime_commit = None
+                runtime_commit_fn = getattr(self.verified_runtime, "commit_executed_action", None)
+                if callable(runtime_commit_fn):
+                    runtime_commit = runtime_commit_fn(
+                        executed_action=str(getattr(result, "token", token)).upper(),
+                        authorized_action=str(token).upper(),
+                    )
+                    if isinstance(verified_runtime_decision.get("event"), dict):
+                        verified_runtime_decision["event"]["action_receipt"] = runtime_commit
+                    verified_runtime_decision["action_receipt"] = runtime_commit
+                self._previous_agentview = raw_agentview
+                self._previous_wrist = raw_wrist
+                self._previous_frame_id = int(step_idx)
+                self._previous_executed_action = str(getattr(result, "token", token)).upper()
+
+                # PRE_DESCENT is a semantic hand-off, not an open-loop
+                # vertical trajectory.  After one bounded downward atom, force
+                # a fresh Qwen route review so contact, seating, or a new rim
+                # relation can change the next intent.
+                if (
+                    self.visual_route_plugin is not None
+                    and stage_name_for_guard == "TRANSPORT"
+                    and str(
+                        getattr(self.visual_route_plugin, "last_progress", None)
+                        and getattr(
+                            self.visual_route_plugin.last_progress,
+                            "active_leg",
+                            "",
+                        )
+                        or ""
+                    ).upper()
+                    in {"PRE_DESCENT", "DESCENT"}
+                    and str(getattr(result, "token", token)).upper() == "MV_DOWN"
+                ):
+                    self.visual_route_plugin.request_intent_refresh(
+                        "bounded_pre_descent_step",
+                        critical=True,
+                    )
 
                 if self.visual_harness is not None:
                     self.visual_harness.mark_action(token)
@@ -1989,12 +3277,15 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                 if (
                     token == GRASP_TOKEN
                     and result.gripper_closed
+                    and not bool(getattr(self.verified_runtime, "placement_v22_enabled", False))
                 ):
                     grasp_verification = self._verify_grasp_visually(
                         subgoal=subgoal,
                         obs=obs,
                     )
-                    if isinstance(grasp_verification, dict):
+                    if isinstance(grasp_verification, dict) and not bool(
+                        getattr(self.verified_runtime, "placement_v22_enabled", False)
+                    ):
                         verify_event = getattr(
                             self.recovery_plugin,
                             "agent_grasp_verification",
@@ -2042,6 +3333,8 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                         critical=True,
                     )
                 if (
+                    not bool(getattr(self.verified_runtime, "placement_v22_enabled", False))
+                    and
                     (
                         str(getattr(subgoal, "motion", "")).upper()
                         == "PLACE"
@@ -2075,7 +3368,29 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                         self._place_verification_stage = None
                         if transport_stage:
                             # The placement verifier is evidence for the next Qwen
-                            # intent, never a one-shot host-selected recovery atom.
+                            # intent. Its bounded recovery choice is exposed as
+                            # exactly one executable atom; after that fresh
+                            # observation the route intent is replanned.
+                            recovery_action = str(
+                                (place_verification or {}).get("recovery_action", "HOLD")
+                            ).upper()
+                            if recovery_action in {
+                                "MV_UP", "MV_LEFT", "MV_RIGHT", "MV_FWD", "MV_BACK",
+                            }:
+                                self._place_verification_recovery_action = recovery_action
+                            set_feedback = getattr(
+                                self.visual_route_plugin,
+                                "set_placement_feedback",
+                                None,
+                            )
+                            if callable(set_feedback):
+                                set_feedback(
+                                    decision="NO",
+                                    reasoning=str(
+                                        (place_verification or {}).get("reasoning", "")
+                                    ),
+                                    recovery_action=recovery_action,
+                                )
                             self.visual_route_plugin.request_intent_refresh(
                                 "placement_verification_failed",
                                 critical=True,
@@ -2100,6 +3415,23 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                                 f"{str((place_verification or {}).get('reasoning', '')).strip()} "
                                 "keep holding it and follow the fresh visual recovery action "
                                 f"chosen by the Agent ({recovery_action or 'HOLD'}); do not release."
+                            )
+                    elif (
+                        transport_stage
+                        and self._place_verification_decision == "UNKNOWN"
+                    ):
+                        set_feedback = getattr(
+                            self.visual_route_plugin,
+                            "set_placement_feedback",
+                            None,
+                        )
+                        if callable(set_feedback):
+                            set_feedback(
+                                decision="UNKNOWN",
+                                reasoning=str(
+                                    (place_verification or {}).get("reasoning", "")
+                                ),
+                                recovery_action="HOLD",
                             )
 
                 subgoal_done = bool(
@@ -2146,11 +3478,55 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                         )
                     )
                 )
+                if bool(getattr(self.verified_runtime, "placement_v22_enabled", False)):
+                    # The post-close answer is a candidate. V2.2 advances only
+                    # after the runtime observes one bounded lift and a fresh
+                    # stable object/EEF relation.
+                    verified_grasp = False
                 if agent_grasp_decision is not None:
                     # A NO or UNKNOWN visual verdict keeps the semantic GRASP stage
                     # open. NO will also request the normal release/rollback path;
                     # UNKNOWN lets the next controller decision inspect live views.
                     verified_grasp = False
+                report_grasp = getattr(
+                    self.verified_runtime,
+                    "report_grasp_verdict",
+                    None,
+                )
+                if (
+                    token == GRASP_TOKEN
+                    and callable(report_grasp)
+                    and not bool(getattr(self.verified_runtime, "placement_v22_enabled", False))
+                ):
+                    runtime_grasp_verdict = report_grasp(
+                        verdict=visual_grasp_decision or "UNKNOWN",
+                        frame_id=step_idx,
+                        mechanically_empty=bool(result.grasp_empty),
+                        diagnostic_lift_clear=bool(
+                            (grasp_verification or {}).get("diagnostic_lift_clear", False)
+                        ),
+                        evidence_for=(grasp_verification or {}).get("evidence_for", ()),
+                        reasoning=(
+                            str((grasp_verification or {}).get("reasoning", ""))
+                            if isinstance(grasp_verification, dict)
+                            else ""
+                        ),
+                    )
+                    verified_runtime_decision["post_action_verification"] = (
+                        runtime_grasp_verdict
+                    )
+                    verified_runtime_decision["belief"] = runtime_grasp_verdict.get(
+                        "belief"
+                    )
+                if (
+                    bool(getattr(self.verified_runtime, "placement_v22_enabled", False))
+                    and token == DONE_TOKEN
+                    and str(getattr(subgoal, "motion", "")).upper() == "GRASP"
+                ):
+                    runtime_belief = getattr(self.verified_runtime, "belief", None)
+                    held = getattr(runtime_belief, "held", None)
+                    held_truth = str(getattr(getattr(held, "truth", None), "value", "")).upper()
+                    verified_grasp = held_truth == "TRUE"
                 if verified_grasp:
                     subgoal_done = True
                 elif (
@@ -2312,7 +3688,15 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                 # traceback and, more importantly, obscured the last physical result.
                 post_recovery = None
                 if not terminated and not truncated:
-                    if agent_grasp_decision is not None:
+                    v22_enabled = bool(
+                        getattr(self.verified_runtime, "placement_v22_enabled", False)
+                    )
+                    if v22_enabled:
+                        # V2.2 has one action authority.  The legacy recovery
+                        # plugin may still log evidence, but it cannot release,
+                        # roll back, or move the robot beside the VCR runtime.
+                        post_recovery = None
+                    elif agent_grasp_decision is not None:
                         post_recovery = agent_grasp_decision
                     elif not (
                         token == GRASP_TOKEN
@@ -2327,7 +3711,9 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                             subgoal_done=subgoal_done,
                         )
 
-                if self.recovery_plugin is not None:
+                if self.recovery_plugin is not None and not bool(
+                    getattr(self.verified_runtime, "placement_v22_enabled", False)
+                ):
                     post_recovery, arbitration = (
                         self.recovery_plugin.arbitrate_transport_holding(
                             post_recovery,
@@ -2502,6 +3888,18 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                     step_record["final_task_check"] = final_check
                 if capability_evidence:
                     step_record["capability"] = capability_evidence
+                if runtime_commit is not None:
+                    step_record["runtime_action_receipt"] = runtime_commit
+
+                save_visual_artifacts = getattr(self.logger, "save_visual_artifacts", None)
+                if callable(save_visual_artifacts):
+                    save_visual_artifacts(
+                        step_idx,
+                        raw_agentview=None if raw_frames_saved_early else raw_agentview,
+                        raw_wrist=None if raw_frames_saved_early else raw_wrist,
+                        provider_overlay=agentview,
+                        qwen_input=self._critical_qwen_input,
+                    )
 
                 self.logger.log_step(
                     step_idx=step_idx,
@@ -2509,6 +3907,25 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                     wrist=wrist,
                     record=step_record,
                 )
+
+                if _should_end_after_verified_grasp(
+                    self.verified_runtime, verified_grasp
+                ):
+                    end_reason = "grasp_verification_only_complete"
+                    break
+
+                if (
+                    verified_runtime_decision.get("runtime_version")
+                    and verified_runtime_decision.get("status") == "FAILED"
+                ):
+                    failure = verified_runtime_decision.get("failure")
+                    code = (
+                        str(failure.get("code") or "failed").lower()
+                        if isinstance(failure, dict)
+                        else "failed"
+                    )
+                    end_reason = f"runtime_v2_{code}"
+                    break
 
                 # Simulator success is authoritative.
                 if success:
@@ -2647,6 +4064,24 @@ class ZeroshotRobolabRunner(MvTokenRobolabRunner):
                         "Temporal visual evidence and Qwen agreed that the held object "
                         "was lost. The gripper has been opened; reacquire the object "
                         "from the current live scene before starting a new transport epoch."
+                    )
+                    continue
+
+                if runtime_rollback_index is not None:
+                    current_index = int(runtime_rollback_index)
+                    subgoal_start_step = step_idx + 1
+                    previous_direction = None
+                    recent_moves.clear()
+                    chunk_queue = []
+                    self._reacquire_required = bool(
+                        str(
+                            getattr(subgoals[current_index], "motion", "")
+                        ).upper()
+                        == "APPROACH"
+                    )
+                    recovery_note = (
+                        "VCR-v2 verifier rejected the previous physical transition; "
+                        "resume from the typed recovery option using fresh observations."
                     )
                     continue
 

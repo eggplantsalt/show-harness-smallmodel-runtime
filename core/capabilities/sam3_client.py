@@ -23,10 +23,12 @@ class Sam3Client:
         url: str = "http://127.0.0.1:8773/sse",
         python: str = "/root/autodl-tmp/openeta-services/sam3/.venv/bin/python",
         timeout_s: float = 45.0,
+        max_attempts: int = 1,
     ) -> None:
         self.url = str(url)
         self.python = str(python)
         self.timeout_s = float(timeout_s)
+        self.max_attempts = max(1, int(max_attempts))
         self.bridge = Path(__file__).resolve().parents[2] / "scripts/capabilities/sam3_bridge.py"
         self._process: Optional[subprocess.Popen[str]] = None
         self._responses: queue.Queue[dict[str, Any]] = queue.Queue()
@@ -80,20 +82,39 @@ class Sam3Client:
             },
         }
         with self._lock:
-            try:
-                self._start()
-                if self._process is None or self._process.stdin is None:
-                    return {"success": False, "error": "sam3_bridge_not_started"}
-                self._process.stdin.write(json.dumps(request) + "\n")
-                self._process.stdin.flush()
-                return self._responses.get(timeout=self.timeout_s)
-            except (OSError, queue.Empty, BrokenPipeError) as exc:
+            last: dict[str, Any] = {
+                "success": False,
+                "error": "sam3_client: no attempt executed",
+            }
+            for attempt in range(1, self.max_attempts + 1):
+                try:
+                    self._start()
+                    if self._process is None or self._process.stdin is None:
+                        last = {"success": False, "error": "sam3_bridge_not_started"}
+                    else:
+                        self._process.stdin.write(json.dumps(request) + "\n")
+                        self._process.stdin.flush()
+                        last = self._responses.get(timeout=self.timeout_s)
+                    if isinstance(last, dict) and bool(last.get("success", False)):
+                        if attempt > 1:
+                            last = dict(last)
+                            last["client_attempts"] = attempt
+                        return last
+                except (OSError, queue.Empty, BrokenPipeError) as exc:
+                    last = {"success": False, "error": f"sam3_client: {exc}"}
                 self.close()
-                return {"success": False, "error": f"sam3_client: {exc}"}
+            last = dict(last)
+            last["client_attempts"] = self.max_attempts
+            return last
 
     def close(self) -> None:
         process = self._process
         self._process = None
+        while True:
+            try:
+                self._responses.get_nowait()
+            except queue.Empty:
+                break
         if process is None:
             return
         try:

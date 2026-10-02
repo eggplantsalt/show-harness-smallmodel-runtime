@@ -48,6 +48,8 @@ GPU_UTIL="${GPU_UTIL:-0.9}"
 MAX_LEN="${MAX_LEN:-8192}"
 MAX_NUM_SEQS="${MAX_NUM_SEQS:-256}"
 TEMPERATURE="${TEMPERATURE:-0}"
+TOP_P="${TOP_P:-1.0}"
+TOP_K="${TOP_K:--1}"
 MAX_LORA_RANK="${MAX_LORA_RANK:-64}"
 VENV="${VLLM_VENV:-${REPO_ROOT}/.venv-vllm}"
 EXTRA_ARGS=()
@@ -108,6 +110,7 @@ if [ ${#LORA_ARGS[@]} -gt 0 ] || [ -n "${FAMILY:-}" ] || [ -n "${CHAT_TEMPLATE:-
   fi
 fi
 [ ${#LORA_ARGS[@]} -gt 0 ] && EXTRA_ARGS+=(--enable-lora --max-lora-rank "${MAX_LORA_RANK}" --lora-modules "${LORA_ARGS[@]}")
+[ -n "${REASONING_PARSER:-}" ] && EXTRA_ARGS+=(--reasoning-parser "${REASONING_PARSER}")
 
 [ -f "${VENV}/bin/activate" ] || {
   echo "ERROR: vLLM venv not found: ${VENV}" >&2
@@ -149,7 +152,7 @@ CMD=(
   --max-model-len "${MAX_LEN}"
   --max-num-seqs "${MAX_NUM_SEQS}"
   --tensor-parallel-size "${TP}"
-  --override-generation-config "{\"temperature\": ${TEMPERATURE}, \"top_p\": 1.0, \"top_k\": -1}"
+  --override-generation-config "{\"temperature\": ${TEMPERATURE}, \"top_p\": ${TOP_P}, \"top_k\": ${TOP_K}}"
   --trust-remote-code
   --host "${HOST:-0.0.0.0}"
   --port "${PORT}"
@@ -162,6 +165,7 @@ SEP="─────────────────────────
 echo "$SEP"
 echo "  vLLM      http://0.0.0.0:${PORT}   GPU ${CUDA_VISIBLE_DEVICES:-<all>}  tp ${TP}  util ${GPU_UTIL}"
 echo "  model     ${SERVED_NAME}"
+[ -n "${REASONING_PARSER:-}" ] && echo "  reasoning ${REASONING_PARSER}"
 [ "${MODEL}" != "${SERVED_NAME}" ] && echo "  path      ${MODEL}"
 [ -n "${CHAT_TEMPLATE:-}" ] && echo "  template  ${CHAT_TEMPLATE##*/}"
 [ ${#LORA_ARGS[@]} -gt 0 ] && for m in "${LORA_ARGS[@]}"; do printf "  lora      %-24s %s\n" "${m%%=*}" "${m#*=}"; done

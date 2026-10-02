@@ -1,0 +1,64 @@
+defaults:
+  - robot_libero_clean_qwen3vl_runtime_v2.yaml
+
+# V2.2 is an explicit profile.  The V2.1 profile remains reproducible and is
+# not changed by the placement authority switch below.
+research_profile: clean_qwen3vl_verified_capability_runtime_v22
+log_dir: rollouts/libero_clean_qwen3vl_verified_capability_runtime_v22
+route_phase_hysteresis_m: 0.005
+legacy_stage_token_normalization: false
+
+runtime_v2:
+  enabled: true
+  mode: active
+  placement_v22_enabled: true
+  # Let Qwen make the visual grasp decision when metric spatial fusion is
+  # unavailable. Runtime still requires a fresh Wrist identity and in-band
+  # robot pose, then independently verifies the resulting hold.
+  require_spatial_ready_for_grasp: false
+  # Compare single and double with frozen keyframes before online rollout.
+  placement_reflection_mode: single
+  # These are embodiment/action-resolution margins, not scene dimensions.
+  placement_action_step_m: 0.01
+  placement_enter_margin_m: 0.02
+  placement_exit_margin_m: 0.01
+  placement_confirm_frames: 2
+  spatial_tools:
+    enabled: true
+    provider: moge2
+    model_version: v2
+    repo_dir: /root/autodl-tmp/openeta-services/MoGe
+    checkpoint: /root/autodl-tmp/openeta-services/checkpoints/moge-2-vitl/model.pt
+    service_python: /root/autodl-tmp/openeta-services/moge-env/bin/python
+    device: cuda:1
+    max_age_frames: 2
+    propagation_max_age_frames: 8
+    conflict_sigma: 2.5
+    active_probe_step_m: 0.01
+  visual_tracking:
+    enabled: true
+    provider: cotracker3_online
+    repo_dir: /root/autodl-tmp/openeta-services/CoTracker
+    checkpoint: /root/autodl-tmp/openeta-services/checkpoints/cotracker3/scaled_online.pth
+    device: cuda:1
+    window_len: 16
+    max_points: 64
+    min_visible_points: 4
+  # AnyPlace is isolated and shadow-only until the explicit held-out gates in
+  # plan03 are met.  It cannot authorize an action in this profile.
+  anyplace_shadow:
+    enabled: true
+    mode: shadow
+    device: cuda:1
+    top_k: 5
+    allow_candidate_ranking: false
+    # Loaded only inside the Python-3.8 worker. The main VCR process remains
+    # AnyPlace-free and the result remains shadow evidence.
+    anyplace_root: /root/autodl-tmp/openeta-services/AnyPlace
+    config_path: /root/autodl-tmp/openeta-services/AnyPlace/anyplace/config/full_eval_cfgs/anyplace_eval/vial_inserting/openeta_anyplace_multitask.yaml
+
+visual_route:
+  enabled: true
+  mode: active
+  transport_loop_enabled: true
+  phase_hysteresis_m: 0.005

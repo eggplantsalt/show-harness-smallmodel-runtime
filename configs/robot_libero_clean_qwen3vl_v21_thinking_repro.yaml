@@ -1,0 +1,27 @@
+defaults:
+  - ../../Show-Harness-V21/configs/robot_libero_clean_qwen3vl_v21_instruct.yaml
+
+# Reproduce the preserved V2.1 harness with the locally served Thinking
+# checkpoint.  Only the model endpoint/checkpoint and trace directory differ
+# from the preserved Instruct profile; the original 256x256 camera contract and
+# V2.1 spatial/transport settings remain intact.
+research_profile: clean_qwen3vl_v21_thinking_frozen_reproduction
+log_dir: /root/autodl-tmp/Show-Harness/rollouts/v21_frozen_reproduction_thinking_256
+camera_height: 256
+camera_width: 256
+max_steps: 300
+planner_max_tokens: 4096
+
+vlm:
+  base_url: http://127.0.0.1:8001/v1
+  temperature: 1.0
+
+vlm_backends:
+  qwen3vl_local:
+    model: Qwen/Qwen3-VL-8B-Thinking
+    max_tokens: 2048
+    reasoning_cot: true
+    cot_max_tokens: 1024
+    chat_template_kwargs:
+      enable_thinking: true
+      thinking: true

@@ -61,6 +61,8 @@ def make_vlm_client(args: argparse.Namespace, cfg: dict[str, Any]):
         temperature=float(vlm_cfg["temperature"]),
         chat_template_kwargs=vlm_cfg.get("chat_template_kwargs", {}),
         cot_max_tokens=vlm_cfg.get("cot_max_tokens"),
+        thinking_token_budget=vlm_cfg.get("thinking_token_budget"),
+        token_thinking_budget=vlm_cfg.get("token_thinking_budget"),
         reasoning_directive=vlm_cfg.get("reasoning_directive"),
         provider=vlm_cfg.get("provider", "vllm"),
         api_dialect=vlm_cfg.get("api_dialect"),
@@ -70,5 +72,3 @@ def make_vlm_client(args: argparse.Namespace, cfg: dict[str, Any]):
         retry_max_delay_s=vlm_cfg.get("retry_max_delay_s"),
         api_key_refresh=make_api_key_refresher(vlm_cfg),
     )
-
-

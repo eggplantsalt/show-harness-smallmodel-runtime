@@ -1,0 +1,32 @@
+defaults:
+  - robot_libero_clean_qwen3vl_runtime_v22.yaml
+
+# Same V2.2 harness and simulator settings as the Instruct control; only the
+# locally served Qwen checkpoint and its critical-event decoding are changed.
+research_profile: clean_qwen3vl_thinking_verified_capability_runtime_v22
+log_dir: rollouts/libero_clean_qwen3vl_thinking_verified_capability_runtime_v22
+# Keep the full task plan inside the configured output budget. The inherited
+# Instruct profile capped this response at 1024 tokens and truncated before any
+# environment action; Thinking critical-role budgets are configured separately.
+planner_max_tokens: 4096
+planner_thinking_token_budget: 512
+
+vlm_backends:
+  qwen3vl_local:
+    provider: vllm
+    api_dialect: vllm
+    model: Qwen/Qwen3-VL-8B-Thinking
+    max_tokens: 4096
+    cot_max_tokens: 4096
+    thinking_token_budget: 1024
+    token_thinking_budget: 32
+    temperature: 1.0
+    # Keep ordinary primitive-token turns short; V2.2 critical semantic
+    # decisions explicitly enable the Thinking checkpoint in their role call.
+    reasoning_cot: false
+    reasoning_effort: null
+    chat_template_kwargs:
+      enable_thinking: true
+    max_retries: 2
+    retry_base_delay_s: 1.0
+    retry_max_delay_s: 8.0

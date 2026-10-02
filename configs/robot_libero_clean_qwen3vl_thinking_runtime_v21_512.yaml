@@ -1,0 +1,12 @@
+defaults:
+  - robot_libero_clean_qwen3vl_thinking_runtime_v21.yaml
+
+# Resolution-only follow-up for the V2.1 + Thinking reproduction.
+# Raise both simulator render resolution and the shared camera preprocessing
+# target so the extra pixels reach SAM3, the tracker, spatial providers, and VLM.
+research_profile: clean_qwen3vl_thinking_verified_capability_runtime_v21_512
+log_dir: rollouts/v21_thinking_evolution_0930_native512
+camera_height: 512
+camera_width: 512
+agentview_square_size: 512
+wrist_square_size: 512

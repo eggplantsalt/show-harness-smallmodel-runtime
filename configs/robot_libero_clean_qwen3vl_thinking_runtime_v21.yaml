@@ -1,0 +1,74 @@
+defaults:
+  - robot_libero_clean_qwen3vl_runtime_v2.yaml
+
+# V2.1 is the experimental baseline: retain its calibrated spatial harness,
+# signed semantic pregrasp options, transport route, and legacy placement flow.
+# This profile changes the Qwen checkpoint and adds bounded in-episode memory
+# reflection at grasp entry and after measured action anomalies.
+research_profile: clean_qwen3vl_thinking_verified_capability_runtime_v21
+log_dir: rollouts/libero_clean_qwen3vl_thinking_verified_capability_runtime_v21
+
+planner_max_tokens: 4096
+planner_thinking_token_budget: 512
+
+vlm_backends:
+  qwen3vl_local:
+    provider: vllm
+    api_dialect: vllm
+    model: Qwen/Qwen3-VL-8B-Thinking
+    max_tokens: 4096
+    cot_max_tokens: 4096
+    # Critical semantic decisions get a bounded thinking budget in their role.
+    thinking_token_budget: 1024
+    # Atomic motion tokens are mechanically constrained; keep those replies
+    # short while planner/pregrasp/verifier calls perform semantic reasoning.
+    token_thinking_budget: 1
+    temperature: 1.0
+    reasoning_cot: false
+    reasoning_effort: null
+    chat_template_kwargs:
+      enable_thinking: true
+    max_retries: 2
+    retry_base_delay_s: 1.0
+    retry_max_delay_s: 8.0
+
+runtime_v2:
+  enabled: true
+  mode: active
+  # Persist a Qwen-selected target only when the next observation has a fresh,
+  # high-confidence same-camera temporal association despite detector score ties.
+  temporal_identity_lock_on_detector_ties: true
+  # Choose the longer bounded hover budget from validated metric target/EEF
+  # offset when detector ambiguity hides a raw pixel bbox from option selection.
+  metric_approach_uses_hover_budget: true
+  # Active parallax needs same-camera CoTracker correspondences; without this
+  # service the configured V2.1 spatial path silently falls back to MoGe alone.
+  visual_tracking:
+    enabled: true
+    provider: cotracker3_online
+    repo_dir: /root/autodl-tmp/openeta-services/CoTracker
+    checkpoint: /root/autodl-tmp/openeta-services/checkpoints/cotracker3/scaled_online.pth
+    device: cuda:1
+    window_len: 16
+    max_points: 64
+    min_visible_points: 4
+  visual_memory:
+    max_entries_per_epoch: 8
+    # Enlarge only the current same-instance target after a fresh temporal
+    # association; the full same-episode panel remains in the Qwen payload.
+    pregrasp_target_crop_enabled: true
+    # Grasp-entry reflection may use the previous target identity only while
+    # the same-camera temporal track remains within this many frames.
+    semantic_evidence_max_age_frames: 1
+  spatial_tools:
+    # Isolate MoGe's PyTorch stack while keeping its persistent weights on GPU1.
+    service_python: /root/autodl-tmp/openeta-services/moge-env/bin/python
+    # A same-camera AgentView identity/mask can provide a second calibrated
+    # spatial observation when the Wrist target is occluded at grasp entry.
+    allow_agentview_identity_fallback: true
+  # Two-pass reflection is limited in runtime to first grasp entry and a new
+  # observed action anomaly, with one reflection per event signature.
+  pregrasp_reflection_mode: double
+  # A semantic REOBSERVE request at first grasp-entry occlusion may move up by
+  # at most this robot-calibrated increment, clipped to lift_clear_height_m.
+  grasp_reobserve_step_m: 0.02

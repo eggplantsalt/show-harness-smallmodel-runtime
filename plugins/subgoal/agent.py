@@ -84,6 +84,7 @@ class SubgoalPlannerAgent:
         prompt_template: str | None = None,
         video_ref_block: str = "",
         max_tokens: int = 4096,
+        thinking_token_budget: int | None = None,
     ) -> None:
         self.client = client
         self.common_context = common_context
@@ -98,8 +99,24 @@ class SubgoalPlannerAgent:
         # Observed: four attempts all returned VALID fenced JSON, all cut off
         # mid-stage -> silent task_fallback). Config: planner_max_tokens.
         self.max_tokens = int(max_tokens)
+        self.reasoning_enabled = bool(getattr(client, "reasoning_enabled", False))
+        configured_budget = (
+            thinking_token_budget
+            if thinking_token_budget is not None
+            else getattr(client, "thinking_token_budget", None)
+        )
+        self.thinking_token_budget = (
+            max(1, int(configured_budget))
+            if self.reasoning_enabled and configured_budget
+            else None
+        )
         self._last_prompt = ""
         self._last_diagnostics: dict[str, Any] = {}
+
+    def _reasoning_request_options(self) -> tuple[dict[str, bool], int | None]:
+        if self.reasoning_enabled:
+            return {"enable_thinking": True}, self.thinking_token_budget
+        return dict(NO_THINK_CHAT_TEMPLATE_KWARGS), None
 
     def plan(
         self,
@@ -117,6 +134,7 @@ class SubgoalPlannerAgent:
         )
         self._last_prompt = prompt
         errors: list[str] = []
+        chat_kwargs, thinking_budget = self._reasoning_request_options()
         try:
             response = self.client.complete_json(
                 prompt,
@@ -125,7 +143,8 @@ class SubgoalPlannerAgent:
                 schema=SUBGOAL_PLAN_SCHEMA,
                 max_tokens=self.max_tokens,
                 temperature=0.0,
-                chat_template_kwargs=NO_THINK_CHAT_TEMPLATE_KWARGS,
+                thinking_token_budget=thinking_budget,
+                chat_template_kwargs=chat_kwargs,
                 debug=debug,
             )
             response = _require_plan_response(response)
@@ -150,7 +169,8 @@ class SubgoalPlannerAgent:
                 schema=None,
                 max_tokens=self.max_tokens,
                 temperature=0.0,
-                chat_template_kwargs=NO_THINK_CHAT_TEMPLATE_KWARGS,
+                thinking_token_budget=thinking_budget,
+                chat_template_kwargs=chat_kwargs,
                 debug=debug,
             )
             response = _require_plan_response(response)
@@ -165,10 +185,15 @@ class SubgoalPlannerAgent:
             # demo brief included). Dropping to a task-only generic prompt has made
             # a failed plan look like a successful pick-and-place plan.
             text_prompt = _text_retry_prompt(prompt)
-            for label, chat_kwargs in (
-                ("text_no_think", NO_THINK_CHAT_TEMPLATE_KWARGS),
-                ("text_default", None),
-            ):
+            retry_options = (
+                [("text_thinking", {"enable_thinking": True})]
+                if self.reasoning_enabled
+                else [
+                    ("text_no_think", NO_THINK_CHAT_TEMPLATE_KWARGS),
+                    ("text_default", None),
+                ]
+            )
+            for label, text_chat_kwargs in retry_options:
                 try:
                     response = self.client.complete_text(
                         text_prompt,
@@ -176,9 +201,10 @@ class SubgoalPlannerAgent:
                         wrist_image=wrist_image,
                         max_tokens=self.max_tokens,
                         temperature=0.0,
-                        chat_template_kwargs=chat_kwargs,
+                        chat_template_kwargs=text_chat_kwargs,
                         debug=debug,
                         strip_reasoning=False,
+                        thinking_token_budget=thinking_budget,
                     )
                     parsed = _require_plan_json(_parse_json_object(response.raw_text))
                     response = _json_response(
@@ -217,6 +243,8 @@ class SubgoalPlannerAgent:
             "total_latency_s": round(time.monotonic() - started, 3),
             "response_chars": len(finished.raw_text),
             "max_tokens": self.max_tokens,
+            "reasoning_enabled": self.reasoning_enabled,
+            "thinking_token_budget": self.thinking_token_budget,
             "image_roles": list(image_roles or []),
         }
         return finished

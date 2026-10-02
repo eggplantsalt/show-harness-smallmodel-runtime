@@ -51,7 +51,9 @@ def test_memory_reports_progress_and_invalidates_scene() -> None:
     assert second.progress_delta_px == 4.0
     context = memory.context(target="salad dressing", frame_id=2)
     assert "salad dressing" in context
-    assert "progress_delta_px=4.0" in context
+    # The machine field remains ``progress_delta_px``; prompts use a clearer
+    # human-facing label so the model does not confuse motion with task success.
+    assert "motion_since_previous=4.0px" in context
     memory.invalidate_scene("test_motion")
     assert memory.scene_epoch == 1
     assert "no current verified target evidence" in memory.context(
@@ -73,5 +75,9 @@ def test_camera_geometry_projects_robot_only_and_applies_orientation() -> None:
     assert projected is not None
     assert projected["source"] == "proprioception_camera_calibration"
     assert projected["in_frame"]
+    # The point lands below/right of center in the raw render image, then the
+    # configured 180-degree policy-view rotation mirrors both raster axes.
+    assert projected["raw_pixel_xy"][0] > 50.0
+    assert projected["raw_pixel_xy"][1] > 50.0
     assert projected["pixel_xy"][0] < 50.0
-    assert projected["pixel_xy"][1] > 50.0
+    assert projected["pixel_xy"][1] < 50.0

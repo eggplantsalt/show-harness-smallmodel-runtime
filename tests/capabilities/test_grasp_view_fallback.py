@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import base64
+import io
+
 import numpy as np
+from PIL import Image
 
 from core.capabilities.visual_harness import VisualHarness
 
@@ -67,10 +71,84 @@ def test_grasp_wrist_abstain_falls_back_to_agentview_and_persists() -> None:
     assert first["tool"]["primary_camera"] == "wrist"
     assert first["tool"]["fallback_camera"] == "agentview"
     assert second["camera"] == "agentview"
-    assert fake.calls == [
+    # Query compression is an ordered, bounded ladder.  The first update must
+    # exhaust Wrist variants before falling back to AgentView; the persisted
+    # AgentView result may then be bridged by short occlusion memory while Wrist
+    # is probed again.
+    assert fake.calls[:4] == [
         ("wrist", "green-capped bottle, neck"),
+        ("wrist", "neck bottle"),
+        ("wrist", "bottle"),
         ("agentview", "green-capped bottle, neck"),
     ]
+    assert fake.calls[4:] == [
+        ("wrist", "green-capped bottle, neck"),
+        ("wrist", "neck bottle"),
+        ("wrist", "bottle"),
+    ]
+
+
+def test_selected_fallback_and_wrist_masks_reach_tracker_evidence() -> None:
+    harness = VisualHarness(
+        enabled=True,
+        sam3_enabled=False,
+        tracker_enabled=False,
+        memory_enabled=False,
+        geometry_enabled=False,
+        confidence_threshold=0.4,
+        reacquire_every=1,
+        grasp_agentview_fallback_enabled=True,
+    )
+    selected_mask = {
+        "format": "row_span_rle",
+        "shape": [64, 64],
+        "rle": [[24, 20, 40]],
+        "area_px": 21,
+        "bbox_xyxy": [20, 24, 41, 25],
+    }
+    wrist_calls = 0
+
+    def fake_ground(image, target, affordance):
+        nonlocal wrist_calls
+        is_wrist = int(image[0, 0, 0]) == 1
+        if is_wrist:
+            wrist_calls += 1
+            if wrist_calls == 1:
+                return None, 0.0, "sam3_abstain", {"mask": None}
+        return (
+            (20, 20, 42, 48),
+            0.8,
+            "sam3",
+            {"mask": selected_mask, "label": "target"},
+        )
+
+    harness._sam3_ground = fake_ground
+    agentview = np.zeros((64, 64, 3), dtype=np.uint8)
+    wrist = np.ones((64, 64, 3), dtype=np.uint8)
+
+    fallback = harness.update(
+        agentview=agentview,
+        wrist=wrist,
+        stage="GRASP",
+        target="selected target",
+        affordance="body",
+        frame_id=1,
+    )
+    refreshed_wrist = harness.update(
+        agentview=agentview,
+        wrist=wrist,
+        stage="GRASP",
+        target="selected target",
+        affordance="body",
+        frame_id=2,
+    )
+
+    assert fallback["camera"] == "agentview"
+    assert fallback["mask"] == selected_mask
+    assert fallback["tool"]["mask"] == selected_mask
+    assert refreshed_wrist["camera"] == "wrist"
+    assert refreshed_wrist["mask"] == selected_mask
+    assert refreshed_wrist["tool"]["mask"] == selected_mask
 
 
 def test_sam3_does_not_pick_an_ambiguous_first_bottle() -> None:
@@ -105,6 +183,66 @@ def test_sam3_does_not_pick_an_ambiguous_first_bottle() -> None:
     assert score == 0.68
     assert source == "sam3_abstain"
     assert meta["abstain_reason"] == "ambiguous_top_detections"
+
+
+def test_ambiguous_secondary_masks_are_transient_and_camera_bound() -> None:
+    def png_mask(box: tuple[int, int, int, int]) -> dict[str, str]:
+        mask = np.zeros((64, 64), dtype=np.uint8)
+        x1, y1, x2, y2 = box
+        mask[y1:y2, x1:x2] = 255
+        stream = io.BytesIO()
+        Image.fromarray(mask).save(stream, format="PNG")
+        return {"base64": base64.b64encode(stream.getvalue()).decode("ascii")}
+
+    class AmbiguousViews:
+        def segment(self, image, query, *, confidence_threshold):
+            is_wrist = int(image[0, 0, 0]) == 1
+            detections = [] if is_wrist else [
+                {
+                    "bbox_xyxy": [10, 10, 20, 25],
+                    "score": 0.68,
+                    "label": "candidate-a",
+                    "mask": png_mask((10, 10, 20, 25)),
+                },
+                {
+                    "bbox_xyxy": [40, 35, 52, 55],
+                    "score": 0.67,
+                    "label": "candidate-b",
+                    "mask": png_mask((40, 35, 52, 55)),
+                },
+            ]
+            return {"success": True, "details": {"detections": detections}}
+
+    harness = VisualHarness(
+        enabled=True,
+        sam3_enabled=False,
+        tracker_enabled=False,
+        memory_enabled=False,
+        geometry_enabled=False,
+        confidence_threshold=0.4,
+        sam3_ambiguity_margin=0.05,
+        grasp_agentview_fallback_enabled=True,
+    )
+    harness.sam3 = AmbiguousViews()
+    agentview = np.zeros((64, 64, 3), dtype=np.uint8)
+    wrist = np.ones((64, 64, 3), dtype=np.uint8)
+
+    evidence = harness.update(
+        agentview=agentview,
+        wrist=wrist,
+        stage="GRASP",
+        target="target",
+        frame_id=4,
+    )
+
+    rows = evidence["_transient_candidate_masks_by_camera"]["agentview"]
+    assert len(rows) == 2
+    assert rows[0]["bbox_xyxy"] == [10, 10, 20, 25]
+    assert rows[0]["mask"]["shape"] == [64, 64]
+    assert rows[0]["mask"]["area_px"] == 150
+    assert evidence["secondary_view"]["camera"] == "agentview"
+    assert "_candidate_masks" not in evidence["secondary_view"]["tool"]
+    assert "_transient_candidate_masks_by_camera" not in harness.last_evidence
 
 
 def test_transport_semantic_refresh_keeps_grasp_instance_identity() -> None:

@@ -8,13 +8,20 @@ set -euo pipefail
 export HF_HOME="${HF_HOME:-/root/autodl-tmp/huggingface}"
 export HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}"
 MODEL="${MODEL:-Qwen/Qwen3-VL-8B-Instruct}"
-REVISION="${MODEL_REVISION:-0c351dd01ed87e9c1b53cbc748cba10e6187ff3b}"
+case "${MODEL}" in
+  Qwen/Qwen3-VL-8B-Instruct)
+    DEFAULT_REVISION="0c351dd01ed87e9c1b53cbc748cba10e6187ff3b"
+    ;;
+  Qwen/Qwen3-VL-8B-Thinking)
+    DEFAULT_REVISION="92f3c4b4feadd3a016ef468d103bb5f58b2a2c6b"
+    ;;
+  *)
+    echo "ERROR: supported clean models are Qwen/Qwen3-VL-8B-Instruct and Qwen/Qwen3-VL-8B-Thinking; got ${MODEL}" >&2
+    exit 2
+    ;;
+esac
+REVISION="${MODEL_REVISION:-${DEFAULT_REVISION}}"
 MODEL_DIR="${MODEL_DIR:-${HF_HOME}/hub/${MODEL}}"
-
-if [[ "${MODEL}" != "Qwen/Qwen3-VL-8B-Instruct" ]]; then
-  echo "ERROR: this clean downloader is pinned to Qwen/Qwen3-VL-8B-Instruct; got ${MODEL}" >&2
-  exit 2
-fi
 
 mkdir -p "${MODEL_DIR}"
 files=(

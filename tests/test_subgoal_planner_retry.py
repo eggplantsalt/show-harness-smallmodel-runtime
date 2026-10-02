@@ -44,6 +44,43 @@ class _RetryClient:
 
 
 class SubgoalPlannerRetryTests(unittest.TestCase):
+    def test_thinking_planner_uses_a_bounded_reasoning_budget(self) -> None:
+        class _ThinkingClient:
+            reasoning_enabled = True
+            thinking_token_budget = 1024
+
+            def __init__(self):
+                self.kwargs = None
+
+            def complete_json(self, prompt, image, **kwargs):
+                self.kwargs = kwargs
+                plan = {
+                    "subgoals": [
+                        {
+                            "id": "inspect",
+                            "target": "object",
+                            "affordance": "visible object surface",
+                            "motion": "MOVE",
+                            "description": "Inspect the object and select a safe action.",
+                            "completion": "The object state is visually verified.",
+                        }
+                    ]
+                }
+                return _Response(json.dumps(plan), payload={"json": plan})
+
+        client = _ThinkingClient()
+        agent = SubgoalPlannerAgent(
+            client=client,
+            common_context="Use current visual evidence.",
+            thinking_token_budget=512,
+        )
+        response = agent.plan("inspect the object", np.zeros((2, 2, 3), dtype=np.uint8))
+
+        self.assertTrue(response.raw_text)
+        self.assertEqual(client.kwargs["thinking_token_budget"], 512)
+        self.assertEqual(client.kwargs["chat_template_kwargs"], {"enable_thinking": True})
+        self.assertEqual(agent.diagnostics()["thinking_token_budget"], 512)
+
     def test_pregrasp_merge_folds_a_pure_reach_into_the_grasp_stage(self) -> None:
         class _StaticAgent:
             def plan(self, task, image, **kwargs):

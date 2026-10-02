@@ -37,8 +37,19 @@ class ZeroshotLiberoRunner(ZeroshotRobolabRunner):
         action substitute.
         """
         self._active_stage = str(getattr(subgoal, "motion", "")).upper()
+        runtime = getattr(self, "verified_runtime", None)
+        if bool(getattr(runtime, "placement_v22_enabled", False)):
+            # V2.2 is a single-authority profile: once VCR has produced a
+            # bounded token, the LIBERO adapter may execute it and record the
+            # receipt, but no legacy stage normalizer may rewrite it.
+            return str(token).strip().upper()
         if not self.legacy_stage_token_normalization:
             self._update_move_height_hold(token, subgoal=subgoal, obs=obs)
+            if bool(getattr(runtime, "semantic_pregrasp_enabled", False)):
+                # VCR-v2 owns the semantic-to-atomic compilation and records any
+                # adapter rewrite as an action receipt.  The legacy low-height
+                # normalizer must not silently turn a depth decision into MV_UP.
+                return str(token).strip().upper()
             return self._normalize_low_grasp_token(token, subgoal=subgoal, obs=obs)
         token = super()._normalize_stage_token(token, subgoal=subgoal, obs=obs)
         token = self._normalize_visual_xy_token(token, subgoal=subgoal)
@@ -364,6 +375,14 @@ class ZeroshotLiberoRunner(ZeroshotRobolabRunner):
     def _visual_geometry(self, obs, agentview, wrist):
         """Project only the current EEF through LIBERO camera calibration."""
         try:
+            raw_agentview_shape = tuple(
+                np.asarray(self._rgb(obs, self.agentview_camera)).shape[:2]
+            )
+            raw_wrist_shape = (
+                tuple(np.asarray(self._rgb(obs, self.wrist_camera)).shape[:2])
+                if self.use_wrist_image
+                else raw_agentview_shape
+            )
             calibrations = make_mujoco_calibrations(
                 self.env,
                 {
@@ -371,8 +390,11 @@ class ZeroshotLiberoRunner(ZeroshotRobolabRunner):
                     "wrist": self.wrist_camera,
                 },
                 image_shapes={
-                    "agentview": tuple(np.asarray(agentview).shape[:2]),
-                    "wrist": tuple(np.asarray(wrist).shape[:2]) if wrist is not None else tuple(np.asarray(agentview).shape[:2]),
+                    # Calibration dimensions describe the raw renderer image;
+                    # project_point then applies the same preparation rotation
+                    # and flip as the policy image.
+                    "agentview": raw_agentview_shape,
+                    "wrist": raw_wrist_shape,
                 },
                 rotations={
                     "agentview": self.agentview_rotation_degrees,

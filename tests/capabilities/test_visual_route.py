@@ -217,6 +217,55 @@ def test_alignment_scales_with_detected_opening_not_fixed_pixel_offset():
     assert large["limits_px"] != small["limits_px"]
 
 
+def test_visual_rim_risk_does_not_become_contact_while_downward_motion_progresses():
+    plugin = VisualRoutePlugin(enabled=True, mode="active", placement_v22_enabled=True)
+    plugin.route = _route(RoutePhase.PRE_DESCENT)
+    plugin.route.payload_below_eef_m = 0.06
+    plugin.route.estimated_rim_height_m = 0.24
+    held = {"bbox_xyxy": [100, 100, 120, 140], "rim_contact_risk": True}
+    destination = {"opening_bbox_xyxy": [95, 140, 125, 170]}
+
+    first = plugin._compute_progress(
+        [0.12, 0.12, 0.29], held, destination, "MV_DOWN"
+    )
+    second = plugin._compute_progress(
+        [0.12, 0.12, 0.28], held, destination, "MV_DOWN"
+    )
+    assert first.contact_or_stall is False
+    assert second.contact_or_stall is False
+    assert first.contact_candidate is True
+    assert second.contact_candidate is True
+    plugin.last_progress = second
+    assert plugin._placement_evidence(frame_id=2)["relation"] != "RIM_CONTACT"
+
+    third = plugin._compute_progress(
+        [0.12, 0.12, 0.28], held, destination, "MV_DOWN"
+    )
+    assert third.contact_or_stall is False
+    fourth = plugin._compute_progress(
+        [0.12, 0.12, 0.28], held, destination, "MV_DOWN"
+    )
+    assert fourth.contact_or_stall is True
+    plugin.last_progress = fourth
+    assert plugin._placement_evidence(frame_id=4)["relation"] == "RIM_CONTACT"
+
+
+def test_descent_phase_does_not_fall_back_to_transport_clearance_height():
+    plugin = VisualRoutePlugin(enabled=True, mode="active")
+    plugin.route = _route(RoutePhase.PRE_DESCENT)
+    plugin.last_progress = plugin._compute_progress(
+        [0.12, 0.12, 0.29], {}, {}, "MV_DOWN"
+    )
+    plugin._update_phase(
+        "TRANSPORT",
+        [0.12, 0.12, 0.10],
+        held={},
+        destination={},
+        previous_action="MV_DOWN",
+    )
+    assert plugin.route.phase == RoutePhase.PRE_DESCENT
+
+
 def test_missing_opening_does_not_fabricate_a_route_from_outer_box():
     calibration = _calibration()
     plugin = VisualRoutePlugin(enabled=True, mode="active")
@@ -287,7 +336,9 @@ def test_renderer_preserves_raw_frame_and_draws_route_overlay():
 def test_safe_transport_height_is_fixed_for_a_grasp_epoch():
     plugin = VisualRoutePlugin(enabled=True, mode="active", client=None)
     frame = np.zeros((256, 256, 3), dtype=np.uint8)
-    held = {"bbox_xyxy": [148, 127, 167, 162], "confidence": 0.8}
+    # This synthetic mask/bbox pair follows the camera's corrected policy-view
+    # projection and represents a payload still above the opening.
+    held = {"bbox_xyxy": [148, 80, 167, 100], "confidence": 0.8}
     destination = {
         "bbox_xyxy": [17, 103, 77, 160],
         "opening_bbox_xyxy": [30, 103, 74, 125],
@@ -353,7 +404,7 @@ def test_qwen_not_held_is_rejected_by_latched_visual_evidence():
         frame_id=0,
         eef_world=[0.06744, -0.09998, 0.11518],
         geometry=_libero_geometry(),
-        held_evidence={"bbox_xyxy": [148, 127, 167, 162], "confidence": 0.8},
+        held_evidence={"bbox_xyxy": [148, 80, 167, 100], "confidence": 0.8},
         destination_evidence={
             "bbox_xyxy": [17, 103, 77, 160],
             "opening_bbox_xyxy": [30, 103, 74, 125],
@@ -404,7 +455,7 @@ def test_geometry_and_qwen_intent_refresh_counters_are_independent():
         current_index=0,
         eef_world=[0.06744, -0.09998, 0.11518],
         geometry=_libero_geometry(),
-        held_evidence={"bbox_xyxy": [148, 127, 167, 162], "confidence": 0.8},
+        held_evidence={"bbox_xyxy": [148, 80, 167, 100], "confidence": 0.8},
         destination_evidence={"bbox_xyxy": [17, 103, 77, 160], "opening_bbox_xyxy": [30, 103, 74, 125]},
         gripper_closed=True,
     )

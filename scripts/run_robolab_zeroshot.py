@@ -30,6 +30,36 @@ from plugins.variable_step import VariableStepPlugin
 from plugins.subgoal import SubgoalPlanner, SubgoalPlannerAgent
 
 
+def _robolab_observation_context(*, include_robolab_context: bool, placement_v22: bool) -> str:
+    """Return generic view guidance, excluding legacy object-specific advice in V2.2."""
+    if not include_robolab_context:
+        return ""
+    context = (
+        "RGB observation rule: only claim an object or the fingers are visible "
+        "when they can actually be identified in the current image. The image "
+        "center is not automatically the robot grasp point. If a target is "
+        "occluded or outside the wrist image, say WRIST: NO and use the other "
+        "view to recover visibility before attempting to grasp. If the target is "
+        "not visibly between the fingers in the wrist image, never issue GRASP "
+        "and never make a low horizontal move based on a claimed wrist position: "
+        "raise above the table first, then use AgentView to approach. "
+    )
+    if not placement_v22:
+        context += (
+            "For an any-fruit task, choose the clearly visible, round orange if it is "
+            "unobstructed; otherwise choose the nearest clearly visible fruit. Do "
+            "not commit to a distant or occluded fruit. "
+        )
+    context += (
+        "While the fingertip height is above the table clearance, AgentView is the "
+        "source for horizontal approach and the wrist image is only a local "
+        "confirmation. Do not descend below clearance until the chosen target is "
+        "near the end effector in AgentView; use the wrist image only for final "
+        "alignment and closing."
+    )
+    return context
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Show-Harness RoboLab zero-shot planner/controller"
@@ -138,27 +168,15 @@ def build_zero_shot_stack(
         )
 
     common_context = prompts["common_context"]
+    placement_v22 = bool(
+        (cfg.get("runtime_v2") or {}).get("placement_v22_enabled", False)
+    )
     common_context = "\n\n".join(
         part for part in (
             common_context,
-            (
-            "RGB observation rule: only claim an object or the fingers are visible "
-            "when they can actually be identified in the current image. The image "
-            "center is not automatically the robot grasp point. If a target is "
-            "occluded or outside the wrist image, say WRIST: NO and use the other "
-            "view to recover visibility before attempting to grasp. If the target is "
-            "not visibly between the fingers in the wrist image, never issue GRASP "
-            "and never make a low horizontal move based on a claimed wrist position: "
-            "raise above the table first, then use AgentView to approach. For an "
-            "any-fruit task, choose the clearly visible, round orange if it is "
-            "unobstructed; otherwise choose the nearest clearly visible fruit. Do "
-            "not commit to a distant or occluded fruit. While the fingertip height "
-            "is above the table clearance, AgentView is the source for horizontal "
-            "approach and the wrist image is only a local confirmation. Do not "
-            "descend below clearance until the chosen fruit is near the end effector "
-            "in AgentView; use the wrist image only for final alignment and closing."
-            if include_robolab_context
-            else ""
+            _robolab_observation_context(
+                include_robolab_context=include_robolab_context,
+                placement_v22=placement_v22,
             ),
             common_context_extra,
         ) if part
@@ -180,6 +198,10 @@ def build_zero_shot_stack(
             common_context=common_context,
             max_tokens=int(
                 cfg.get("planner_max_tokens", 4096)
+            ),
+            thinking_token_budget=cfg.get(
+                "planner_thinking_token_budget",
+                getattr(client, "thinking_token_budget", None),
             ),
         ),
         merge_pregrasp=merge_pregrasp,

@@ -5,6 +5,9 @@ import json
 import copy
 import random
 import time
+import base64
+import hashlib
+import io
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -14,6 +17,74 @@ from urllib.parse import urlparse
 import requests
 
 from core.record.images import image_to_data_url
+
+
+
+# 输入是一个最终定稿的请求字典（payload），里面装着要发给 VLM 的消息、模型名、温度、token 上限、图片以及可能的 JSON 格式要求；输出是一个审计字典，记录了模型名、token/温度设置、文本哈希、整个请求的哈希、每张图片的哈希与尺寸、图片数量以及 JSON schema 的哈希；
+# 它的作用就是在请求发出前给这次调用生成一份轻量、可复现的“指纹存档”，让以后能快速判断两次请求是否完全相同、方便复现实验和排查问题，而无需保存原始图片和完整文本。
+def _request_audit(payload: dict[str, Any]) -> dict[str, Any]:
+    """Hash the exact finalized text and image bytes placed on the wire."""
+    text_parts: list[str] = []
+    image_parts: list[dict[str, Any]] = []
+    for message in payload.get("messages", []):
+        content = message.get("content") if isinstance(message, dict) else None
+        if not isinstance(content, list):
+            if isinstance(content, str):
+                text_parts.append(content)
+            continue
+        for part in content:
+            if not isinstance(part, dict):
+                continue
+            if part.get("type") == "text":
+                text_parts.append(str(part.get("text", "")))
+            elif part.get("type") == "image_url":
+                url = (part.get("image_url") or {}).get("url", "")
+                item: dict[str, Any] = {"sha256": None, "size": None}
+                if isinstance(url, str) and url.startswith("data:") and "," in url:
+                    try:
+                        raw = base64.b64decode(url.split(",", 1)[1], validate=True)
+                        item["sha256"] = hashlib.sha256(raw).hexdigest()
+                        try:
+                            from PIL import Image
+                            with Image.open(io.BytesIO(raw)) as image:
+                                item["size"] = list(image.size)
+                        except Exception:
+                            pass
+                    except (ValueError, TypeError):
+                        pass
+                item["detail"] = (part.get("image_url") or {}).get("detail")
+                image_parts.append(item)
+    joined_text = "\n".join(text_parts)
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    response_format = payload.get("response_format")
+    response_format_audit = None
+    if isinstance(response_format, dict):
+        format_schema = response_format.get("json_schema")
+        format_schema = format_schema.get("schema") if isinstance(format_schema, dict) else None
+        response_format_audit = {
+            "type": response_format.get("type"),
+            "schema_sha256": (
+                hashlib.sha256(
+                    json.dumps(
+                        format_schema, sort_keys=True, separators=(",", ":"),
+                        ensure_ascii=False,
+                    ).encode("utf-8")
+                ).hexdigest()
+                if isinstance(format_schema, dict)
+                else None
+            ),
+        }
+    return {
+        "model": payload.get("model"),
+        "max_tokens": payload.get("max_tokens", payload.get("max_completion_tokens")),
+        "thinking_token_budget": payload.get("thinking_token_budget"),
+        "temperature": payload.get("temperature"),
+        "prompt_sha256": hashlib.sha256(joined_text.encode("utf-8")).hexdigest(),
+        "request_sha256": hashlib.sha256(canonical).hexdigest(),
+        "images": image_parts,
+        "image_count": len(image_parts),
+        "response_format": response_format_audit,
+    }
 
 
 def _payload_has_images(payload: dict[str, Any]) -> bool:
@@ -70,9 +141,15 @@ class VLMResponse:
 
 
 class VLMParseError(RuntimeError):
-    def __init__(self, message: str, raw_text: str) -> None:
+    def __init__(
+        self,
+        message: str,
+        raw_text: str,
+        payload: Optional[dict[str, Any]] = None,
+    ) -> None:
         super().__init__(message)
         self.raw_text = raw_text
+        self.payload = dict(payload or {})
 
 
 class VLMClient:
@@ -86,6 +163,8 @@ class VLMClient:
         temperature: float,
         chat_template_kwargs: Optional[dict] = None,
         cot_max_tokens: Optional[int] = None,
+        thinking_token_budget: Optional[int] = None,
+        token_thinking_budget: Optional[int] = None,
         reasoning_directive: Optional[str] = None,
         provider: str = "vllm",
         api_dialect: Optional[str] = None,
@@ -104,6 +183,12 @@ class VLMClient:
         # Decode budget for the chain-of-thought controller path; caps a verbose
         # thinker's per-step latency. None -> the role falls back to its 1024 floor.
         self.cot_max_tokens = int(cot_max_tokens) if cot_max_tokens else None
+        self.thinking_token_budget = (
+            max(1, int(thinking_token_budget)) if thinking_token_budget else None
+        )
+        self.token_thinking_budget = (
+            max(1, int(token_thinking_budget)) if token_thinking_budget else None
+        )
         # Appended to the CoT prompt to steer reasoning length/depth per backend
         # (e.g. brief for a fast model, more thorough for a reasoning one).
         self.reasoning_directive = str(reasoning_directive or "")
@@ -190,10 +275,10 @@ class VLMClient:
     def _finalize_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Rewrite a vLLM-shaped payload for the active provider.
 
-        api_dialect="vllm": returned unchanged. For hosted providers the payload is
-        rebuilt with only accepted fields (chat_template_kwargs / guided_choice /
-        logprobs are dropped) and ``guided_json`` becomes an OpenAI-style
-        ``response_format`` so the answer is still constrained to a JSON object. The
+        api_dialect="vllm": use vLLM's current JSON-schema ``response_format`` field.
+        For hosted providers the payload is rebuilt with only accepted fields
+        (chat_template_kwargs / guided_choice / logprobs are dropped) and the local
+        schema becomes an OpenAI-style JSON-object ``response_format``. The
         dialects differ:
           * openai: max_tokens -> max_completion_tokens; temperature only forwarded when
             it is the default 1.0 (reasoning models reject a custom value); reasoning_effort
@@ -204,7 +289,18 @@ class VLMClient:
             models like flash-lite are unaffected).
         """
         if not self._is_hosted():
-            return payload
+            out = dict(payload)
+            schema = out.pop("guided_json", None)
+            if isinstance(schema, dict):
+                out["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "harness_response",
+                        "schema": schema,
+                        "strict": True,
+                    },
+                }
+            return out
         out: dict[str, Any] = {"model": payload["model"], "messages": payload["messages"]}
         if self._is_openai():
             if "max_tokens" in payload:
@@ -452,16 +548,26 @@ class VLMClient:
             agentview_label=agentview_label,
             wrist_label=wrist_label,
         )
-        active_chat_kwargs = self._chat_template_kwargs(chat_template_kwargs)
+        thinking_budget = self.token_thinking_budget
+        if self.reasoning_enabled and thinking_budget is None and not self._is_hosted():
+            # Thinking checkpoints can ignore an `enable_thinking=false` template
+            # override. Give atomic ReAct choices a small, explicit reasoning budget
+            # and reserve enough completion tokens for the selected action token.
+            thinking_budget = 32
+        active_chat_kwargs = self._reasoning_chat_kwargs(
+            chat_template_kwargs, thinking_budget
+        )
 
         payload = {
             "model": self.model,
             "messages": [{"role": "user", "content": content}],
             "temperature": self.temperature,
-            "max_tokens": self._token_call_budget(),
+            "max_tokens": self._token_call_budget(thinking_budget),
             "guided_choice": list(allowed_tokens),
             "chat_template_kwargs": active_chat_kwargs,
         }
+        if thinking_budget is not None:
+            payload["thinking_token_budget"] = thinking_budget
         if debug:
             payload["logprobs"] = True
         data, raw_text, latency_s = self._post_completion(payload)
@@ -486,10 +592,14 @@ class VLMClient:
                     }
                 ],
                 "temperature": 0.0,
-                "max_tokens": self._token_call_budget(),
+                "max_tokens": self._token_call_budget(thinking_budget),
                 "guided_choice": list(allowed_tokens),
-                "chat_template_kwargs": retry_kwargs,
+                "chat_template_kwargs": self._reasoning_chat_kwargs(
+                    retry_kwargs, thinking_budget
+                ),
             }
+            if thinking_budget is not None:
+                retry_payload["thinking_token_budget"] = thinking_budget
             if debug:
                 retry_payload["logprobs"] = True
             retry_data, retry_raw_text, retry_latency_s = self._post_completion(
@@ -687,6 +797,7 @@ class VLMClient:
         agentview_label: Optional[str] = "Image A: agentview RGB",
         wrist_label: Optional[str] = "Image B: wrist RGB",
         image_detail: Optional[str] = None,
+        thinking_token_budget: Optional[int] = None,
     ) -> VLMResponse:
         content = _message_content(
             prompt,
@@ -696,7 +807,12 @@ class VLMClient:
             wrist_label=wrist_label,
             image_detail=image_detail,
         )
-        active_chat_kwargs = self._chat_template_kwargs(chat_template_kwargs)
+        effective_thinking_budget = thinking_token_budget
+        if effective_thinking_budget is None and self.reasoning_enabled:
+            effective_thinking_budget = self.thinking_token_budget
+        active_chat_kwargs = self._reasoning_chat_kwargs(
+            chat_template_kwargs, effective_thinking_budget
+        )
 
         payload = {
             "model": self.model,
@@ -707,15 +823,33 @@ class VLMClient:
             "max_tokens": self.max_tokens if max_tokens is None else int(max_tokens),
             "chat_template_kwargs": active_chat_kwargs,
         }
+        if effective_thinking_budget is not None:
+            payload["thinking_token_budget"] = max(1, int(effective_thinking_budget))
         if debug:
             payload["logprobs"] = True
         payload = self._finalize_payload(payload)
+        audit = _request_audit(payload)
         started = time.monotonic()
         data = self._post_chat(payload)
         latency_s = time.monotonic() - started
+        message = data["choices"][0]["message"]
+        if data["choices"][0].get("finish_reason") == "length":
+            failure_payload = _response_payload(
+                {
+                    **_completion_metadata(data, message),
+                    "request_audit": audit,
+                    "failure": "truncated_final_answer",
+                },
+                latency_s,
+            )
+            raise VLMParseError(
+                "VLM final answer was truncated at the token limit",
+                _message_text(message),
+                failure_payload,
+            )
         # strip_reasoning=False keeps the <think>...</think> chain-of-thought in the
         # text (for CoT logging/analysis); token recovery still finds the answer.
-        message_text = _message_text(data["choices"][0]["message"])
+        message_text = _message_text(message)
         raw_text = (
             _strip_reasoning_artifacts(message_text)
             if strip_reasoning
@@ -724,7 +858,9 @@ class VLMClient:
         return VLMResponse(
             token="",
             raw_text=raw_text.strip(),
-            payload=_response_payload(data if debug else {}, latency_s),
+            payload=_response_payload(
+                {**(data if debug else {}), **_completion_metadata(data, message)}, latency_s
+            ),
         )
 
     def complete_json(
@@ -735,6 +871,7 @@ class VLMClient:
         schema: Optional[dict[str, Any]] = None,
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
+        thinking_token_budget: Optional[int] = None,
         chat_template_kwargs: Optional[dict] = None,
         debug: bool = False,
         agentview_label: Optional[str] = "Image A: agentview RGB",
@@ -749,7 +886,12 @@ class VLMClient:
             wrist_label=wrist_label,
             image_detail=image_detail,
         )
-        active_chat_kwargs = self._chat_template_kwargs(chat_template_kwargs)
+        effective_thinking_budget = thinking_token_budget
+        if effective_thinking_budget is None and self.reasoning_enabled:
+            effective_thinking_budget = self.thinking_token_budget
+        active_chat_kwargs = self._reasoning_chat_kwargs(
+            chat_template_kwargs, effective_thinking_budget
+        )
         payload: dict[str, Any] = {
             "model": self.model,
             "messages": [{"role": "user", "content": content}],
@@ -759,20 +901,42 @@ class VLMClient:
             "max_tokens": self.max_tokens if max_tokens is None else int(max_tokens),
             "chat_template_kwargs": active_chat_kwargs,
         }
+        if effective_thinking_budget is not None:
+            payload["thinking_token_budget"] = max(1, int(effective_thinking_budget))
         if schema is not None:
             payload["guided_json"] = schema
         if debug:
             payload["logprobs"] = True
         payload = self._finalize_payload(payload)
+        audit = _request_audit(payload)
         started = time.monotonic()
         data = self._post_chat(payload)
         latency_s = time.monotonic() - started
+        message = data["choices"][0]["message"]
+        if data["choices"][0].get("finish_reason") == "length":
+            failure_payload = _response_payload(
+                {
+                    **_completion_metadata(data, message),
+                    "request_audit": audit,
+                    "failure": "truncated_final_answer",
+                },
+                latency_s,
+            )
+            raise VLMParseError(
+                "VLM final answer was truncated at the token limit",
+                _message_text(message),
+                failure_payload,
+            )
         raw_text = _strip_reasoning_artifacts(
-            _message_text(data["choices"][0]["message"])
+            _message_text(message)
         ).strip()
         parsed = _parse_json_object(raw_text)
         clean_text = json.dumps(parsed, ensure_ascii=False, sort_keys=True)
         response_payload = {"json": parsed, "raw": data} if debug else {"json": parsed}
+        if isinstance(data.get("usage"), dict):
+            response_payload["usage"] = data["usage"]
+        response_payload.update(_completion_metadata(data, message))
+        response_payload["request_audit"] = audit
         return VLMResponse(
             token="",
             raw_text=clean_text,
@@ -785,13 +949,33 @@ class VLMClient:
             kwargs.update(override)
         return kwargs
 
-    def _token_call_budget(self) -> int:
+    def _reasoning_chat_kwargs(
+        self,
+        override: Optional[dict],
+        thinking_token_budget: Optional[int],
+    ) -> dict:
+        kwargs = self._chat_template_kwargs(override)
+        if self.reasoning_enabled or thinking_token_budget is not None:
+            # Qwen3-VL-8B-Thinking still emits a reasoning channel when a request
+            # asks the template to disable thinking. Keep the template and the
+            # explicit per-request token budget in agreement.
+            kwargs["enable_thinking"] = True
+            kwargs.pop("thinking", None)
+        return kwargs
+
+    def _token_call_budget(self, thinking_token_budget: Optional[int] = None) -> int:
         # vLLM guided_choice answers in a few tokens, so 24 is plenty. Hosted providers
         # have no guided_choice (the token is recovered from free text), and a reasoning
         # model also burns completion tokens on hidden reasoning before the short answer,
         # so a 24-cap returns empty content; give them the full configured budget.
         if self._is_hosted():
             return int(self.max_tokens)
+        if thinking_token_budget is not None:
+            budget = min(
+                max(1, int(thinking_token_budget)),
+                max(1, self.max_tokens - 24),
+            )
+            return max(8, min(self.max_tokens, budget + 24))
         return max(8, min(self.max_tokens, 24))
 
     def _post_completion(self, payload: dict[str, Any]) -> tuple[dict[str, Any], str, float]:
@@ -1047,19 +1231,44 @@ def _tokens_in_text(raw_text: str, allowed_tokens: Sequence[str]) -> list[str]:
 
 
 def _message_text(message: dict) -> str:
-    """Return the model's answer text, tolerating reasoning (CoT) models.
-
-    A reasoner served with a reasoning parser splits chain-of-thought into
-    ``reasoning_content`` and the answer into ``content``. If ``content`` comes
-    back empty (guided decoding, or the server routing everything into the
-    reasoning channel), fall back to ``reasoning_content`` so the JSON/token
-    parsers downstream still receive the output instead of an empty string.
-    """
+    """Return only the final-answer channel, never reasoning-only output."""
     content = message.get("content")
-    if content and str(content).strip():
+    if isinstance(content, str):
         return content
+    if isinstance(content, list):
+        return "".join(
+            str(part.get("text", ""))
+            for part in content
+            if isinstance(part, dict) and part.get("type") == "text"
+        )
+    return ""
+
+
+def _completion_metadata(data: dict[str, Any], message: dict[str, Any]) -> dict[str, Any]:
+    """Record reasoning use and token accounting without copying hidden CoT."""
+    content = _message_text(message)
+    # vLLM 0.24's `deepseek_r1` parser exposes its separate channel as
+    # `reasoning`; OpenAI-compatible servers commonly use `reasoning_content`.
+    # Count either field for audit, but never copy hidden reasoning into metadata.
     reasoning = message.get("reasoning_content")
-    return reasoning or content or ""
+    if not isinstance(reasoning, str) or not reasoning:
+        reasoning = message.get("reasoning")
+    if not isinstance(reasoning, str):
+        reasoning = ""
+    if not reasoning:
+        tagged = re.search(r"<think>(.*?)</think>", content, flags=re.DOTALL | re.IGNORECASE)
+        reasoning = tagged.group(1) if tagged else ""
+    choice = (data.get("choices") or [{}])[0]
+    metadata: dict[str, Any] = {
+        "finish_reason": choice.get("finish_reason"),
+        "reasoning_present": bool(reasoning.strip()),
+        "reasoning_chars": len(reasoning),
+        "final_content_chars": len(content),
+    }
+    usage = data.get("usage")
+    if isinstance(usage, dict):
+        metadata["usage"] = usage
+    return metadata
 
 
 def _strip_reasoning_artifacts(raw_text: str) -> str:

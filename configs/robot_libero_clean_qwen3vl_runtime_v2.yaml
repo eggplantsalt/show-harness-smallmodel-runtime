@@ -1,0 +1,110 @@
+defaults:
+  - robot_libero_clean_qwen3vl_c3_threshold04_approachguard.yaml
+
+# Parallel V2 profile.  V1 remains available through the parent profile.
+research_profile: clean_qwen3vl_verified_capability_runtime_v2
+log_dir: rollouts/libero_clean_qwen3vl_verified_capability_runtime_v2
+max_steps: 300
+# Generic metric convergence neighborhood before semantic descent.
+route_goal_tolerance_m: 0.01
+
+plugins:
+  # V2 binds coarse/fine motion to verified options: MOVE_TO_HOVER uses the
+  # embodiment-level coarse step, while alignment/contact options use fine.
+  variable_step: true
+
+v0:
+  # Runtime options have their own budgets; this cap only prevents the legacy
+  # staged runner from terminating a healthy bounded option prematurely.
+  max_subgoal_steps: 120
+  max_replans: 2
+
+verified_runtime:
+  enabled: false
+
+runtime_v2:
+  enabled: true
+  mode: active
+  # V2.1: Qwen chooses an axis/semantic intent; the runtime compiles it to an
+  # embodiment action and records the actual adapter receipt.
+  semantic_pregrasp_enabled: true
+  # A semantic GRASP/SELECT_GRASP cannot close while the fused target residual
+  # is outside the embodiment envelope.  The compiler emits one signed depth
+  # correction instead of allowing an empty close.
+  require_spatial_ready_for_grasp: true
+  depth_positive_action: MV_FWD
+  depth_negative_action: MV_BACK
+  lateral_positive_action: MV_LEFT
+  lateral_negative_action: MV_RIGHT
+  height_positive_action: MV_UP
+  height_negative_action: MV_DOWN
+  probe_depth_action: MV_BACK
+  visual_memory:
+    max_entries_per_epoch: 8
+  spatial_tools:
+    enabled: true
+    provider: moge3_plus_active_parallax
+    checkpoint: /root/autodl-tmp/openeta-services/checkpoints/moge-2-vitl/model.pt
+    model_version: v2_fallback
+    device: cuda:1
+    max_age_frames: 2
+    propagation_max_age_frames: 8
+    conflict_sigma: 2.5
+    active_probe_step_m: 0.01
+  graspgenx:
+    enabled: true
+    mode: shadow
+    device: cuda:1
+    gripper_descriptor: /root/autodl-tmp/openeta-services/GraspGenX/ext/gripper_descriptions/gripper_descriptions/assets/x_grippers/franka_panda/config.json
+  confidence_threshold: 0.4
+  # Pixel tolerance is only a fallback outside the world-XY / Wrist grasp
+  # controllers below.  It is not tuned to one object.
+  alignment_px: 13.5
+  height_tolerance_m: 0.003
+  # Generic table-support backprojection; the target mask bottom point is
+  # intersected with the calibrated work surface instead of an object height.
+  support_plane_z_m: 0.015
+  world_alignment_tolerance_m: 0.008
+  # Eye-in-hand lateral gripper-corridor calibration. Planar depth remains
+  # controlled by AgentView support-plane geometry; Wrist vertical pixels are
+  # not interpreted as robot forward/back motion.
+  # Kept only for V1-compatible construction; V2.1 semantic pregrasp never
+  # treats this pixel as a formal target.
+  wrist_grasp_anchor_px: [128.0, 70.0]
+  wrist_alignment_fraction: 0.20
+  wrist_alignment_min_px: 4.0
+  # Robot/action-resolution calibration: after local Wrist alignment, make one
+  # bounded contact-approach step and verify alignment again before closing.
+  wrist_final_descent_steps: 1
+  sensor_fault_limit: 3
+  # Generic embodiment effect threshold used only to detect a blocked
+  # recovery descent from consecutive proprioceptive EEF poses.
+  recovery_descent_stall_tolerance_m: 0.0015
+  min_progress_px: 1.0
+  wrong_direction_px: 1.5
+  no_progress_limit: 3
+  wrong_direction_limit: 2
+  cycle_window: 8
+  effect_alpha: 0.5
+  axis_hold_steps: 3
+  budgets:
+    locate: 10
+    hover: 80
+    align: 40
+    # The route controller spends bounded steps on clearance/contact replans
+    # before lateral progress.  This embodiment-level allowance remains below
+    # the episode cap and is not tied to an object or scene coordinate.
+    transfer: 120
+    commit: 15
+    recovery: 60
+    max_recovery_attempts: 2
+    episode: 300
+
+capabilities:
+  # V2 must infer object height online.  This disables the old development
+  # object's plane-height back-projection while retaining robot-only geometry.
+  target_reference_height_m: null
+  confidence_threshold: 0.4
+  sam3_ambiguity_margin: 0.05
+  reacquire_every: 4
+  sam3_max_attempts: 2

@@ -2,14 +2,148 @@
 
 from __future__ import annotations
 
+import base64
+import io
+import math
 import time
 from typing import Any, Optional
 
 import numpy as np
+from PIL import Image
 
 from .camera_geometry import CameraCalibration, backproject_pixel_to_plane
 from .sam3_client import Sam3Client
 from .visual_memory import CpuVisualTracker, EpisodicVisualMemory, _box_tuple, image_sha1
+
+
+def _decode_sam3_mask(value: Any, shape: tuple[int, int]) -> Optional[np.ndarray]:
+    """Decode one SAM3 PNG artifact without leaking base64 into telemetry."""
+    if not isinstance(value, dict):
+        return None
+    encoded = value.get("base64")
+    if not isinstance(encoded, str) or not encoded:
+        return None
+    try:
+        image = Image.open(io.BytesIO(base64.b64decode(encoded, validate=True))).convert("L")
+        mask = np.asarray(image, dtype=np.uint8) > 0
+        if mask.shape != shape:
+            mask = np.asarray(
+                Image.fromarray(mask.astype(np.uint8) * 255, mode="L").resize(
+                    (int(shape[1]), int(shape[0])), Image.Resampling.NEAREST
+                ),
+                dtype=np.uint8,
+            ) > 0
+        return mask
+    except (ValueError, OSError, TypeError):
+        return None
+
+
+def _mask_rle(mask: np.ndarray) -> list[list[int]]:
+    """Compact row-span RLE used as a JSON-safe mask contract."""
+    result: list[list[int]] = []
+    for y, row in enumerate(np.asarray(mask, dtype=bool)):
+        xs = np.flatnonzero(row)
+        if xs.size == 0:
+            continue
+        starts = xs[np.r_[True, np.diff(xs) > 1]]
+        ends = xs[np.r_[np.diff(xs) > 1, True]]
+        for start, end in zip(starts.tolist(), ends.tolist()):
+            result.append([int(y), int(start), int(end)])
+    return result
+
+
+def _mask_payload(value: Any, shape: tuple[int, int]) -> Optional[dict[str, Any]]:
+    mask = _decode_sam3_mask(value, shape)
+    if mask is None or not bool(mask.any()):
+        return None
+    ys, xs = np.nonzero(mask)
+    return {
+        "format": "row_span_rle",
+        "shape": [int(shape[0]), int(shape[1])],
+        "rle": _mask_rle(mask),
+        "area_px": int(mask.sum()),
+        "bbox_xyxy": [int(xs.min()), int(ys.min()), int(xs.max() + 1), int(ys.max() + 1)],
+    }
+
+
+def _box_center(value: tuple[int, int, int, int]) -> tuple[float, float]:
+    return (
+        (float(value[0]) + float(value[2])) * 0.5,
+        (float(value[1]) + float(value[3])) * 0.5,
+    )
+
+
+def _box_inside(inner: Optional[tuple[int, int, int, int]], outer: Optional[tuple[int, int, int, int]]) -> bool:
+    """Return whether an opening bbox is contained by its receptacle bbox.
+
+    This is a semantic consistency check, not a scene calibration: an interior
+    mask may touch the image boundary when the receptacle is clipped, but it
+    cannot extend outside the currently observed receptacle silhouette.
+    """
+    if inner is None or outer is None:
+        return False
+    return bool(
+        float(inner[0]) >= float(outer[0])
+        and float(inner[1]) >= float(outer[1])
+        and float(inner[2]) <= float(outer[2])
+        and float(inner[3]) <= float(outer[3])
+    )
+
+
+def _translate_mask_payload(
+    value: Any,
+    *,
+    dx: float,
+    dy: float,
+) -> Optional[dict[str, Any]]:
+    """Translate a compact mask with a tracker bbox without inventing pixels.
+
+    SAM3 masks are attached to the last semantic grounding.  Between two
+    groundings the CPU tracker only supplies a bbox, so preserving the mask at
+    its old image location would make the placement footprint stale.  Moving
+    the row spans by the measured bbox displacement keeps the segmentation
+    shape while making its temporal provenance explicit.
+    """
+    if not isinstance(value, dict) or value.get("format") != "row_span_rle":
+        return None
+    shape = value.get("shape")
+    spans = value.get("rle")
+    if not isinstance(shape, (list, tuple)) or len(shape) != 2 or not isinstance(spans, list):
+        return None
+    try:
+        height, width = int(shape[0]), int(shape[1])
+        shift_x, shift_y = int(round(float(dx))), int(round(float(dy)))
+    except (TypeError, ValueError):
+        return None
+    translated: list[list[int]] = []
+    for span in spans:
+        if not isinstance(span, (list, tuple)) or len(span) != 3:
+            continue
+        try:
+            y, x0, x1 = (int(item) for item in span)
+        except (TypeError, ValueError):
+            continue
+        y += shift_y
+        x0 += shift_x
+        x1 += shift_x
+        if y < 0 or y >= height:
+            continue
+        x0, x1 = max(0, x0), min(width - 1, x1)
+        if x0 <= x1:
+            translated.append([y, x0, x1])
+    if not translated:
+        return None
+    xs = [item for _y, x0, x1 in translated for item in (x0, x1)]
+    ys = [item[0] for item in translated]
+    area = sum(x1 - x0 + 1 for _y, x0, x1 in translated)
+    return {
+        "format": "row_span_rle",
+        "shape": [height, width],
+        "rle": translated,
+        "area_px": int(area),
+        "bbox_xyxy": [min(xs), min(ys), max(xs) + 1, max(ys) + 1],
+        "source": "sam3_mask_translated_by_tracker",
+    }
 
 
 class VisualHarness:
@@ -28,6 +162,7 @@ class VisualHarness:
         geometry_enabled: bool = True,
         sam3_url: str = "http://127.0.0.1:8773/sse",
         sam3_python: str = "/root/autodl-tmp/openeta-services/sam3/.venv/bin/python",
+        sam3_max_attempts: int = 1,
         reacquire_every: int = 4,
         confidence_threshold: float = 0.5,
         sam3_ambiguity_margin: float = 0.05,
@@ -109,7 +244,11 @@ class VisualHarness:
         )
         self.occlusion_hold_frames = max(0, int(occlusion_hold_frames))
         self.sam3 = (
-            Sam3Client(url=sam3_url, python=sam3_python)
+            Sam3Client(
+                url=sam3_url,
+                python=sam3_python,
+                max_attempts=sam3_max_attempts,
+            )
             if self.enabled and self.sam3_enabled
             else None
         )
@@ -134,10 +273,15 @@ class VisualHarness:
         self.held_last_grounding_frame: Optional[int] = None
         self.last_held_evidence: dict[str, Any] = {}
         self._held_instance_anchor_bbox: Optional[tuple[int, int, int, int]] = None
+        self._held_mask: Optional[dict[str, Any]] = None
+        self._held_mask_bbox: Optional[tuple[int, int, int, int]] = None
         self.held_rim_anchor_y: Optional[float] = None
         self.held_horizontal_stall = False
         self.opening_stage_identity: Optional[str] = None
         self.opening_last_grounding_frame: Optional[int] = None
+        self.opening_mask: Optional[dict[str, Any]] = None
+        self._opening_mask_bbox: Optional[tuple[int, int, int, int]] = None
+        self._opening_outer_bbox: Optional[tuple[int, int, int, int]] = None
         self.tool_calls = 0
         self.tool_failures = 0
         self.guard_shadow_events = 0
@@ -161,6 +305,7 @@ class VisualHarness:
                     "/root/autodl-tmp/openeta-services/sam3/.venv/bin/python",
                 )
             ),
+            sam3_max_attempts=int(section.get("sam3_max_attempts", 1)),
             reacquire_every=int(section.get("reacquire_every", 4)),
             confidence_threshold=float(section.get("confidence_threshold", 0.5)),
             sam3_ambiguity_margin=float(section.get("sam3_ambiguity_margin", 0.05)),
@@ -243,10 +388,15 @@ class VisualHarness:
         self.held_last_grounding_frame = None
         self.last_held_evidence = {}
         self._held_instance_anchor_bbox = None
+        self._held_mask = None
+        self._held_mask_bbox = None
         self.held_rim_anchor_y = None
         self.held_horizontal_stall = False
         self.opening_stage_identity = None
         self.opening_last_grounding_frame = None
+        self.opening_mask = None
+        self._opening_mask_bbox = None
+        self._opening_outer_bbox = None
         self.tool_calls = 0
         self.tool_failures = 0
         self.guard_shadow_events = 0
@@ -451,6 +601,21 @@ class VisualHarness:
                 "score": round(float(item[0]), 4),
                 "bbox_xyxy": list(item[1]),
                 "label": item[2].get("label"),
+                "has_mask": isinstance(item[2].get("mask"), dict),
+                "area_px": item[2].get("area_px"),
+            }
+            for item in candidates[:5]
+        ]
+        # Keep masks for the bounded candidate set available to the caller so
+        # a temporal identity association can select the matching mask.  The
+        # masks are returned through a transient, non-serialized field below;
+        # they are deliberately not copied into normal tool/event logs.
+        candidate_masks = [
+            {
+                "bbox_xyxy": list(item[1]),
+                "mask": _mask_payload(
+                    item[2].get("mask"), tuple(int(v) for v in image.shape[:2])
+                ),
             }
             for item in candidates[:5]
         ]
@@ -467,6 +632,7 @@ class VisualHarness:
                 "candidate_count": len(candidates),
                 "ambiguity_margin": self.sam3_ambiguity_margin,
                 "candidates": candidate_summary,
+                "_candidate_masks": candidate_masks,
             }
         if bbox is None or score < self.confidence_threshold:
             self.tool_failures += 1
@@ -481,14 +647,17 @@ class VisualHarness:
                 "bbox_xyxy": chosen.get("bbox_xyxy"),
                 "label": chosen.get("label"),
             }
+        selected_mask = _mask_payload(chosen.get("mask"), tuple(int(v) for v in image.shape[:2]))
         return bbox, score, "sam3", {
             **base_meta,
             "detection_count": len(detections),
             "candidate_count": len(candidates),
             "candidates": candidate_summary,
             "area_px": chosen.get("area_px"),
-            "label": chosen.get("label"),
-        }
+                "label": chosen.get("label"),
+                "mask": selected_mask,
+                "_candidate_masks": candidate_masks,
+            }
 
     def _sam3_ground_opening(
         self, image: np.ndarray, target: str
@@ -563,12 +732,14 @@ class VisualHarness:
                 "abstain_reason": "no_opening_detection",
             }
         score, bbox, chosen, _query = best
+        selected_mask = _mask_payload(chosen.get("mask"), tuple(int(v) for v in image.shape[:2]))
         return bbox, score, "sam3_opening", {
             **meta,
             "detection_count": len(detections) if isinstance(detections, list) else 0,
             "bbox_xyxy": list(bbox),
             "label": chosen.get("label"),
             "area_px": chosen.get("area_px"),
+            "mask": selected_mask,
         }
 
     def _update_held_object(
@@ -596,6 +767,8 @@ class VisualHarness:
             self.held_last_grounding_frame = None
             self.last_held_evidence = {}
             self._held_instance_anchor_bbox = None
+            self._held_mask = None
+            self._held_mask_bbox = None
             self.held_rim_anchor_y = None
             self.held_horizontal_stall = False
             if self.held_tracker is not None:
@@ -787,6 +960,38 @@ class VisualHarness:
                 self.held_last_grounding_frame = None
                 source = "tracker_lost"
 
+        # Keep the last semantically grounded mask across tracker-only frames.
+        # A tracker bbox is useful for temporal association but is not a shape
+        # model; dropping the mask here would make the placement footprint
+        # collapse to a point later in the spatial route.
+        current_mask = tool.get("mask") if isinstance(tool, dict) else None
+        current_mask_box = _box_tuple(
+            current_mask.get("bbox_xyxy") if isinstance(current_mask, dict) else None
+        )
+        if isinstance(current_mask, dict) and bbox is not None and current_mask_box is not None:
+            # A semantic refresh may select an associated candidate different
+            # from the detector's top candidate.  Do not attach the top mask to
+            # the wrong instance.
+            if float(np.linalg.norm(np.asarray(_box_center(bbox)) - np.asarray(_box_center(current_mask_box)))) <= max(
+                8.0, 0.6 * float(np.linalg.norm([bbox[2] - bbox[0], bbox[3] - bbox[1]]))
+            ):
+                self._held_mask = dict(current_mask)
+                self._held_mask_bbox = bbox
+            else:
+                current_mask = None
+        if bbox is not None and self._held_mask is not None and self._held_mask_bbox is not None:
+            if current_mask is None:
+                old_center = _box_center(self._held_mask_bbox)
+                new_center = _box_center(bbox)
+                shifted = _translate_mask_payload(
+                    self._held_mask,
+                    dx=float(new_center[0] - old_center[0]),
+                    dy=float(new_center[1] - old_center[1]),
+                )
+                if shifted is not None:
+                    self._held_mask = shifted
+            self._held_mask_bbox = bbox
+
         result: dict[str, Any] = {
             "target": held_prompt,
             "bbox_xyxy": list(bbox) if bbox is not None else None,
@@ -795,6 +1000,7 @@ class VisualHarness:
             "visible": bbox is not None,
             "grounding_frame": self.held_last_grounding_frame,
             "tool": tool,
+            "mask": self._held_mask,
         }
         previous_held_bbox = _box_tuple(
             self.last_held_evidence.get("bbox_xyxy")
@@ -912,6 +1118,7 @@ class VisualHarness:
             "confidence": round(float(confidence), 4),
             "source": source,
             "tool": meta,
+            "mask": meta.get("mask") if isinstance(meta, dict) else None,
         }
         if include_opening:
             opening, opening_confidence, opening_source, opening_meta = (
@@ -925,6 +1132,7 @@ class VisualHarness:
                     "opening_confidence": round(float(opening_confidence), 4),
                     "opening_source": opening_source,
                     "opening_tool": opening_meta,
+                    "opening_mask": opening_meta.get("mask") if isinstance(opening_meta, dict) else None,
                 }
             )
         return result
@@ -953,6 +1161,9 @@ class VisualHarness:
             self._same_action_count = 0
             self.opening_stage_identity = None
             self.opening_last_grounding_frame = None
+            self.opening_mask = None
+            self._opening_mask_bbox = None
+            self._opening_outer_bbox = None
             if self.opening_tracker is not None:
                 self.opening_tracker.reset()
         self.last_stage_identity = stage_identity
@@ -1018,6 +1229,9 @@ class VisualHarness:
                             "probe_camera": "wrist",
                             "probe": wrist_meta,
                             "selected_camera": "wrist",
+                            # Keep the selected instance mask at the stable
+                            # top-level evidence path consumed by CoTracker.
+                            "mask": wrist_meta.get("mask"),
                         },
                     )
                 else:
@@ -1030,6 +1244,7 @@ class VisualHarness:
                         "selected_camera": "agentview",
                         "fallback_reason": "wrist_no_detection",
                         "fallback": agentview_meta,
+                        "mask": agentview_meta.get("mask") if bbox is not None else None,
                     }
             else:
                 bbox, confidence, source, tool_meta = self._sam3_ground(
@@ -1050,6 +1265,7 @@ class VisualHarness:
                         "fallback_camera": "agentview",
                         "fallback": fallback_meta,
                         "fallback_reason": "wrist_no_detection",
+                        "mask": fallback_meta.get("mask") if fallback_bbox is not None else None,
                     }
                     if fallback_bbox is not None:
                         self.stage_camera_override = "agentview"
@@ -1237,6 +1453,124 @@ class VisualHarness:
                     opening_meta,
                 ) = self._sam3_ground_opening(agentview, target)
                 self.opening_last_grounding_frame = int(frame_id)
+                candidate_mask = (
+                    opening_meta.get("mask")
+                    if isinstance(opening_meta, dict)
+                    else None
+                )
+                candidate_box = _box_tuple(opening_bbox)
+                candidate_mask_box = _box_tuple(
+                    candidate_mask.get("bbox_xyxy")
+                    if isinstance(candidate_mask, dict)
+                    else None
+                )
+                if candidate_mask_box is not None:
+                    candidate_box = candidate_mask_box
+                candidate_complete = bool(
+                    candidate_box is not None
+                    and candidate_box[0] > 2
+                    and candidate_box[1] > 2
+                    and candidate_box[2] < agentview.shape[1] - 2
+                    and candidate_box[3] < agentview.shape[0] - 2
+                )
+                outer_box = _box_tuple(outer_destination_bbox)
+                candidate_inside = (
+                    _box_inside(candidate_box, outer_box)
+                    if outer_box is not None
+                    else candidate_complete
+                )
+                previous_opening_box = self._opening_mask_bbox or _box_tuple(
+                    self.opening_mask.get("bbox_xyxy")
+                    if isinstance(self.opening_mask, dict)
+                    else None
+                )
+
+                def remember_opening(mask: dict[str, Any], box: tuple[int, int, int, int]) -> None:
+                    self.opening_mask = dict(mask)
+                    self._opening_mask_bbox = box
+                    self._opening_outer_bbox = outer_box
+
+                def predict_from_outer_motion() -> Optional[tuple[dict[str, Any], tuple[int, int, int, int]]]:
+                    if (
+                        not isinstance(self.opening_mask, dict)
+                        or previous_opening_box is None
+                        or self._opening_outer_bbox is None
+                        or outer_box is None
+                    ):
+                        return None
+                    previous_outer_center = _box_center(self._opening_outer_bbox)
+                    current_outer_center = _box_center(outer_box)
+                    predicted_mask = _translate_mask_payload(
+                        self.opening_mask,
+                        dx=current_outer_center[0] - previous_outer_center[0],
+                        dy=current_outer_center[1] - previous_outer_center[1],
+                    )
+                    predicted_box = _box_tuple(
+                        predicted_mask.get("bbox_xyxy")
+                        if isinstance(predicted_mask, dict)
+                        else None
+                    )
+                    if predicted_mask is None or predicted_box is None:
+                        return None
+                    if not _box_inside(predicted_box, outer_box):
+                        return None
+                    predicted_mask["source"] = "opening_mask_translated_by_outer_motion"
+                    return predicted_mask, predicted_box
+
+                if isinstance(candidate_mask, dict) and candidate_box is not None and candidate_inside:
+                    # A complete mask is preferred, but an image-clipped mask is
+                    # still admissible when the observed outer silhouette proves
+                    # that it belongs to the receptacle rather than the floor or
+                    # an adjacent object.
+                    remember_opening(candidate_mask, candidate_box)
+                    opening_bbox = candidate_box
+                else:
+                    predicted = predict_from_outer_motion()
+                    if predicted is not None:
+                        predicted_mask, predicted_box = predicted
+                        remember_opening(predicted_mask, predicted_box)
+                        opening_bbox = predicted_box
+                        opening_confidence = min(float(opening_confidence or 0.0), 0.7)
+                        opening_source = "opening_mask_outer_motion"
+                        opening_meta = {
+                            "mask": predicted_mask,
+                            "rejected_mask": candidate_mask,
+                            "rejection_reason": (
+                                "candidate_opening_outside_outer_bbox"
+                                if candidate_box is not None and outer_box is not None
+                                else "candidate_opening_incomplete"
+                            ),
+                            "outer_motion": True,
+                        }
+                    elif (
+                        isinstance(self.opening_mask, dict)
+                        and previous_opening_box is not None
+                        and (outer_box is None or _box_inside(previous_opening_box, outer_box))
+                    ):
+                        # Keep only a geometrically compatible historical mask;
+                        # an incompatible stale mask is intentionally exposed as
+                        # missing evidence and will make VCR hold.
+                        opening_bbox = previous_opening_box
+                        opening_confidence = min(float(opening_confidence or 0.0), 0.5)
+                        opening_source = "opening_mask_memory"
+                        opening_meta = {
+                            "mask": dict(self.opening_mask),
+                            "rejected_mask": candidate_mask,
+                            "rejection_reason": (
+                                "candidate_opening_outside_outer_bbox"
+                                if candidate_box is not None and outer_box is not None
+                                else "candidate_opening_incomplete"
+                            ),
+                        }
+                    else:
+                        opening_bbox = None
+                        opening_confidence = 0.0
+                        opening_source = "opening_geometry_inconsistent"
+                        opening_meta = {
+                            "mask": None,
+                            "rejected_mask": candidate_mask,
+                            "rejection_reason": "opening_not_contained_by_outer_receptacle",
+                        }
                 if opening_bbox is not None and self.opening_tracker is not None:
                     self.opening_tracker.seed(
                         agentview, opening_bbox, opening_confidence
@@ -1252,7 +1586,69 @@ class VisualHarness:
                     opening_meta = {
                         "match_score": tracked_opening.get("score"),
                         "track_age": tracked_opening.get("track_age"),
+                        "mask": self.opening_mask,
                     }
+                    outer_box = _box_tuple(outer_destination_bbox)
+                    if outer_box is not None and not _box_inside(opening_bbox, outer_box):
+                        predicted = None
+                        if (
+                            isinstance(self.opening_mask, dict)
+                            and self._opening_outer_bbox is not None
+                        ):
+                            previous_outer_center = _box_center(self._opening_outer_bbox)
+                            current_outer_center = _box_center(outer_box)
+                            predicted_mask = _translate_mask_payload(
+                                self.opening_mask,
+                                dx=current_outer_center[0] - previous_outer_center[0],
+                                dy=current_outer_center[1] - previous_outer_center[1],
+                            )
+                            predicted_box = _box_tuple(
+                                predicted_mask.get("bbox_xyxy")
+                                if isinstance(predicted_mask, dict)
+                                else None
+                            )
+                            if predicted_mask is not None and predicted_box is not None and _box_inside(predicted_box, outer_box):
+                                predicted_mask["source"] = "opening_mask_translated_by_outer_motion"
+                                predicted = (predicted_mask, predicted_box)
+                        if predicted is not None:
+                            self.opening_mask, opening_bbox = predicted
+                            self._opening_mask_bbox = opening_bbox
+                            self._opening_outer_bbox = outer_box
+                            opening_confidence = min(opening_confidence, 0.7)
+                            opening_source = "opening_mask_outer_motion"
+                            opening_meta.update(
+                                {
+                                    "mask": self.opening_mask,
+                                    "rejected_tracker_bbox": list(opening_bbox),
+                                    "outer_motion": True,
+                                }
+                            )
+                        else:
+                            opening_bbox = None
+                            opening_confidence = 0.0
+                            opening_source = "opening_geometry_inconsistent"
+                            opening_meta = {
+                                "mask": None,
+                                "rejected_tracker_bbox": list(opening_bbox) if opening_bbox else None,
+                                "rejection_reason": "tracked_opening_not_contained_by_outer_receptacle",
+                            }
+                    elif isinstance(self.opening_mask, dict):
+                        # Keep the semantic mask synchronized with tracker motion
+                        # instead of reusing it at the previous image location.
+                        mask_box = self._opening_mask_bbox or _box_tuple(
+                            self.opening_mask.get("bbox_xyxy")
+                        )
+                        if mask_box is not None:
+                            shifted_mask = _translate_mask_payload(
+                                self.opening_mask,
+                                dx=_box_center(opening_bbox)[0] - _box_center(mask_box)[0],
+                                dy=_box_center(opening_bbox)[1] - _box_center(mask_box)[1],
+                            )
+                            if shifted_mask is not None:
+                                self.opening_mask = shifted_mask
+                                self._opening_mask_bbox = opening_bbox
+                                self._opening_outer_bbox = outer_box
+                                opening_meta["mask"] = shifted_mask
                 else:
                     self.opening_last_grounding_frame = None
                     opening_source = "opening_tracker_lost"
@@ -1476,6 +1872,11 @@ class VisualHarness:
             )
             secondary_evidence["camera"] = secondary_camera
             secondary_evidence["tool"] = secondary_meta
+            secondary_evidence["mask"] = (
+                secondary_meta.get("mask")
+                if isinstance(secondary_meta, dict)
+                else None
+            )
         elif str(stage).upper() == "GRASP" and isinstance(previous_secondary_view, dict):
             secondary_evidence = dict(previous_secondary_view)
             try:
@@ -1729,6 +2130,50 @@ class VisualHarness:
                 }
         if isinstance(destination_proximity, dict):
             destination_proximity["held_object_alignment"] = held_object_alignment
+        transient_candidate_masks_by_camera: dict[str, list[dict[str, Any]]] = {}
+
+        def collect_candidate_masks(meta: Any, camera_name: str) -> None:
+            if not isinstance(meta, dict):
+                return
+            camera_key = str(camera_name or "").lower()
+            rows = meta.get("_candidate_masks")
+            if camera_key in {"agentview", "wrist"} and isinstance(rows, list):
+                transient_candidate_masks_by_camera[camera_key] = [
+                    row for row in rows
+                    if isinstance(row, dict) and isinstance(row.get("mask"), dict)
+                ]
+            # The selected camera may be represented by nested probe/fallback
+            # metadata.  Keep each candidate list tied to its original pixels.
+            for key, camera_field in (
+                ("probe", "probe_camera"),
+                ("primary", "primary_camera"),
+                ("fallback", "fallback_camera"),
+                ("secondary", "secondary_camera"),
+            ):
+                nested_camera = str(meta.get(camera_field) or "").lower()
+                if isinstance(meta.get(key), dict) and nested_camera:
+                    collect_candidate_masks(meta[key], nested_camera)
+
+        collect_candidate_masks(tool_meta, camera)
+        if secondary_camera is not None:
+            collect_candidate_masks(secondary_meta, secondary_camera)
+
+        def public_metadata(value: Any) -> Any:
+            if isinstance(value, dict):
+                return {
+                    key: public_metadata(item)
+                    for key, item in value.items()
+                    if key != "_candidate_masks"
+                }
+            if isinstance(value, list):
+                return [public_metadata(item) for item in value]
+            return value
+
+        tool_meta = public_metadata(tool_meta)
+        secondary_meta = public_metadata(secondary_meta)
+        if isinstance(secondary_evidence, dict):
+            secondary_evidence["tool"] = secondary_meta
+
         self.last_stage_key = stage_key
         self.last_frame_id = int(frame_id)
         self.last_action = previous_action
@@ -1749,6 +2194,12 @@ class VisualHarness:
             "visible": bbox is not None,
             "progress_delta_px": progress,
             "tool": tool_meta,
+            "mask": tool_meta.get("mask") if isinstance(tool_meta, dict) else None,
+            "opening_mask": (
+                tool_meta.get("opening", {}).get("mask")
+                if isinstance(tool_meta, dict) and isinstance(tool_meta.get("opening"), dict)
+                else self.opening_mask
+            ),
             "geometry": geometry_evidence,
             "secondary_view": secondary_evidence,
             "held_object": held_object,
@@ -1762,7 +2213,15 @@ class VisualHarness:
             self.last_evidence["occlusion_source_frame"] = tool_meta.get("from_frame")
         elif bbox is not None:
             self.last_visible_evidence = dict(self.last_evidence)
-        return dict(self.last_evidence)
+        result = dict(self.last_evidence)
+        if transient_candidate_masks_by_camera:
+            # This field exists only for the current runner iteration.  It is
+            # consumed before event serialization and never retained in the
+            # harness's cross-frame state or sent directly to the VLM.
+            result["_transient_candidate_masks_by_camera"] = (
+                transient_candidate_masks_by_camera
+            )
+        return result
 
     def mark_action(self, token: str) -> None:
         normalized = str(token).strip().upper()

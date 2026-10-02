@@ -20,6 +20,7 @@ from core.sim.libero_task import ensure_libero_path, make_libero_task
 from core.sim.zeroshot_libero_runner import ZeroshotLiberoRunner
 from core.capabilities.visual_harness import VisualHarness
 from core.capabilities.verified_runtime import VerifiedEmbodiedRuntime
+from core.runtime_v2 import VerifiedCapabilityRuntime
 from core.v0_types import V0Config
 from plugins.config import PluginsConfig
 from plugins.recovery import RecoveryPlugin
@@ -27,6 +28,42 @@ from plugins.visual_route import VisualRoutePlugin
 from scripts.run_robolab_zeroshot import build_zero_shot_stack
 from core.prompting.prompt_loader import load_prompt_dir
 from interpreters.libero_atomic_controller import LiberoAtomicController
+
+
+def _libero_context_extra(*, placement_v22: bool) -> str:
+    """Provide embodiment calibration without encoding a particular scene policy."""
+    if placement_v22:
+        return (
+            "LIBERO camera calibration: AgentView is upright after the configured "
+            "180-degree transform; screen-down maps to MV_FWD, screen-up to MV_BACK, "
+            "screen-right to MV_RIGHT, and screen-left to MV_LEFT. Wrist is an eye-in-hand "
+            "view with a different motion-parallax mapping; do not transfer AgentView pixel "
+            "directions to Wrist depth. The runtime supplies the currently feasible semantic "
+            "options and compiles the selected option using fresh spatial evidence. Keep "
+            "APPROACH and GRASP as distinct stages. Use AgentView for high-clearance approach "
+            "and both views for final alignment. Before descent or closing, inspect the current "
+            "images and robot pose; after each action, compare the measured effect with the "
+            "expected change. Do not repeat or reverse a move based only on a single-frame "
+            "pixel offset; request new evidence when the observed effect is ambiguous."
+        )
+    return (
+        "LIBERO embodiment calibration: the AgentView image is upright after the configured "
+        "180-degree transform: screen-down maps to world +X (MV_FWD), screen-up to world -X "
+        "(MV_BACK), screen-right to world -Y (MV_RIGHT), and screen-left to world +Y "
+        "(MV_LEFT). Wrist is an eye-in-hand view with different parallax; never transfer "
+        "AgentView pixel directions to Wrist depth. At semantic decision points, reason from "
+        "the task description, both current views, same-episode visual memory when supplied, "
+        "spatial evidence, and measured effects of actions that actually executed. If target "
+        "identity is ambiguous, cite visible distinguishing evidence or request a fresh view; "
+        "do not invent an attribute. Select only a runtime-provided semantic option. The "
+        "runtime checks its preconditions, translates it through embodiment calibration, "
+        "executes one bounded action, and obtains a fresh observation. Re-evaluate after the "
+        "observed effect; do not repeat a contradicted option or follow a fixed action order "
+        "when current evidence calls for re-observation or replanning. Keep approach, contact, "
+        "and grasp judgments grounded in the visible relation between the intended object, "
+        "the gripper, and the robot pose. Do not infer physical contact, holding, or task "
+        "success from a single image or model judgment."
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -40,6 +77,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--episode-index", type=int, default=None)
     parser.add_argument("--episodes", type=int, default=None)
     parser.add_argument("--max-steps", type=int, default=None)
+    parser.add_argument(
+        "--grasp-verification-only",
+        action="store_true",
+        help="end after runtime verifies a grasp; V2.2 grasp-only evaluation",
+    )
     parser.add_argument("--loop-period-s", type=float, default=None)
     parser.add_argument("--log-dir", default=None)
     parser.add_argument("--vlm-backend", default=os.environ.get("VLM_BACKEND"))
@@ -55,6 +97,11 @@ def main() -> int:
     args = parse_args()
     load_secrets_env()
     cfg = load_yaml(args.robot_config)
+    if args.grasp_verification_only:
+        runtime_cfg = cfg.setdefault("runtime_v2", {})
+        if not bool(runtime_cfg.get("placement_v22_enabled", False)):
+            raise ValueError("--grasp-verification-only requires the V2.2 runtime profile")
+        runtime_cfg["grasp_verification_only"] = True
     for arg, key in (
         ("suite_name", "suite_name"),
         ("task_id", "task_id"),
@@ -85,32 +132,10 @@ def main() -> int:
         prompts=prompts,
         include_robolab_context=False,
         merge_pregrasp=False,
-        common_context_extra=(
-            "LIBERO backend calibration: this is the standard LIBERO Panda camera frame. "
-            "The AgentView image is upright after the configured 180-degree transform: "
-            "screen-down is world +X (MV_FWD), screen-up is world -X (MV_BACK), "
-            "screen-right is world -Y (MV_RIGHT), and screen-left is world +Y (MV_LEFT). "
-            "The wrist image is already upright with the black gripper entering from the "
-            "top; use the same screen-direction mapping for horizontal and depth corrections. "
-            "For every LIBERO pick task, the plan must contain a distinct APPROACH stage "
-            "before GRASP; do not merge approach and grasp into one stage. Complete the "
-            "APPROACH stage using AgentView while high above the table, then use Wrist "
-            "only for final local alignment in GRASP. "
-            "When multiple same-class objects or bottles are visible, the plan must include "
-            "a distinguishing visual attribute such as cap color or body color in TARGET or "
-            "AFFORD (for this scene, distinguish the green-capped salad-dressing bottle from "
-            "the other bottles); never leave the controller with only a generic bottle query. "
-            "In a GRASP stage, align both X and Y while above the table, then descend only into "
-            "the calibrated final pre-grasp height band. If the Wrist view is empty but AgentView "
-            "alignment is already within tolerance, do not infer that another descent is needed: "
-            "use AgentView and robot height, and issue GRASP when the target is between the open "
-            "fingers. If the EEF is below the final band, issue MV_UP before GRASP. The target's "
-            "screen-down offset includes camera parallax because it is lower than the EEF. "
-            "When the EEF is high and left/right alignment is already good, use MV_DOWN to "
-            "enter the final height band before using MV_FWD/MV_BACK for depth correction. "
-            "If a target "
-            "remains on one side after a move, repeat that same direction; do not alternate "
-            "left/right or forward/back merely because the image is noisy."
+        common_context_extra=_libero_context_extra(
+            placement_v22=bool(
+                (cfg.get("runtime_v2") or {}).get("placement_v22_enabled", False)
+            )
         ),
         controller_prompt_override=(
             prompts.get("controller_libero_prompt")
@@ -120,8 +145,31 @@ def main() -> int:
     )
 
     visual_harness = VisualHarness.from_config(cfg)
-    verified_runtime = VerifiedEmbodiedRuntime.from_config(cfg)
+    runtime_v2 = VerifiedCapabilityRuntime.from_config(cfg)
+    runtime_v1 = VerifiedEmbodiedRuntime.from_config(cfg)
+    if runtime_v2 is not None and runtime_v1 is not None:
+        raise ValueError(
+            "runtime_v2 and verified_runtime cannot both be enabled"
+        )
+    verified_runtime = runtime_v2 or runtime_v1
     visual_route_plugin = VisualRoutePlugin.from_config(cfg, client=client)
+
+    if runtime_v2 is not None:
+        # Fail before the first robot/environment action.  A blank-frame SAM3
+        # request may legitimately return no detection; transport health only
+        # requires the service call itself to succeed.
+        client.health_check(wait_s=0.0)
+        if visual_harness is None or visual_harness.sam3 is None:
+            raise RuntimeError("VCR-v2 requires the configured SAM3 capability")
+        import numpy as np
+
+        probe = visual_harness.sam3.segment(
+            np.zeros((32, 32, 3), dtype=np.uint8),
+            "object",
+            confidence_threshold=0.1,
+        )
+        if not isinstance(probe, dict) or not bool(probe.get("success", False)):
+            raise RuntimeError(f"SAM3 preflight failed: {probe}")
 
     # One decision contains the commanded motion steps plus optional settle
     # steps; GRASP/RELEASE can hold the gripper for longer.  Keep the
@@ -184,7 +232,11 @@ def main() -> int:
             "init_state_index": handle.init_state_index,
             "bddl_file": handle.bddl_file,
             "seed": int(cfg.get("seed", 0)),
-            "control_loop": "libero_zeroshot_full_harness",
+            "control_loop": (
+                "libero_verified_capability_runtime_v2"
+                if runtime_v2 is not None
+                else "libero_zeroshot_full_harness"
+            ),
             "vlm_backend": cfg["vlm"].get("backend"),
             "vlm_model": cfg["vlm"].get("model"),
             "model_revision": cfg.get("model_revision"),
@@ -194,6 +246,11 @@ def main() -> int:
             "verified_runtime": (
                 verified_runtime.metadata()
                 if verified_runtime is not None
+                else {"enabled": False}
+            ),
+            "runtime_v2": (
+                runtime_v2.metadata()
+                if runtime_v2 is not None
                 else {"enabled": False}
             ),
             "visual_route": visual_route_plugin.metadata(),

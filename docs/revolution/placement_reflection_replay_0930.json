@@ -1,0 +1,336 @@
+{
+  "cases": [
+    {
+      "run_dir": "/root/autodl-tmp/Show-Harness/rollouts/libero_clean_qwen3vl_verified_capability_runtime_v22/run_6e9a0808aeb8/LIBERO-LIBERO_OBJECT-2/0930/task_0/00-52-57",
+      "frame_id": 170,
+      "contact_candidate": true,
+      "contact_or_stall": false,
+      "panel_meta": {
+        "frame_ids": [
+          151,
+          169,
+          170
+        ],
+        "refs": [
+          "images/raw_agentview/0151.png",
+          "images/raw_wrist/0151.png",
+          "images/raw_agentview/0169.png",
+          "images/raw_wrist/0169.png",
+          "images/raw_agentview/0170.png",
+          "images/raw_wrist/0170.png"
+        ],
+        "panel_sha256": "7ac1dbaf77f603d5600f121cb8b24bafb80a1fb763e71e06a56ac18b3f85739f",
+        "panel_shape": [
+          768,
+          512,
+          3
+        ]
+      },
+      "legacy": {
+        "relation": "RIM_CONTACT",
+        "decision": "UNKNOWN",
+        "recovery_action": "HOLD",
+        "reasoning": "The salad dressing is held directly above the basket's opening with its rim in contact, indicating alignment for placement.",
+        "raw_text": "{\"reasoning\": \"The salad dressing is held directly above the basket's opening with its rim in contact, indicating alignment for placement.\", \"relation\": \"RIM_CONTACT\"}",
+        "latency_s": 1.331,
+        "usage": {
+          "prompt_tokens": 1051,
+          "total_tokens": 1085,
+          "completion_tokens": 34,
+          "prompt_tokens_details": null
+        },
+        "scene_description": null,
+        "first_latency_s": null,
+        "first_usage": null
+      },
+      "off": {
+        "relation": "ABOVE_UNALIGNED",
+        "decision": "UNKNOWN",
+        "recovery_action": "HOLD",
+        "reasoning": "The salad dressing is held above the basket but not aligned for safe placement, with its footprint not fully contained within the basket's opening.",
+        "raw_text": "{\"reasoning\": \"The salad dressing is held above the basket but not aligned for safe placement, with its footprint not fully contained within the basket's opening.\", \"relation\": \"ABOVE_UNALIGNED\"}",
+        "latency_s": 1.614,
+        "usage": {
+          "prompt_tokens": 1512,
+          "total_tokens": 1553,
+          "completion_tokens": 41,
+          "prompt_tokens_details": null
+        },
+        "scene_description": null,
+        "first_latency_s": null,
+        "first_usage": null
+      },
+      "single": {
+        "relation": "ABOVE_UNALIGNED",
+        "decision": "UNKNOWN",
+        "recovery_action": "HOLD",
+        "reasoning": "The salad dressing is held above the basket but not aligned for stable placement, with its footprint not fully contained within the basket's opening.",
+        "raw_text": "{\"reasoning\": \"The salad dressing is held above the basket but not aligned for stable placement, with its footprint not fully contained within the basket's opening.\", \"relation\": \"ABOVE_UNALIGNED\"}",
+        "latency_s": 1.549,
+        "usage": {
+          "prompt_tokens": 1760,
+          "total_tokens": 1801,
+          "completion_tokens": 41,
+          "prompt_tokens_details": null
+        },
+        "scene_description": null,
+        "first_latency_s": null,
+        "first_usage": null
+      },
+      "double": {
+        "relation": "ABOVE_UNALIGNED",
+        "decision": "UNKNOWN",
+        "recovery_action": "HOLD",
+        "reasoning": "The object is still held and not yet seated in the basket, with its footprint above the rim and no clear rim contact or stable seating.",
+        "raw_text": "{\"reasoning\": \"The object is still held and not yet seated in the basket, with its footprint above the rim and no clear rim contact or stable seating.\", \"relation\": \"ABOVE_UNALIGNED\"}",
+        "latency_s": 1.284,
+        "usage": {
+          "prompt_tokens": 1806,
+          "total_tokens": 1848,
+          "completion_tokens": 42,
+          "prompt_tokens_details": null
+        },
+        "scene_description": {
+          "held_object": "UNKNOWN",
+          "opening": "basket",
+          "relative_position": "UNKNOWN",
+          "contact_or_support": "UNKNOWN",
+          "action_effect": "UNKNOWN",
+          "uncertainty": "high",
+          "evidence_frame_ids": [
+            151,
+            169,
+            170
+          ]
+        },
+        "first_latency_s": 2.16,
+        "first_usage": {
+          "prompt_tokens": 806,
+          "total_tokens": 879,
+          "completion_tokens": 73,
+          "prompt_tokens_details": null
+        }
+      }
+    },
+    {
+      "run_dir": "/root/autodl-tmp/Show-Harness/rollouts/libero_clean_qwen3vl_verified_capability_runtime_v22/run_de31988be086/LIBERO-LIBERO_OBJECT-2/0930/task_0/01-13-01",
+      "frame_id": 138,
+      "contact_candidate": false,
+      "contact_or_stall": false,
+      "panel_meta": {
+        "frame_ids": [
+          137,
+          138
+        ],
+        "refs": [
+          "images/raw_agentview/0137.png",
+          "images/raw_wrist/0137.png",
+          "images/raw_agentview/0138.png",
+          "images/raw_wrist/0138.png"
+        ],
+        "panel_sha256": "f7ebd16cb2c50e782e41a897d8e1017f0fa4cd4ff08e6251a4d8f180ddc0829f",
+        "panel_shape": [
+          512,
+          512,
+          3
+        ]
+      },
+      "legacy": {
+        "relation": "ABOVE_UNALIGNED",
+        "decision": "UNKNOWN",
+        "recovery_action": "HOLD",
+        "reasoning": "The salad dressing is held above the basket with no visible rim contact or stable seating, and its footprint is not contained within the basket opening.",
+        "raw_text": "{\"reasoning\": \"The salad dressing is held above the basket with no visible rim contact or stable seating, and its footprint is not contained within the basket opening.\", \"relation\": \"ABOVE_UNALIGNED\"}",
+        "latency_s": 1.228,
+        "usage": {
+          "prompt_tokens": 1071,
+          "total_tokens": 1113,
+          "completion_tokens": 42,
+          "prompt_tokens_details": null
+        },
+        "scene_description": null,
+        "first_latency_s": null,
+        "first_usage": null
+      },
+      "off": {
+        "relation": "ABOVE_UNALIGNED",
+        "decision": "UNKNOWN",
+        "recovery_action": "HOLD",
+        "reasoning": "The salad dressing is held above the basket but not aligned for safe placement, with its footprint not yet seated in the opening.",
+        "raw_text": "{\"reasoning\": \"The salad dressing is held above the basket but not aligned for safe placement, with its footprint not yet seated in the opening.\", \"relation\": \"ABOVE_UNALIGNED\"}",
+        "latency_s": 1.166,
+        "usage": {
+          "prompt_tokens": 1375,
+          "total_tokens": 1414,
+          "completion_tokens": 39,
+          "prompt_tokens_details": null
+        },
+        "scene_description": null,
+        "first_latency_s": null,
+        "first_usage": null
+      },
+      "single": {
+        "relation": "ABOVE_UNALIGNED",
+        "decision": "UNKNOWN",
+        "recovery_action": "HOLD",
+        "reasoning": "The salad dressing is held above the basket but not aligned for stable placement, with its footprint not yet seated in the receptacle.",
+        "raw_text": "{\"reasoning\": \"The salad dressing is held above the basket but not aligned for stable placement, with its footprint not yet seated in the receptacle.\", \"relation\": \"ABOVE_UNALIGNED\"}",
+        "latency_s": 1.241,
+        "usage": {
+          "prompt_tokens": 1495,
+          "total_tokens": 1535,
+          "completion_tokens": 40,
+          "prompt_tokens_details": null
+        },
+        "scene_description": null,
+        "first_latency_s": null,
+        "first_usage": null
+      },
+      "double": {
+        "relation": "ABOVE_UNALIGNED",
+        "decision": "UNKNOWN",
+        "recovery_action": "HOLD",
+        "reasoning": "The salad dressing is still held above the basket and not yet seated or aligned for placement.",
+        "raw_text": "{\"reasoning\": \"The salad dressing is still held above the basket and not yet seated or aligned for placement.\", \"relation\": \"ABOVE_UNALIGNED\"}",
+        "latency_s": 1.243,
+        "usage": {
+          "prompt_tokens": 1537,
+          "total_tokens": 1569,
+          "completion_tokens": 32,
+          "prompt_tokens_details": null
+        },
+        "scene_description": {
+          "held_object": "UNKNOWN",
+          "opening": "UNKNOWN",
+          "relative_position": "UNKNOWN",
+          "contact_or_support": "UNKNOWN",
+          "action_effect": "UNKNOWN",
+          "uncertainty": "high",
+          "evidence_frame_ids": [
+            137,
+            138
+          ]
+        },
+        "first_latency_s": 2.331,
+        "first_usage": {
+          "prompt_tokens": 591,
+          "total_tokens": 659,
+          "completion_tokens": 68,
+          "prompt_tokens_details": null
+        }
+      }
+    },
+    {
+      "run_dir": "/root/autodl-tmp/Show-Harness/rollouts/libero_clean_qwen3vl_verified_capability_runtime_v22/run_32852afad823/LIBERO-LIBERO_OBJECT-2/0930/task_0/01-24-22",
+      "frame_id": 178,
+      "contact_candidate": true,
+      "contact_or_stall": false,
+      "panel_meta": {
+        "frame_ids": [
+          166,
+          177,
+          178
+        ],
+        "refs": [
+          "images/raw_agentview/0166.png",
+          "images/raw_wrist/0166.png",
+          "images/raw_agentview/0177.png",
+          "images/raw_wrist/0177.png",
+          "images/raw_agentview/0178.png",
+          "images/raw_wrist/0178.png"
+        ],
+        "panel_sha256": "3145abf57a1d79bc8bc07007526acf5ca4360df647a552f95b734508c86d371c",
+        "panel_shape": [
+          768,
+          512,
+          3
+        ]
+      },
+      "legacy": {
+        "relation": "ABOVE_UNALIGNED",
+        "decision": "UNKNOWN",
+        "recovery_action": "HOLD",
+        "reasoning": "The salad dressing is held above the basket but not aligned for safe placement, with no visible rim contact or seated support.",
+        "raw_text": "{\"reasoning\": \"The salad dressing is held above the basket but not aligned for safe placement, with no visible rim contact or seated support.\", \"relation\": \"ABOVE_UNALIGNED\"}",
+        "latency_s": 1.46,
+        "usage": {
+          "prompt_tokens": 1035,
+          "total_tokens": 1073,
+          "completion_tokens": 38,
+          "prompt_tokens_details": null
+        },
+        "scene_description": null,
+        "first_latency_s": null,
+        "first_usage": null
+      },
+      "off": {
+        "relation": "ABOVE_UNALIGNED",
+        "decision": "UNKNOWN",
+        "recovery_action": "HOLD",
+        "reasoning": "The salad dressing is held above the basket but not aligned for safe placement, with its footprint not yet seated in the opening.",
+        "raw_text": "{\"reasoning\": \"The salad dressing is held above the basket but not aligned for safe placement, with its footprint not yet seated in the opening.\", \"relation\": \"ABOVE_UNALIGNED\"}",
+        "latency_s": 1.519,
+        "usage": {
+          "prompt_tokens": 1495,
+          "total_tokens": 1534,
+          "completion_tokens": 39,
+          "prompt_tokens_details": null
+        },
+        "scene_description": null,
+        "first_latency_s": null,
+        "first_usage": null
+      },
+      "single": {
+        "relation": "ABOVE_UNALIGNED",
+        "decision": "UNKNOWN",
+        "recovery_action": "HOLD",
+        "reasoning": "The salad dressing is held above the basket but not aligned for stable placement, with its footprint not fully contained within the basket's opening.",
+        "raw_text": "{\"reasoning\": \"The salad dressing is held above the basket but not aligned for stable placement, with its footprint not fully contained within the basket's opening.\", \"relation\": \"ABOVE_UNALIGNED\"}",
+        "latency_s": 1.536,
+        "usage": {
+          "prompt_tokens": 1743,
+          "total_tokens": 1784,
+          "completion_tokens": 41,
+          "prompt_tokens_details": null
+        },
+        "scene_description": null,
+        "first_latency_s": null,
+        "first_usage": null
+      },
+      "double": {
+        "relation": "ABOVE_UNALIGNED",
+        "decision": "UNKNOWN",
+        "recovery_action": "HOLD",
+        "reasoning": "The salad dressing is still held above the basket and not yet seated or contained within the opening.",
+        "raw_text": "{\"reasoning\": \"The salad dressing is still held above the basket and not yet seated or contained within the opening.\", \"relation\": \"ABOVE_UNALIGNED\"}",
+        "latency_s": 1.305,
+        "usage": {
+          "prompt_tokens": 1789,
+          "total_tokens": 1822,
+          "completion_tokens": 33,
+          "prompt_tokens_details": null
+        },
+        "scene_description": {
+          "held_object": "UNKNOWN",
+          "opening": "UNKNOWN",
+          "relative_position": "UNKNOWN",
+          "contact_or_support": "UNKNOWN",
+          "action_effect": "UNKNOWN",
+          "uncertainty": "high",
+          "evidence_frame_ids": [
+            166,
+            177,
+            178
+          ]
+        },
+        "first_latency_s": 2.753,
+        "first_usage": {
+          "prompt_tokens": 805,
+          "total_tokens": 878,
+          "completion_tokens": 73,
+          "prompt_tokens_details": null
+        }
+      }
+    }
+  ]
+}
