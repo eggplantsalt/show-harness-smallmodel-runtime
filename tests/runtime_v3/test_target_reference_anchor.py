@@ -77,7 +77,7 @@ class _Environment:
         self.sim = SimpleNamespace(model=model, data=data)
 
 
-def _observer(*, masks=None, evidence_rows=None):
+def _observer(*, masks=None, evidence_rows=None, scene_ready_required=False):
     mask_a = np.zeros((64, 64), dtype=bool)
     mask_a[20:30, 20:30] = True
     mask_b = np.zeros_like(mask_a)
@@ -88,6 +88,7 @@ def _observer(*, masks=None, evidence_rows=None):
         move_vectors={"MV_FWD": (1, 0, 0), "MV_BACK": (-1, 0, 0),
                       "MV_LEFT": (0, 1, 0), "MV_RIGHT": (0, -1, 0),
                       "MV_UP": (0, 0, 1), "MV_DOWN": (0, 0, -1)},
+        scene_ready_required=scene_ready_required,
     )
     return observer, _Environment()
 
@@ -133,6 +134,38 @@ def test_new_sam_observations_do_not_move_reference_anchor():
     observer.observe(env)
     assert observer.last_segmentation.centroid_px != frozen
     assert observer.reference_anchor.reference_point_px == frozen
+
+
+def test_scene_ready_gate_defers_reference_until_three_stable_visual_observations():
+    mask = np.zeros((64, 64), dtype=bool)
+    mask[20:30, 20:30] = True
+    observer, env = _observer(masks=[mask, mask, mask], scene_ready_required=True)
+    first = observer.observe(env)
+    second = observer.observe(env)
+    assert observer.reference_anchor is None
+    assert first.evidence["object_relative_state"].scene_ready is False
+    assert second.evidence["object_relative_state"].scene_ready is False
+    third = observer.observe(env)
+    assert observer.scene_ready is True
+    assert observer.reference_anchor is not None and observer.reference_anchor.valid
+    assert observer.reference_anchor.source_frame_id == third.frame_id
+    assert third.evidence["object_relative_state"].scene_ready_gate_enabled is True
+
+
+def test_scene_ready_gate_is_an_initialization_gate_not_a_target_motion_detector():
+    mask_a = np.zeros((64, 64), dtype=bool)
+    mask_a[20:30, 20:30] = True
+    mask_b = np.zeros_like(mask_a)
+    mask_b[28:38, 20:30] = True
+    observer, env = _observer(masks=[mask_a, mask_a, mask_a, mask_b],
+                              scene_ready_required=True)
+    for _ in range(3):
+        observer.observe(env)
+    assert observer.scene_ready
+    observer.observe(env)
+    assert observer.scene_ready
+    assert observer.reference_anchor is not None
+    assert observer.reference_anchor.valid is True
 
 
 def test_post_sam_centroid_is_diagnostic_while_runtime_error_uses_frozen_reference():

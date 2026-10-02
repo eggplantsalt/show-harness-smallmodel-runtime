@@ -30,6 +30,8 @@ class ObjectRelativeState:
     target_reference_valid: bool = False
     target_reference_camera: Optional[str] = None
     target_reference_invalidation_reason: Optional[str] = None
+    scene_ready: bool = True
+    scene_ready_gate_enabled: bool = False
 
 
 @dataclass(frozen=True)
@@ -175,4 +177,6 @@ def _object_relative_state(value: Any) -> Optional[ObjectRelativeState]:
             str(value["target_reference_invalidation_reason"])
             if value.get("target_reference_invalidation_reason") is not None else None
         ),
+        scene_ready=bool(value.get("scene_ready", True)),
+        scene_ready_gate_enabled=bool(value.get("scene_ready_gate_enabled", False)),
     )

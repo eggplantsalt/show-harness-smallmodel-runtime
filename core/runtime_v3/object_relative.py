@@ -21,6 +21,7 @@ from core.capabilities.camera_geometry import (
 from .canonical_image import CanonicalImageAdapter
 from .observer import RobotObservation
 from .options import BoundedMicroMotionSpec, PrimitiveCommand, RuntimeOption
+from .scene_settling import SceneReadyEvidence
 from .state import BeliefState, ObjectRelativeState
 
 
@@ -610,6 +611,7 @@ class ObjectRelativePerceptionObserver:
         move_vectors: Mapping[str, Sequence[float]],
         confidence_threshold: float = SAM3_CONFIDENCE_THRESHOLD,
         canonical_image_adapter: CanonicalImageAdapter | None = None,
+        scene_ready_required: bool = False,
     ) -> None:
         self.base_observer = base_observer
         self.sam3 = sam3
@@ -618,6 +620,8 @@ class ObjectRelativePerceptionObserver:
         self.move_vectors = {str(key): tuple(float(v) for v in value)
                              for key, value in move_vectors.items()}
         self.canonical_image_adapter = canonical_image_adapter or CanonicalImageAdapter()
+        self.scene_ready_required = bool(scene_ready_required)
+        self.scene_ready_evidence = SceneReadyEvidence() if self.scene_ready_required else None
         self.identity_anchor: TargetIdentityAnchor | None = None
         self.reference_anchor: TargetReferenceAnchor | None = None
         self._camera_signature: tuple[Any, ...] | None = None
@@ -627,6 +631,10 @@ class ObjectRelativePerceptionObserver:
         self.last_calibration: CameraCalibration | None = None
         self.last_resolution: dict[str, Any] = {}
         self.perception_history: list[dict[str, Any]] = []
+
+    @property
+    def scene_ready(self) -> bool:
+        return (self.scene_ready_evidence.ready if self.scene_ready_evidence is not None else True)
 
     def invalidate_target_reference(self, reason: str) -> None:
         """Invalidate the active reference; it cannot be re-established implicitly."""
@@ -668,6 +676,9 @@ class ObjectRelativePerceptionObserver:
         if self._reference_reground_requested:
             self.identity_anchor = None
             self.reference_anchor = None
+            if self.scene_ready_evidence is not None:
+                self.scene_ready_evidence.reset()
+            self._reference_reground_requested = False
         if self.identity_anchor is None:
             self.identity_anchor = make_target_identity_anchor(
                 candidate_segmentation,
@@ -748,19 +759,43 @@ class ObjectRelativePerceptionObserver:
         )
         if invalidation_reason is not None:
             self.invalidate_target_reference(invalidation_reason)
+            if self.scene_ready_evidence is not None:
+                self.scene_ready_evidence.reset()
         self._camera_signature = current_camera_signature
+
+        scene_was_ready = self.scene_ready
+        if self.scene_ready_evidence is not None and not scene_was_ready:
+            scene_is_ready = self.scene_ready_evidence.update(
+                target_identity_status=segmentation.identity_status,
+                centroid_px=segmentation.centroid_px,
+                bbox_xyxy=segmentation.bbox_xyxy,
+                mask_area_px=segmentation.area_px,
+            )
+            if (scene_is_ready and segmentation.visible
+                    and current_camera_signature is not None):
+                # Promote the most recent associated mask only after its visual
+                # position, bbox and area passed the measured stable-window gate.
+                settled_anchor = make_target_identity_anchor(
+                    segmentation, target_phrase=self.target_phrase, frame_id=base.frame_id,
+                )
+                if settled_anchor is None:
+                    self.scene_ready_evidence.reset()
+                    scene_is_ready = False
+                else:
+                    self.identity_anchor = settled_anchor
 
         # The initial identity association establishes the reference exactly once.
         # A later SAM centroid is never allowed to replace it. Re-grounding has an
         # explicit API so the caller must opt into a new identity/reference epoch.
         if (self.reference_anchor is None and self.identity_anchor is not None
                 and segmentation.visible and current_camera_signature is not None):
-            self.reference_anchor = make_target_reference_anchor(
-                self.identity_anchor,
-                camera=calibration.name,
-                camera_signature=current_camera_signature,
-            )
-            self._reference_reground_requested = False
+            if self.scene_ready:
+                self.reference_anchor = make_target_reference_anchor(
+                    self.identity_anchor,
+                    camera=calibration.name,
+                    camera_signature=current_camera_signature,
+                )
+                self._reference_reground_requested = False
         reference_valid = bool(self.reference_anchor and self.reference_anchor.valid)
         reference_point = (self.reference_anchor.reference_point_px if reference_valid else None)
         workspace = base.evidence.get("relevant_geometry", {}).get("workspace_z_bounds_m")
@@ -811,6 +846,8 @@ class ObjectRelativePerceptionObserver:
             target_reference_invalidation_reason=(
                 self.reference_anchor.invalidation_reason if self.reference_anchor else None
             ),
+            scene_ready=self.scene_ready,
+            scene_ready_gate_enabled=self.scene_ready_required,
         )
         self.perception_history.append({
             "image": image.copy(),
@@ -823,6 +860,10 @@ class ObjectRelativePerceptionObserver:
             "camera_signature": current_camera_signature,
             "reference_invalidation_signals": signals,
             "reference_epoch_reset_reason": self._last_reference_invalidation_reason,
+            "scene_ready": self.scene_ready,
+            "scene_ready_gate_enabled": self.scene_ready_required,
+            "scene_ready_evidence": (self.scene_ready_evidence.to_record()
+                                     if self.scene_ready_evidence is not None else None),
             "resolution": dict(geometry),
             "dynamic_sam_error_px": dynamic_sam_error,
             "object_relative_state": relative,
@@ -851,6 +892,10 @@ class ObjectRelativePerceptionObserver:
             "sam3_candidate_count": len(segmentation.candidates),
             "target_identity_status": segmentation.identity_status,
             "target_identity_association": segmentation.association_metrics,
+            "scene_ready": self.scene_ready,
+            "scene_ready_gate_enabled": self.scene_ready_required,
+            "scene_ready_evidence": (self.scene_ready_evidence.to_record()
+                                     if self.scene_ready_evidence is not None else None),
         })
         if not segmentation.visible:
             merged_geometry["object_relative_alignment_valid"] = False

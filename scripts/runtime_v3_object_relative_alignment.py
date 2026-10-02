@@ -37,6 +37,7 @@ from core.runtime_v3.object_relative import (
     ObjectRelativePerceptionObserver,
 )
 from core.runtime_v3.runner import RuntimeV3Runner
+from core.runtime_v3.scene_initialization import run_scene_ready_holds
 from core.runtime_v3.selector import DeterministicSelector
 from core.runtime_v3.state import StateBuilder
 from core.runtime_v3.temporal_calibration import run_v3_tick
@@ -275,6 +276,8 @@ def _run_trial(
     oracle_before: dict[str, Any] | None = None
     oracle_after: dict[str, Any] | None = None
     pre_action_ready_record: dict[str, Any] | None = None
+    formal_initial_frame: dict[str, Any] | None = None
+    scene_ready_result: dict[str, Any] | None = None
     environment = LiberoEnvironmentAdapter.create(
         suite_name=SUITE,
         task_id=TASK_ID,
@@ -324,10 +327,18 @@ def _run_trial(
             sam3,
             target_phrase=TARGET_PHRASE,
             move_vectors=config["move_vectors"],
+            scene_ready_required=True,
         )
+        scene_ready_result = run_scene_ready_holds(
+            environment, observer, controller, task_id=f"{SUITE}:{TASK_ID}",
+            commanded_step_m=CONTROL_TICK_MM / 1000.0,
+            workspace_z_bounds_m=workspace, max_hold_ticks=40,
+        )
+        if not scene_ready_result.get("ready") or not observer.scene_ready:
+            raise RuntimeError(f"visual SceneReady was not established: {scene_ready_result}")
 
         def write_pre_action_ready(state, options, selection) -> None:
-            nonlocal oracle_before, pre_action_ready_record
+            nonlocal oracle_before, pre_action_ready_record, formal_initial_frame
             _ensure_output_writable(trial_dir)
             _ensure_output_writable(artifacts_dir)
             if (state.object_relative_state is None
@@ -341,6 +352,7 @@ def _run_trial(
             if not observer.perception_history:
                 raise RuntimeError("pre-action perception artifacts are unavailable")
             initial_frame = observer.perception_history[-1]
+            formal_initial_frame = initial_frame
             selected_direction = selected.primitive.micro_motion_spec.direction
             before_artifacts.update(observer.save_visual_artifacts(
                 str(artifacts_dir), image=initial_frame["image"], prefix="before",
@@ -362,6 +374,9 @@ def _run_trial(
                 "predicted_eef_projection_px": (chosen.get("hypothetical_projection_px")
                                                  if chosen else None),
                 "before_artifacts": dict(before_artifacts),
+                "scene_ready": observer.scene_ready,
+                "scene_ready_evidence": (observer.scene_ready_evidence.to_record()
+                                          if observer.scene_ready_evidence else None),
                 "logger_writable": True,
                 "artifact_variables_initialized": True,
                 "oracle_target_pose_diagnostic_only": oracle_before,
@@ -394,7 +409,7 @@ def _run_trial(
         oracle_after = _oracle_target_world_position(environment)
         event = events[0] if events else {}
         history = observer.perception_history
-        initial = history[0] if history else None
+        initial = formal_initial_frame or (history[0] if history else None)
         final = history[-1] if len(history) > 1 else None
         if initial is not None and not before_artifacts:
             before_artifacts = observer.save_visual_artifacts(
@@ -523,6 +538,7 @@ def _run_trial(
             "init_state_index": init_state_index,
             "pre_settle_hold_ticks": PRE_SETTLE_TICKS,
             "pre_settle_cycles": pre_settle,
+            "scene_ready_initialization": scene_ready_result,
             "source_resolution_before": {
                 "agentview": ([int(initial["image"].shape[1]), int(initial["image"].shape[0])]
                               if initial else None),
@@ -637,6 +653,8 @@ def _run_trial(
             "observed_eef_pixel_shift": observed_eef_shift,
             "geometry_direction_consistent": geometry_consistent,
             "pre_action_ready": bool(pre_action_ready_record),
+            "scene_ready_before_anchor": bool(pre_action_ready_record and pre_action_ready_record.get("scene_ready")),
+            "scene_ready_evidence": (pre_action_ready_record or {}).get("scene_ready_evidence"),
             "pre_action_ready_record": (str(trial_dir / "PRE_ACTION_READY.json")
                                          if pre_action_ready_record else None),
             "oracle_target_motion_diagnostic": {
