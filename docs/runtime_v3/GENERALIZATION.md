@@ -65,8 +65,12 @@ transfer failure.
 
 ## Experimental status
 
-Implementation and the task manifest are frozen before formal rollout. The
-formal Stage A result and same-commit audit are recorded here after execution.
-Stage B Qwen binding is gated on the observed Stage A result and a working local
-Qwen endpoint. Qwen may output only semantic entity binding; it never selects a
-physical direction or scale.
+The task manifest is frozen. The first formal attempt at commit `253afeb` is
+preserved locally at
+`rollouts/runtime_v3_cross_object_alignment/run_20261003T082839Z_bac7770d`, but
+is invalid as transfer evidence: approval tracing raised `NameError: uuid is
+not defined` before Executor invocation. No physical actions occurred. The
+failure was discovered after the frozen run ended; a corrected implementation
+commit and fresh run are required. Qwen binding remains gated on a valid Stage A
+result and a working local Qwen endpoint. Qwen may output only semantic entity
+binding; it never selects a physical direction or scale.

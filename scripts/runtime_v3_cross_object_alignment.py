@@ -94,9 +94,11 @@ def _failure_layer(reason: str | None) -> str | None:
         return "PERCEPTION_FAILURE"
     if "NO_POSITIVE_OPTION" in value or "NO_VALID" in value:
         return "NO_VALID_PHYSICAL_OPTION"
+    if "ARBITER" in value or "AUTHORIZATION" in value:
+        return "ARBITER_AUTHORIZATION_FAILURE"
     if "EXECUTION" in value or "EXECUTOR" in value:
         return "PHYSICAL_EXECUTION_FAILURE"
-    if "EFFECT_NOT_IMPROVED" in value or "EFFECT_VERIFICATION" in value:
+    if "EFFECT_NOT_IMPROVED" in value or "EFFECT_NOT_OBSERVED" in value or "EFFECT_VERIFICATION" in value:
         return "EFFECT_VERIFICATION_FAILURE"
     return "UNCLASSIFIED_FAILURE"
 
@@ -115,7 +117,7 @@ def _episode_layers(episode: Mapping[str, Any]) -> list[str]:
     layer = _failure_layer(episode.get("error") or episode.get("termination_reason"))
     if layer:
         layers.append(layer)
-    return layers
+    return list(dict.fromkeys(layers))
 
 
 def _task_metrics(episodes: Sequence[Mapping[str, Any]]) -> dict[str, Any]:

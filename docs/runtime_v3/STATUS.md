@@ -19,8 +19,15 @@
   same-code expansion to states 3–5 only after a 3/3 positive initial gate.
   Simulator target-pose diagnostics are disabled for these runs.
 - `PYTHONPATH=. /root/autodl-tmp/OpenETA/sim/venvs/libero/bin/python -m pytest -q tests/runtime_v3`: 208 passed.
-- Formal Stage A and Qwen semantic binding results: pending execution after the
-  first implementation commit.
+- First Stage A attempt at `253afeb` is retained at
+  `rollouts/runtime_v3_cross_object_alignment/run_20261003T082839Z_bac7770d`,
+  but is invalid as transfer evidence: the harness raised `NameError: uuid is
+  not defined` after PRE_ACTION_READY, so no ALIGN action was executed. The
+  failure was found after the frozen run completed; the code was not changed
+  between task rollouts. A corrected frozen rerun is required before judgment.
+- `tests/runtime_v3` now has 209 tests, including a regression test for
+  approval trace creation and unique per-episode failure taxonomy counts.
+- Corrected formal Stage A and Qwen semantic binding results: pending.
 
 ## M3.5 observation boundary and deployable metric depth (2026-10-03)
 

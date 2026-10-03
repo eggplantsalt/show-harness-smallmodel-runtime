@@ -8,6 +8,7 @@ import json
 import math
 import os
 import sys
+import uuid
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 from urllib.parse import urlparse
@@ -107,8 +108,9 @@ class ExperimentArbiter(Arbiter):
         decision = super().authorize(state, options, selection)
         if (decision.kind == DecisionKind.APPROVED and decision.action is not None
                 and decision.action.option_id in {SEMANTIC_OPTION_ID, "CALIBRATE_BOUNDED_MOTION"}):
+            trace_id = uuid.uuid4().hex
             self.approval_count += 1
-            self.last_approval_trace_id = uuid.uuid4().hex
+            self.last_approval_trace_id = trace_id
         return decision
 
 
@@ -489,6 +491,11 @@ def run_stage_b_episode(*, init_state: int, run_dir: Path, config: Mapping[str, 
             if not events:
                 state = result.get("state") or runner.state
                 termination = (_state_stop_reason(state) if state is not None else None) or result.get("status", "EXECUTION_FAILED")
+                ready_path = steps_dir / f"step_{step_index:02d}/PRE_ACTION_READY.json"
+                try:
+                    ready_record = json.loads(ready_path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    ready_record = {}
                 current_error = error_from_state(state) if state is not None else None
                 if initial_error is None:
                     initial_error = current_error
@@ -496,9 +503,14 @@ def run_stage_b_episode(*, init_state: int, run_dir: Path, config: Mapping[str, 
                 frame = observer.perception_history[-1] if observer.perception_history else None
                 relative = state.object_relative_state if state is not None else None
                 lattice = candidate_lattice_records(
-                    state.relevant_geometry.get("candidate_lattice", []) if state else [])
+                    state.relevant_geometry.get("candidate_lattice", []) if state else [],
+                    state.relevant_geometry.get("chosen_lattice_candidate") if state else None,
+                )
                 row = {"alignment_step": step_index, "executed": False,
                        "termination_reason": termination,
+                       "runner_result_status": result.get("status"),
+                       "runner_result_reason": result.get("reason"),
+                       "runner_decision": result.get("decision"),
                        "task_id": task_id,
                        "task_instruction": environment.task_description,
                        "entity_key": entity_spec.key,
@@ -508,6 +520,8 @@ def run_stage_b_episode(*, init_state: int, run_dir: Path, config: Mapping[str, 
                                               in {"ANCHORED", "SAME_TARGET"}),
                        "identity_status": relative.target_identity_status if relative else None,
                        "reference_valid": bool(relative and relative.target_reference_valid),
+                       "selected_direction": ready_record.get("selected_direction"),
+                       "selected_scale_m": ready_record.get("selected_scale_m"),
                        "scene_ready": bool(relative and relative.scene_ready),
                        "error_before_px": current_error,
                        "candidate_lattice": lattice,

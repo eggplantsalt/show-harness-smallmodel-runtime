@@ -4,9 +4,12 @@ from pathlib import Path
 import pytest
 
 from core.runtime_v3.object_relative import MultiScaleAlignmentOptionGenerator
+from core.runtime_v3.arbiter import DecisionKind
+from core.runtime_v3.selector import Selection
 from core.runtime_v3.state import BeliefState, ObjectRelativeState, RuntimeEntityState, StateBuilder
 from core.runtime_v3.task_spec import EntitySpec, GoalKind, ReferenceTaskCompiler, TaskSpec
-from scripts.runtime_v3_cross_object_alignment import _failure_layer
+from scripts.runtime_v3_multiscale_alignment import ExperimentArbiter
+from scripts.runtime_v3_cross_object_alignment import _episode_layers, _failure_layer
 
 
 def _bound_state(key: str, phrase: str, direction: str = "DOWN") -> BeliefState:
@@ -19,6 +22,7 @@ def _bound_state(key: str, phrase: str, direction: str = "DOWN") -> BeliefState:
     geometry = {
         "camera_projection_valid": True,
         "workspace_valid": True,
+        "workspace_z_bounds_m": (-1.0, 1.0),
         "multiscale_alignment_valid": True,
         "pixel_error_before_px": 28.2842712475,
         "chosen_lattice_candidate": {
@@ -30,6 +34,7 @@ def _bound_state(key: str, phrase: str, direction: str = "DOWN") -> BeliefState:
     }
     return BeliefState(
         task_id="benchmark:fixture", frame_id=3, runtime_entity_state=entity,
+        observation_fresh=True, end_effector_state={"position_xyz": (0.0, 0.0, 0.0)},
         object_relative_state=relative, relevant_geometry=geometry,
         evidence_refs=("frame:3",),
     )
@@ -100,6 +105,16 @@ def test_runtime_alignment_option_uses_entity_key_and_same_contract_for_multiple
     assert all("target_phrase" not in item.expected_effect for item in realized)
 
 
+def test_experiment_arbiter_records_an_id_for_each_approved_alignment():
+    state = _bound_state("target", "milk")
+    option = MultiScaleAlignmentOptionGenerator().generate(state)[0]
+    arbiter = ExperimentArbiter()
+    decision = arbiter.authorize(state, [option], Selection(option.option_id))
+    assert decision.kind is DecisionKind.APPROVED
+    assert arbiter.approval_count == 1
+    assert arbiter.last_approval_trace_id
+
+
 def test_runtime_physical_modules_have_no_selected_task_or_object_special_cases():
     root = Path(__file__).resolve().parents[2]
     physical_paths = (
@@ -161,3 +176,8 @@ def test_failure_taxonomy_keeps_scene_and_perception_failures_distinct():
     assert _failure_layer("SAM3 segmentation failed") == "PERCEPTION_FAILURE"
     assert _failure_layer("bounded Executor execution failed") == "PHYSICAL_EXECUTION_FAILURE"
     assert _failure_layer("TRIAL_FAILED") == "UNCLASSIFIED_FAILURE"
+    assert _failure_layer("ARBITER_REJECTED") == "ARBITER_AUTHORIZATION_FAILURE"
+    assert _episode_layers({
+        "failure_layer": "SCENE_NOT_READY", "termination_reason": "TRIAL_FAILED",
+        "error": "SceneReady failed", "alignment_steps": [],
+    }) == ["SCENE_NOT_READY"]
