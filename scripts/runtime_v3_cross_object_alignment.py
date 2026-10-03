@@ -86,6 +86,12 @@ def _failure_layer(reason: str | None) -> str | None:
     compact = "".join(character for character in value if character.isalnum())
     if "INSTRUCTION" in value or "SEMANTIC" in value:
         return "SEMANTIC_BINDING_FAILURE"
+    if "SCENE_MOTION_NOT_READY" in value:
+        return "SCENE_MOTION_NOT_READY"
+    if "ENTITY_OBSERVATION_NOT_READY" in value:
+        return "ENTITY_OBSERVATION_NOT_READY"
+    if "SEMANTIC_GROUNDING_FAILURE" in value:
+        return "SEMANTIC_GROUNDING_FAILURE"
     if "SCENE_READY" in value or "SCENE_NOT_READY" in value or "SCENEREADY" in compact:
         return "SCENE_NOT_READY"
     if "IDENTITY" in value:

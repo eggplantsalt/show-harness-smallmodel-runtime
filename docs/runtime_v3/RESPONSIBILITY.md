@@ -13,6 +13,8 @@ Runtime V3 owns decisions that depend on measured geometry and physical limits:
   budget is exhausted, or the next tick would cross a workspace boundary.
 - applying the same ALIGN candidate generation/ranking and effect contract to
   any valid `RuntimeEntityState`, independent of its semantic phrase.
+- separating target-independent RGB scene motion from target-specific entity
+  observation stability before establishing identity/reference evidence.
 
 For a bounded micro-motion, the Arbiter approves one semantic option and seals
 its direction, displacement request, tick limit, starting EEF position, and
@@ -36,6 +38,15 @@ responsibilities include:
 
 Qwen receives option IDs and compact state. It does not receive controller
 tokens or an execution interface. Qwen is a bounded semantic decision maker.
+
+## Readiness evidence ownership
+
+`SceneMotionReady` owns only full-frame canonical RGB temporal differences.
+`EntityObservationReady` owns only normalized stability evidence from an
+associated SAM entity and its semantic grounding query. The query normalizer
+is a linguistic boundary adapter; it preserves the raw TaskSpec phrase and
+defines no object-specific aliases. Neither gate reads simulator pose, depth,
+contact, task identity, or task success.
 
 ## Selector evaluation interpretation
 

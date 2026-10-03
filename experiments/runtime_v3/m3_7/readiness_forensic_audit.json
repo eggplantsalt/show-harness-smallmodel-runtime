@@ -1,0 +1,153 @@
+{
+  "milestone": "M3.7 Generalized Readiness and Evidence Boundary",
+  "status": "FORENSIC_CLASSIFICATION_COMPLETE_BEFORE_RUNTIME_REFACTOR",
+  "branch_expected": "runtime-v3",
+  "diagnostic_run": "rollouts/runtime_v3_m3_7_readiness/run_20261003T095536Z_7f5f9f0b",
+  "capture_protocol": {
+    "suite": "LIBERO_OBJECT",
+    "seed": 0,
+    "init_state_index": 0,
+    "robot_ready_hold_ticks": 4,
+    "diagnostic_tail_hold_ticks": 80,
+    "tail_frames_per_task": 81,
+    "camera": "agentview",
+    "canonical_orientation": "vertical_flip",
+    "resolution": [512, 512],
+    "actions": "CALIBRATION_HOLD only",
+    "alignment_actions": 0,
+    "sam_during_simulator_capture": false,
+    "phrase_replays_are_offline_on_the_saved_rgb_frames": true,
+    "oracle_target_pose_passed_to_runtime": false
+  },
+  "sam_provenance": {
+    "service": "existing OpenETA SAM3 MCP service",
+    "backend_version": "sam3@ed70dd7",
+    "checkpoint": "/root/autodl-tmp/openeta-services/models/sam3/sam3.pt",
+    "confidence_threshold": 0.05,
+    "invalid_service_attempt": {
+      "path": "rollouts/runtime_v3_m3_7_readiness/run_20261003T095536Z_7f5f9f0b/task_0/sam/alphabet_soup/sam_trace.json",
+      "reason": "SAM3 was started without OPENETA_SAM3_CHECKPOINT_PATH and its default Hugging Face fetch returned 403 for the gated facebook/sam3 repository.",
+      "included_in_root_cause_counts": false
+    }
+  },
+  "cases": [
+    {
+      "case": "butter_reference",
+      "task_id": 6,
+      "phrase": "butter",
+      "classification": "PERCEPTION_JITTER",
+      "evidence": {
+        "oracle_tail_translation_median_m": 0.0,
+        "oracle_tail_translation_median_mm": 0.0,
+        "oracle_tail_translation_max_m": 0.0000012301,
+        "oracle_tail_net_translation_m": 0.0000012859,
+        "sam_frames_with_candidate": 1,
+        "sam_frames_without_candidate": 80,
+        "associated_frames": 1,
+        "identity_lost_frames": 79,
+        "old_scene_ready_within_40_holds": false
+      },
+      "interpretation": "The target is physically settled during the diagnostic tail, while SAM produces one anchor observation and then no associated target evidence; the old SceneReady gate times out on perception availability/continuity."
+    },
+    {
+      "case": "alphabet_soup_qwen_phrase",
+      "task_id": 0,
+      "phrase": "the alphabet soup",
+      "classification": "QUERY_SENSITIVITY",
+      "comparison_phrase": "alphabet soup",
+      "same_saved_rgb_frames": true,
+      "evidence": {
+        "frames": 81,
+        "qwen_phrase_candidate_frames": 0,
+        "qwen_phrase_associated_frames": 0,
+        "qwen_phrase_old_scene_ready": false,
+        "reference_phrase_candidate_frames": 81,
+        "reference_phrase_associated_frames": 81,
+        "reference_phrase_old_scene_ready_tail_tick": 9
+      },
+      "interpretation": "Removing the leading determiner materially changes grounding on identical images: the raw Qwen phrase yields no candidate, while the reference surface form yields a stable association."
+    },
+    {
+      "case": "alphabet_soup_reference_phrase",
+      "task_id": 0,
+      "phrase": "alphabet soup",
+      "classification": "UNRESOLVED",
+      "evidence": {
+        "oracle_target_tail_net_translation_m": 0.0003593,
+        "associated_mask_frames": 81,
+        "old_scene_ready_tail_tick": 9,
+        "selected_mask_bbox_xyxy": [107, 243, 151, 328],
+        "selected_mask_semantic_identity_on_visual_review": "neighboring Milk carton",
+        "lower_rank_candidate_bbox_xyxy": [253, 303, 299, 369],
+        "lower_rank_candidate_semantic_identity_on_visual_review": "alphabet soup can"
+      },
+      "interpretation": "The mask is stable but the selected top candidate is the neighboring Milk carton; therefore this control does not establish correct alphabet-soup grounding."
+    },
+    {
+      "case": "salad_dressing_control",
+      "task_id": 2,
+      "phrase": "salad dressing",
+      "classification": "TRUE_PHYSICAL_MOTION",
+      "evidence": {
+        "oracle_tail_max_per_tick_translation_mm": 36.4038,
+        "oracle_tail_net_translation_mm": 56.5906,
+        "oracle_motion_over_1mm_tail_ticks": [1, 2, 3],
+        "sam_associated_frames": 81,
+        "old_scene_ready_tail_tick": 6
+      },
+      "interpretation": "The object undergoes real settling motion during the first three post-RobotReady ticks; it is settled by the time the old mask gate reports ready."
+    },
+    {
+      "case": "milk_control",
+      "task_id": 7,
+      "phrase": "milk",
+      "classification": "TRUE_PHYSICAL_MOTION",
+      "evidence": {
+        "oracle_tail_max_per_tick_translation_mm": 40.86,
+        "oracle_tail_net_translation_mm": 38.3588,
+        "oracle_motion_over_1mm_tail_ticks": [1, 2],
+        "sam_associated_frames": 81,
+        "old_scene_ready_tail_tick": 5
+      },
+      "interpretation": "The object undergoes real settling motion during the first two post-RobotReady ticks; the old mask gate reports ready after physical motion has stopped."
+    }
+  ],
+  "old_scene_ready_judgment": {
+    "physical_scene_stability_conflated_with_target_perception_stability": "YES",
+    "evidence": "SceneReadyEvidence consumes only target identity status, centroid, bbox and mask area. Butter is physically static but times out when SAM evidence disappears; the article-bearing soup phrase has no candidates on the same frames where the reference phrase stabilizes. The gate has no target-independent scene-motion input."
+  },
+  "development_only_scene_motion_calibration": {
+    "metric": "mean absolute RGB difference over all canonical pixels and channels, divided by 255",
+    "roi": "none",
+    "stable_tail_definition_for_audit_only": "tail ticks 11-80, after the recorded oracle object translation has ceased in these development captures",
+    "per_task_stable_score_p95": {
+      "task_0": 0.0000351,
+      "task_2": 0.0000119,
+      "task_6": 0.0000264,
+      "task_7": 0.0000076
+    },
+    "proposed_frozen_threshold": 0.00005,
+    "decision_window": "3 consecutive frame pairs at or below the threshold",
+    "development_replay_ready_tail_ticks": {
+      "task_0": 14,
+      "task_2": 10,
+      "task_6": 12,
+      "task_7": 11
+    },
+    "basis": "0.00005 rounds above the largest development stable-tail p95 (0.0000351) and remains far below the normalized RGB differences during measured 21-41 mm settling steps. Freeze before held-out evaluation; do not retune on held-out episodes."
+  },
+  "query_normalization_decision": {
+    "implement_generic_leading_determiner_removal": true,
+    "rule": "collapse whitespace, casefold for the SAM query, then remove at most one leading English determiner from {the, a, an}; preserve the raw semantic phrase in TaskSpec and logs",
+    "evidence_basis": "Same-frame phrase comparison shows 0/81 candidate frames for 'the alphabet soup' versus 81/81 for 'alphabet soup'.",
+    "sufficient_to_prove_correct_object_grounding": false,
+    "semantic_warning": "The reference phrase's highest-ranked mask is visibly the neighboring Milk carton, so query normalization improves surface-form parity but does not validate the selected object's semantic identity."
+  },
+  "visual_artifacts_inspected": [
+    "rollouts/runtime_v3_m3_7_readiness/run_20261003T095536Z_7f5f9f0b/sam_replay_validated/task_0/contacts/task_0_phrase_comparison_same_frames.png",
+    "rollouts/runtime_v3_m3_7_readiness/run_20261003T095536Z_7f5f9f0b/sam_replay_validated/task_0/contacts/task_0_alphabet_soup.png",
+    "rollouts/runtime_v3_m3_7_readiness/run_20261003T095536Z_7f5f9f0b/sam_replay_validated/task_6/contacts/task_6_butter.png",
+    "rollouts/runtime_v3_m3_7_readiness/run_20261003T095536Z_7f5f9f0b/sam_replay_validated/task_2/contacts/task_2_salad_dressing.png",
+    "rollouts/runtime_v3_m3_7_readiness/run_20261003T095536Z_7f5f9f0b/sam_replay_validated/task_7/contacts/task_7_milk.png"
+  ]
+}

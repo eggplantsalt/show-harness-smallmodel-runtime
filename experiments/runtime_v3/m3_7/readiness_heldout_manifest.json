@@ -1,0 +1,30 @@
+{
+  "milestone": "M3.7 Generalized Readiness and Evidence Boundary",
+  "status": "FROZEN_BEFORE_FORMAL_POSTFIX_EVALUATION",
+  "suite": "LIBERO_OBJECT",
+  "seed": 0,
+  "selected_init_states": [0, 1, 2],
+  "selection_basis": "Task family and reset-image visibility only. Selected after inspecting reset-only agentview frames and before any formal readiness or ALIGN rollout for these task IDs. No task will be replaced based on evaluation results.",
+  "preflight_artifact": "rollouts/runtime_v3_m3_7_readiness/heldout_preflight/candidate_contact_sheet.png",
+  "heldout_tasks": [
+    {
+      "task_id": 1,
+      "task_name": "pick_up_the_cream_cheese_and_place_it_in_the_basket",
+      "instruction": "Pick the cream cheese and place it in the basket",
+      "obj_of_interest": "cream_cheese_1",
+      "reset_image": "rollouts/runtime_v3_m3_7_readiness/heldout_preflight/task_1_reset.png",
+      "selection_rationale": "Same non-articulated pick-and-place-in-basket family; the cream-cheese package is visible in the reset agentview. It adds a light-blue, low-profile package appearance to the development set's can, bottle, butter package and milk carton appearances."
+    },
+    {
+      "task_id": 8,
+      "task_name": "pick_up_the_chocolate_pudding_and_place_it_in_the_basket",
+      "instruction": "Pick the chocolate pudding and place it in the basket",
+      "obj_of_interest": "chocolate_pudding_1",
+      "reset_image": "rollouts/runtime_v3_m3_7_readiness/heldout_preflight/task_8_reset.png",
+      "selection_rationale": "Same non-articulated pick-and-place-in-basket family; the dark chocolate-pudding package is visible in the reset agentview. It adds a dark, low-profile package appearance with a different color and outline from the development set."
+    }
+  ],
+  "excluded_development_tasks": [0, 2, 6, 7],
+  "frozen_at_milestone_stage": "after development forensic audit; before Runtime refactor and formal readiness-only evaluation",
+  "replacement_policy": "No replacement after formal evaluation begins"
+}

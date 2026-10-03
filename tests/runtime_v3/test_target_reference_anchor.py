@@ -136,7 +136,7 @@ def test_new_sam_observations_do_not_move_reference_anchor():
     assert observer.reference_anchor.reference_point_px == frozen
 
 
-def test_scene_ready_gate_defers_reference_until_three_stable_visual_observations():
+def test_scene_ready_gate_waits_for_three_entity_observations_and_three_rgb_pairs():
     mask = np.zeros((64, 64), dtype=bool)
     mask[20:30, 20:30] = True
     observer, env = _observer(masks=[mask, mask, mask], scene_ready_required=True)
@@ -146,20 +146,22 @@ def test_scene_ready_gate_defers_reference_until_three_stable_visual_observation
     assert first.evidence["object_relative_state"].scene_ready is False
     assert second.evidence["object_relative_state"].scene_ready is False
     third = observer.observe(env)
+    assert observer.scene_ready is False
+    fourth = observer.observe(env)
     assert observer.scene_ready is True
     assert observer.reference_anchor is not None and observer.reference_anchor.valid
-    assert observer.reference_anchor.source_frame_id == third.frame_id
-    assert third.evidence["object_relative_state"].scene_ready_gate_enabled is True
+    assert observer.reference_anchor.source_frame_id == first.frame_id
+    assert fourth.evidence["object_relative_state"].scene_ready_gate_enabled is True
 
 
 def test_scene_ready_gate_is_an_initialization_gate_not_a_target_motion_detector():
     mask_a = np.zeros((64, 64), dtype=bool)
     mask_a[20:30, 20:30] = True
     mask_b = np.zeros_like(mask_a)
-    mask_b[28:38, 20:30] = True
+    mask_b[21:31, 20:30] = True
     observer, env = _observer(masks=[mask_a, mask_a, mask_a, mask_b],
                               scene_ready_required=True)
-    for _ in range(3):
+    for _ in range(4):
         observer.observe(env)
     assert observer.scene_ready
     observer.observe(env)

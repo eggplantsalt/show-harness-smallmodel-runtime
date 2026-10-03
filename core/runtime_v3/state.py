@@ -57,6 +57,8 @@ class ObjectRelativeState:
     metric_entity_reference: Optional[MetricEntityReference] = None
     scene_ready: bool = True
     scene_ready_gate_enabled: bool = False
+    scene_motion_ready: bool = True
+    entity_observation_ready: bool = True
 
 
 @dataclass(frozen=True)
@@ -209,6 +211,10 @@ def _object_relative_state(value: Any) -> Optional[ObjectRelativeState]:
         metric_entity_reference=_metric_entity_reference(value.get("metric_entity_reference")),
         scene_ready=bool(value.get("scene_ready", True)),
         scene_ready_gate_enabled=bool(value.get("scene_ready_gate_enabled", False)),
+        scene_motion_ready=bool(value.get("scene_motion_ready", value.get("scene_ready", True))),
+        entity_observation_ready=bool(value.get(
+            "entity_observation_ready", value.get("scene_ready", True)
+        )),
     )
 
 

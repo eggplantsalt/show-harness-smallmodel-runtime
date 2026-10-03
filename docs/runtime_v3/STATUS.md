@@ -1,5 +1,24 @@
 # Runtime V3 Status
 
+## M3.7 readiness evidence boundary (in progress)
+
+- Forensic audit is complete and recorded in
+  `experiments/runtime_v3/m3_7/readiness_forensic_audit.json`. It supports
+  separating RGB scene motion from SAM entity evidence. Butter was physically
+  static while its candidate disappeared; the determiner-bearing alphabet
+  soup query returned zero candidates on the same saved frames. The reference
+  soup phrase's selected top mask was visually the neighboring milk carton,
+  so that case remains semantically unresolved.
+- The frozen shared RGB threshold is `0.00005` mean full-frame normalized RGB
+  difference for three consecutive frame pairs. Entity readiness uses three
+  same-identity observations and normalized bbox-relative geometry, IoU, and
+  area limits. A generic determiner normalizer is justified by the same-frame
+  phrase sensitivity result; raw TaskSpec text stays unchanged.
+- Held-out tasks 1 (cream cheese) and 8 (chocolate pudding), init states 0–2,
+  are frozen in `experiments/runtime_v3/m3_7/readiness_heldout_manifest.json`.
+- Formal Stage A, Stage B, and Qwen Stage C results are pending. Do not infer
+  transfer or readiness generalization from the forensic development set.
+
 ## M3.6 zero-code-change cross-object ALIGN transfer (2026-10-03)
 
 - Baseline: branch `runtime-v3`, clean at `95c040d` before this milestone.

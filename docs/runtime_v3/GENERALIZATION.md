@@ -1,5 +1,24 @@
 # Runtime V3 Cross-Object Generalization
 
+## M3.7 readiness evidence boundary
+
+M3.6 exposed two different pre-ALIGN failures: physically settled butter lost
+SAM evidence, and the same alphabet-soup RGB frames produced candidates for
+`alphabet soup` but none for Qwen's `the alphabet soup`. The old SceneReady
+gate only consumed target identity and mask geometry, so it conflated physical
+scene stability and semantic entity evidence. M3.7 separates those inputs into
+`SceneMotionReady` (full-frame canonical RGB only) and
+`EntityObservationReady` (one associated entity's normalized visual window).
+See [`READINESS_EVIDENCE.md`](READINESS_EVIDENCE.md) for the frozen rules.
+
+The M3.7 held-out manifest freezes tasks 1 (cream cheese) and 8 (chocolate
+pudding), init states 0–2, before formal post-refactor runs. Stage A uses HOLD
+only and reports grounding, identity, reference, both readiness gates, and
+post-hoc oracle grades for false-ready / false-not-ready. No ALIGN or Qwen
+physical rollout is allowed until Stage A and reference-binding Stage B are
+complete. Results will be appended after evaluation; the frozen manifest will
+not change in response to results.
+
 ## M3.6 question
 
 M3.6 asks whether the established projective ALIGN contract transfers across

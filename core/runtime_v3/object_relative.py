@@ -20,9 +20,11 @@ from core.capabilities.camera_geometry import (
 )
 from .canonical_image import CanonicalImageAdapter
 from .depth import DepthProvider, metric_entity_reference_from_estimate
+from .grounding_query import GroundingQueryNormalizer
 from .metric_entity import MetricEntityReference, freeze_metric_reference
 from .observer import RobotObservation
 from .options import BoundedMicroMotionSpec, PrimitiveCommand, RuntimeOption
+from .readiness import EntityObservationReady, SceneMotionReady
 from .scene_settling import SceneReadyEvidence
 from .state import BeliefState, ObjectRelativeState, RuntimeEntityState
 from .task_spec import EntitySpec
@@ -102,13 +104,14 @@ def make_target_reference_anchor(
     *,
     camera: str,
     camera_signature: Sequence[Any],
+    reference_source: str = "initial_associated_sam_mask_centroid",
 ) -> TargetReferenceAnchor:
-    """Freeze the initial associated mask centroid as the control reference."""
+    """Freeze a caller-selected associated centroid as the control reference."""
     return TargetReferenceAnchor(
         target_identity=identity_anchor.target_phrase,
         camera=str(camera),
         reference_point_px=tuple(float(value) for value in identity_anchor.centroid_px),
-        reference_source="initial_associated_sam_mask_centroid",
+        reference_source=str(reference_source),
         source_frame_id=identity_anchor.frame_id,
         source_bbox_px=identity_anchor.bbox_xyxy,
         source_mask_area=identity_anchor.mask_area,
@@ -795,7 +798,17 @@ class ObjectRelativePerceptionObserver:
         self.scale_contracts = dict(scale_contracts or {})
         self.metric_depth_provider = metric_depth_provider
         self.metric_reference_anchor: MetricEntityReference | None = None
+        # SceneReadyEvidence remains for historical/offline comparisons only. The
+        # formal gate is the conjunction of target-independent RGB motion and
+        # same-entity visual evidence below.
         self.scene_ready_evidence = SceneReadyEvidence() if self.scene_ready_required else None
+        self.scene_motion_evidence = SceneMotionReady() if self.scene_ready_required else None
+        self.entity_observation_evidence = (
+            EntityObservationReady() if self.scene_ready_required else None
+        )
+        self.grounding_query_normalizer = GroundingQueryNormalizer()
+        self.grounding_query = self.grounding_query_normalizer.normalize(self.target_phrase)
+        self._readiness_active = bool(self.scene_ready_required)
         self.identity_anchor: TargetIdentityAnchor | None = None
         self.reference_anchor: TargetReferenceAnchor | None = None
         self._camera_signature: tuple[Any, ...] | None = None
@@ -808,7 +821,46 @@ class ObjectRelativePerceptionObserver:
 
     @property
     def scene_ready(self) -> bool:
-        return (self.scene_ready_evidence.ready if self.scene_ready_evidence is not None else True)
+        if not self.scene_ready_required:
+            return True
+        return bool(
+            self.scene_motion_ready and self.entity_observation_ready
+            and self.grounding_success and self.identity_valid
+        )
+
+    @property
+    def scene_motion_ready(self) -> bool:
+        return (self.scene_motion_evidence.ready
+                if self.scene_motion_evidence is not None else True)
+
+    @property
+    def entity_observation_ready(self) -> bool:
+        return (self.entity_observation_evidence.ready
+                if self.entity_observation_evidence is not None else True)
+
+    @property
+    def grounding_success(self) -> bool:
+        segmentation = self.last_segmentation
+        return bool(segmentation and segmentation.visible)
+
+    @property
+    def identity_valid(self) -> bool:
+        segmentation = self.last_segmentation
+        return bool(segmentation and segmentation.identity_status in {"ANCHORED", "SAME_TARGET"})
+
+    @property
+    def reference_valid(self) -> bool:
+        return bool(self.reference_anchor and self.reference_anchor.valid)
+
+    def begin_readiness(self) -> None:
+        """Start fresh readiness evidence after RobotReady has completed."""
+        if not self.scene_ready_required:
+            return
+        self._readiness_active = True
+        self.scene_motion_evidence.reset()
+        self.entity_observation_evidence.reset()
+        if self.scene_ready_evidence is not None:
+            self.scene_ready_evidence.reset()
 
     def invalidate_target_reference(self, reason: str) -> None:
         """Invalidate the active reference; it cannot be re-established implicitly."""
@@ -840,8 +892,10 @@ class ObjectRelativePerceptionObserver:
             raise ValueError("agentview source must be an HxWx3 RGB array")
         image = self.canonical_image_adapter.transform_image(raw_image)
         height, width = image.shape[:2]
+        if self._readiness_active and self.scene_motion_evidence is not None:
+            self.scene_motion_evidence.update(image)
         response = self.sam3.segment(
-            image, self.target_phrase, confidence_threshold=self.confidence_threshold
+            image, self.grounding_query, confidence_threshold=self.confidence_threshold
         )
         candidate_segmentation = segmentation_from_response(response, (height, width))
         details = response.get("details") if isinstance(response, Mapping) else None
@@ -862,6 +916,11 @@ class ObjectRelativePerceptionObserver:
             self.metric_reference_anchor = None
             if self.scene_ready_evidence is not None:
                 self.scene_ready_evidence.reset()
+            if self.entity_observation_evidence is not None:
+                self.entity_observation_evidence.reset()
+            if self.scene_motion_evidence is not None:
+                self.scene_motion_evidence.reset()
+            self._readiness_active = True
             self._reference_reground_requested = False
         if self.identity_anchor is None:
             self.identity_anchor = make_target_identity_anchor(
@@ -964,25 +1023,43 @@ class ObjectRelativePerceptionObserver:
         self._camera_signature = current_camera_signature
 
         scene_was_ready = self.scene_ready
+        if (self._readiness_active and self.entity_observation_evidence is not None
+                and self.scene_motion_evidence is not None and not scene_was_ready):
+            self.entity_observation_evidence.update(
+                entity_key=self.entity_spec.key,
+                grounding_query=self.grounding_query,
+                identity_status=segmentation.identity_status,
+                candidate_id=segmentation.selected_candidate_id,
+                mask=segmentation.mask if segmentation.visible else None,
+                centroid_px=segmentation.centroid_px,
+                bbox_xyxy=segmentation.bbox_xyxy,
+                mask_area_px=segmentation.area_px,
+                frame_id=base.frame_id,
+            )
+            if self.entity_observation_evidence.ready:
+                representative = self.entity_observation_evidence.representative_sample()
+                if representative is not None and self.identity_anchor is not None:
+                    # Promote a same-identity medoid mask and median centroid. The
+                    # original semantic phrase remains attached to the entity.
+                    self.identity_anchor = replace(
+                        self.identity_anchor,
+                        initial_mask=representative["mask"].copy(),
+                        centroid_px=tuple(float(value) for value in
+                                          representative["reference_centroid_px"]),
+                        bbox_xyxy=tuple(int(value) for value in representative["bbox_xyxy"]),
+                        mask_area=int(representative["mask_area_px"]),
+                        candidate_id=str(representative["candidate_id"]),
+                        frame_id=representative["frame_id"],
+                    )
         if self.scene_ready_evidence is not None and not scene_was_ready:
-            scene_is_ready = self.scene_ready_evidence.update(
+            # Compatibility evidence is retained for comparisons only and is not
+            # consulted by scene_ready or any Runtime decision.
+            self.scene_ready_evidence.update(
                 target_identity_status=segmentation.identity_status,
                 centroid_px=segmentation.centroid_px,
                 bbox_xyxy=segmentation.bbox_xyxy,
                 mask_area_px=segmentation.area_px,
             )
-            if (scene_is_ready and segmentation.visible
-                    and current_camera_signature is not None):
-                # Promote the most recent associated mask only after its visual
-                # position, bbox and area passed the measured stable-window gate.
-                settled_anchor = make_target_identity_anchor(
-                    segmentation, target_phrase=self.target_phrase, frame_id=base.frame_id,
-                )
-                if settled_anchor is None:
-                    self.scene_ready_evidence.reset()
-                    scene_is_ready = False
-                else:
-                    self.identity_anchor = settled_anchor
 
         # The initial identity association establishes the reference exactly once.
         # A later SAM centroid is never allowed to replace it. Re-grounding has an
@@ -994,6 +1071,10 @@ class ObjectRelativePerceptionObserver:
                     self.identity_anchor,
                     camera=calibration.name,
                     camera_signature=current_camera_signature,
+                    reference_source=(
+                        "same_entity_mask_medoid_median_centroid"
+                        if self.scene_ready_required else "initial_associated_sam_mask_centroid"
+                    ),
                 )
                 self._reference_reground_requested = False
         if (self.metric_depth_provider is not None and self.scene_ready
@@ -1056,6 +1137,8 @@ class ObjectRelativePerceptionObserver:
             metric_entity_reference=self.metric_reference_anchor,
             scene_ready=self.scene_ready,
             scene_ready_gate_enabled=self.scene_ready_required,
+            scene_motion_ready=self.scene_motion_ready,
+            entity_observation_ready=self.entity_observation_ready,
         )
         runtime_entity_state = RuntimeEntityState(
             entity_key=self.entity_spec.key,
@@ -1081,8 +1164,19 @@ class ObjectRelativePerceptionObserver:
             "reference_epoch_reset_reason": self._last_reference_invalidation_reason,
             "scene_ready": self.scene_ready,
             "scene_ready_gate_enabled": self.scene_ready_required,
+            "scene_motion_ready": self.scene_motion_ready,
+            "entity_observation_ready": self.entity_observation_ready,
+            "scene_motion_score": (
+                self.scene_motion_evidence.last_normalized_rgb_difference
+                if self.scene_motion_evidence is not None else None
+            ),
             "scene_ready_evidence": (self.scene_ready_evidence.to_record()
                                      if self.scene_ready_evidence is not None else None),
+            "grounding_query": self.grounding_query,
+            "scene_motion_evidence": (self.scene_motion_evidence.to_record()
+                                      if self.scene_motion_evidence is not None else None),
+            "entity_observation_evidence": (self.entity_observation_evidence.to_record()
+                                             if self.entity_observation_evidence is not None else None),
             "resolution": dict(geometry),
             "dynamic_sam_error_px": dynamic_sam_error,
             "object_relative_state": relative,
@@ -1124,6 +1218,12 @@ class ObjectRelativePerceptionObserver:
             "scene_ready_gate_enabled": self.scene_ready_required,
             "scene_ready_evidence": (self.scene_ready_evidence.to_record()
                                      if self.scene_ready_evidence is not None else None),
+            "scene_motion_ready": self.scene_motion_ready,
+            "entity_observation_ready": self.entity_observation_ready,
+            "scene_motion_evidence": (self.scene_motion_evidence.to_record()
+                                      if self.scene_motion_evidence is not None else None),
+            "entity_observation_evidence": (self.entity_observation_evidence.to_record()
+                                             if self.entity_observation_evidence is not None else None),
         })
         if not segmentation.visible:
             merged_geometry["object_relative_alignment_valid"] = False

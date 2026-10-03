@@ -342,7 +342,9 @@ def _run_trial(
             workspace_z_bounds_m=workspace, max_hold_ticks=40,
         )
         if not scene_ready_result.get("ready") or not observer.scene_ready:
-            raise RuntimeError(f"visual SceneReady was not established: {scene_ready_result}")
+            raise RuntimeError(
+                f"generalized readiness was not established: {scene_ready_result}"
+            )
         scene_ready_trigger_tick = next(
             (int(sample["environment_step"]) for sample in scene_ready_result.get("samples", [])
              if sample.get("scene_ready")), None,
@@ -392,10 +394,21 @@ def _run_trial(
                                                  if chosen else None),
                 "before_artifacts": dict(before_artifacts),
                 "scene_ready": observer.scene_ready,
+                "scene_motion_ready": observer.scene_motion_ready,
+                "entity_observation_ready": observer.entity_observation_ready,
+                "grounding_success": observer.grounding_success,
+                "identity_valid": observer.identity_valid,
+                "reference_valid": observer.reference_valid,
                 "scene_ready_trigger_tick": scene_ready_trigger_tick,
                 "stable_anchor_environment_tick": int(environment.step_count),
                 "scene_ready_evidence": (observer.scene_ready_evidence.to_record()
                                           if observer.scene_ready_evidence else None),
+                "scene_motion_evidence": (observer.scene_motion_evidence.to_record()
+                                          if observer.scene_motion_evidence else None),
+                "entity_observation_evidence": (
+                    observer.entity_observation_evidence.to_record()
+                    if observer.entity_observation_evidence else None
+                ),
                 "logger_writable": True,
                 "artifact_variables_initialized": True,
                 "oracle_target_pose_diagnostic_only": oracle_before,
@@ -688,6 +701,12 @@ def _run_trial(
             "geometry_direction_consistent": geometry_consistent,
             "pre_action_ready": bool(pre_action_ready_record),
             "scene_ready_before_anchor": bool(pre_action_ready_record and pre_action_ready_record.get("scene_ready")),
+            "scene_motion_ready_before_anchor": bool(
+                pre_action_ready_record and pre_action_ready_record.get("scene_motion_ready")
+            ),
+            "entity_observation_ready_before_anchor": bool(
+                pre_action_ready_record and pre_action_ready_record.get("entity_observation_ready")
+            ),
             "scene_ready_evidence": (pre_action_ready_record or {}).get("scene_ready_evidence"),
             "pre_action_ready_record": (str(trial_dir / "PRE_ACTION_READY.json")
                                          if pre_action_ready_record else None),
