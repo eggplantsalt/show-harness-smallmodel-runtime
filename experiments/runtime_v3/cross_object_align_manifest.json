@@ -1,0 +1,69 @@
+{
+  "manifest_id": "M3.6-reference-binding-cross-object-align-v1",
+  "suite": "LIBERO_OBJECT",
+  "seed": 0,
+  "goal_kind": "ALIGN",
+  "selection_frozen_before_rollout": true,
+  "selection_basis": "LIBERO_OBJECT benchmark task map and BDDL instructions, obj_of_interest declarations, and target_object_region placement; no rollout outcome was consulted.",
+  "preflight_visibility_check": {
+    "method": "Render init state 0 at canonical 512x512 agentview with no semantic control actions, then manually inspect the image.",
+    "result": "The named target is directly visible in the initial agentview for every selected task.",
+    "artifacts": "rollouts/runtime_v3_cross_object_alignment/preflight_visibility/task_<id>_state_0_canonical.png",
+    "used_to_rank_or_replace_tasks": false
+  },
+  "task_selection_rules": [
+    "Keep task 2 as the verified anchor task.",
+    "Select tasks from the same basic pick-up-and-place manipulation family.",
+    "Require one explicit primary manipuland in the instruction and BDDL.",
+    "Exclude articulation and multi-stage visibility prerequisites.",
+    "Prefer target classes with different visual form factors.",
+    "Use the same ordered init-state indices 0, 1, and 2 for the initial gate."
+  ],
+  "tasks": [
+    {
+      "task_id": 2,
+      "instruction": "Pick the salad dressing and place it in the basket",
+      "reference_entity_phrase": "salad dressing",
+      "entity_key": "target",
+      "role": "MANIPULAND",
+      "object_category": "bottled dressing / condiment container",
+      "reason_for_inclusion": "Anchor task 2 has the existing six-state positive ALIGN evidence and uses the benchmark's direct floor-to-basket pick-and-place family.",
+      "initial_observation_basis": "Manually inspected canonical init-state-0 agentview; the dressing bottle is visible. BDDL also declares it as an object of interest in target_object_region."
+    },
+    {
+      "task_id": 0,
+      "instruction": "Pick the alphabet soup and place it in the basket",
+      "reference_entity_phrase": "alphabet soup",
+      "entity_key": "target",
+      "role": "MANIPULAND",
+      "object_category": "canned soup / cylindrical can",
+      "reason_for_inclusion": "Same single-stage floor-to-basket family, one named manipuland, and a can-shaped visual category distinct from the anchor container.",
+      "initial_observation_basis": "Manually inspected canonical init-state-0 agentview; the soup can is visible. BDDL also declares it as an object of interest in target_object_region."
+    },
+    {
+      "task_id": 6,
+      "instruction": "Pick the butter and place it in the basket",
+      "reference_entity_phrase": "butter",
+      "entity_key": "target",
+      "role": "MANIPULAND",
+      "object_category": "rectangular butter package",
+      "reason_for_inclusion": "Same single-stage floor-to-basket family, one named manipuland, and a compact box-like visual form distinct from bottle/can categories.",
+      "initial_observation_basis": "Manually inspected canonical init-state-0 agentview; the rectangular butter package is visible. BDDL also declares it as an object of interest in target_object_region."
+    },
+    {
+      "task_id": 7,
+      "instruction": "Pick the milk and place it in the basket",
+      "reference_entity_phrase": "milk",
+      "entity_key": "target",
+      "role": "MANIPULAND",
+      "object_category": "milk carton",
+      "reason_for_inclusion": "Same single-stage floor-to-basket family, one named manipuland, and a tall carton form distinct from the anchor and other selected targets.",
+      "initial_observation_basis": "Manually inspected canonical init-state-0 agentview; the milk carton is visible. BDDL also declares it as an object of interest in target_object_region."
+    }
+  ],
+  "initial_gate": {
+    "init_states": [0, 1, 2],
+    "max_semantic_align_steps_per_episode": 6,
+    "expansion_rule": "Expand a task to init states 0-5 only if its initial three episodes all show positive episode-level net alignment improvement and no task-specific runtime change."
+  }
+}

@@ -61,6 +61,15 @@ end-effector and gripper state, holding/contact evidence, relevant geometry,
 the previous action and expected/observed effects, uncertainty, and evidence
 references. Fields remain optional while adapters are being added.
 
+M3.6 adds immutable `TaskSpec` and `EntitySpec` as the semantic input boundary,
+plus one `RuntimeEntityState` field in that same `BeliefState`. The task/entity
+specification carries instruction, entity key, semantic phrase, role, focus,
+and the current ALIGN goal kind. RuntimeEntityState binds identity and visual
+reference anchors to the entity key. The phrase is used for visual grounding;
+ALIGN geometry and physical authority use observed geometry and the canonical
+entity state, with no object-name or task-ID control branch. See
+[`GENERALIZATION.md`](GENERALIZATION.md).
+
 For pre-contact object-relative alignment, semantic target identity and the
 control reference are separate. `TargetIdentityAnchor` associates later SAM
 candidates with the selected instance. A stage-local `TargetReferenceAnchor`

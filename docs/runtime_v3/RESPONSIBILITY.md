@@ -11,6 +11,8 @@ Runtime V3 owns decisions that depend on measured geometry and physical limits:
 - observing and verifying the resulting physical effect;
 - stopping when the target projection is reached, progress reverses, the tick
   budget is exhausted, or the next tick would cross a workspace boundary.
+- applying the same ALIGN candidate generation/ranking and effect contract to
+  any valid `RuntimeEntityState`, independent of its semantic phrase.
 
 For a bounded micro-motion, the Arbiter approves one semantic option and seals
 its direction, displacement request, tick limit, starting EEF position, and
@@ -28,6 +30,9 @@ responsibilities include:
 - requesting an additional observation with `REOBSERVE`;
 - choosing among multiple options that Runtime has already established as
   physically valid.
+- optionally binding an instruction to an `EntitySpec` after the reference-
+  binding cross-object gate passes; this output stays semantic and cannot carry
+  a physical direction, displacement, scale, or controller action.
 
 Qwen receives option IDs and compact state. It does not receive controller
 tokens or an execution interface. Qwen is a bounded semantic decision maker.

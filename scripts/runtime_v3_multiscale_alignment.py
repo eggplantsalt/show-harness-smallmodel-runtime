@@ -32,6 +32,7 @@ from core.runtime_v3.runner import RuntimeV3Runner
 from core.runtime_v3.scene_initialization import run_scene_ready_holds
 from core.runtime_v3.selector import DeterministicSelector, Selection
 from core.runtime_v3.state import BeliefState, StateBuilder
+from core.runtime_v3.task_spec import EntitySpec
 from core.runtime_v3.temporal_calibration import run_v3_tick
 from scripts.runtime_v3_multistep_alignment import (
     CONTROL_TICK_MM, INIT_STATES, MAX_ALIGNMENT_STEPS, PRE_SETTLE_TICKS,
@@ -95,6 +96,7 @@ class ExperimentArbiter(Arbiter):
         self.authorization_calls = 0
         self.alignment_authorization_calls = 0
         self.approval_count = 0
+        self.last_approval_trace_id: str | None = None
 
     def authorize(self, state, options, selection):
         self.authorization_calls += 1
@@ -106,25 +108,31 @@ class ExperimentArbiter(Arbiter):
         if (decision.kind == DecisionKind.APPROVED and decision.action is not None
                 and decision.action.option_id in {SEMANTIC_OPTION_ID, "CALIBRATE_BOUNDED_MOTION"}):
             self.approval_count += 1
+            self.last_approval_trace_id = uuid.uuid4().hex
         return decision
 
 
 def _setup_trial(*, init_state: int, config: Mapping[str, Any], sam3: Any,
                  workspace: tuple[float, float], camera_resolution: int,
                  scales: Sequence[float] | None = None,
-                 contracts: Mapping[float, Mapping[str, Any]] | None = None):
+                 contracts: Mapping[float, Mapping[str, Any]] | None = None,
+                 suite_name: str = SUITE, task_id: int = TASK_ID,
+                 entity_spec: EntitySpec | None = None, seed: int = 0):
     from core.runtime_v3.adapters.libero_env import LiberoEnvironmentAdapter
     from core.runtime_v3.adapters.libero_observation import LiberoObservationAdapter
     from core.runtime_v3.canonical_image import CanonicalImageAdapter
     from interpreters.libero_atomic_controller import LiberoAtomicController
 
+    entity_spec = entity_spec or EntitySpec("target", TARGET_PHRASE, "MANIPULAND")
     environment = LiberoEnvironmentAdapter.create(
-        suite_name=SUITE, task_id=TASK_ID, init_state_index=init_state, seed=0,
+        suite_name=suite_name, task_id=task_id, init_state_index=init_state, seed=seed,
         camera_height=camera_resolution, camera_width=camera_resolution, horizon=100,
     )
-    if TARGET_PHRASE.casefold() not in environment.task_description.casefold():
+    if entity_spec.semantic_phrase.casefold() not in environment.task_description.casefold():
         environment.close()
-        raise RuntimeError(f"task instruction does not include {TARGET_PHRASE!r}")
+        raise RuntimeError(
+            f"task instruction does not include {entity_spec.semantic_phrase!r}"
+        )
     controller = LiberoAtomicController(
         move_vectors=config["move_vectors"], step_m=CONTROL_TICK_MM / 1000.0,
         sim_steps_per_decision=1, position_scale_m=float(config.get("position_scale_m", 0.05)),
@@ -137,7 +145,7 @@ def _setup_trial(*, init_state: int, config: Mapping[str, Any], sam3: Any,
     reset = True
     for hold_index in range(PRE_SETTLE_TICKS):
         outcome = run_v3_tick(
-            environment, base_observer, controller, task_id=f"{SUITE}:{TASK_ID}",
+            environment, base_observer, controller, task_id=f"{suite_name}:{task_id}",
             token=None, direction_unit=None, commanded_step_m=CONTROL_TICK_MM / 1000.0,
             reset=reset, workspace_z_bounds_m=workspace,
         )
@@ -147,12 +155,12 @@ def _setup_trial(*, init_state: int, config: Mapping[str, Any], sam3: Any,
             raise RuntimeError(f"RobotReady HOLD {hold_index + 1} failed: {outcome}")
         holds.append(outcome)
     observer = ObjectRelativePerceptionObserver(
-        base_observer, sam3, target_phrase=TARGET_PHRASE,
+        base_observer, sam3, entity_spec=entity_spec,
         move_vectors=config["move_vectors"], canonical_image_adapter=CanonicalImageAdapter(),
         scene_ready_required=True, alignment_scales_m=scales, scale_contracts=contracts,
     )
     scene_ready = run_scene_ready_holds(
-        environment, observer, controller, task_id=f"{SUITE}:{TASK_ID}",
+        environment, observer, controller, task_id=f"{suite_name}:{task_id}",
         commanded_step_m=CONTROL_TICK_MM / 1000.0,
         workspace_z_bounds_m=workspace, max_hold_ticks=40,
     )
@@ -377,9 +385,29 @@ def _post_action_stop(step_index: int, actual_improvement: float | None,
     return "MAX_ALIGNMENT_STEPS" if step_index >= MAX_ALIGNMENT_STEPS else None
 
 
+def _save_effect_overlay(before_path: str, after_path: str, output_path: Path) -> str:
+    before = Image.open(before_path).convert("RGB")
+    after = Image.open(after_path).convert("RGB")
+    height = max(before.height, after.height)
+    width = before.width + after.width
+    canvas = Image.new("RGB", (width, height + 30), "white")
+    canvas.paste(before, (0, 30))
+    canvas.paste(after, (before.width, 30))
+    draw = ImageDraw.Draw(canvas)
+    draw.text((8, 8), "before", fill="black")
+    draw.text((before.width + 8, 8), "after / effect verification", fill="black")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    canvas.save(output_path)
+    return str(output_path)
+
+
 def run_stage_b_episode(*, init_state: int, run_dir: Path, config: Mapping[str, Any],
                         sam3: Any, workspace: tuple[float, float], camera_resolution: int,
-                        verified_scales: Sequence[float], contracts: Mapping[float, Mapping[str, Any]]) -> dict[str, Any]:
+                        verified_scales: Sequence[float], contracts: Mapping[float, Mapping[str, Any]],
+                        suite_name: str = SUITE, task_id: int = TASK_ID,
+                        entity_spec: EntitySpec | None = None,
+                        diagnostic_oracle: bool = True, seed: int = 0) -> dict[str, Any]:
+    entity_spec = entity_spec or EntitySpec("target", TARGET_PHRASE, "MANIPULAND")
     episode_dir = run_dir / f"stage_b/init_state_{init_state}"
     episode_dir.mkdir(parents=True, exist_ok=False)
     steps_dir = episode_dir / "steps"
@@ -389,8 +417,9 @@ def run_stage_b_episode(*, init_state: int, run_dir: Path, config: Mapping[str, 
         environment, controller, base, observer, holds, scene, scene_trigger = _setup_trial(
             init_state=init_state, config=config, sam3=sam3, workspace=workspace,
             camera_resolution=camera_resolution, scales=verified_scales, contracts=contracts,
+            suite_name=suite_name, task_id=task_id, entity_spec=entity_spec, seed=seed,
         )
-        oracle_start = oracle_target_world_position(environment)
+        oracle_start = (oracle_target_world_position(environment) if diagnostic_oracle else None)
         image_panels: list[tuple[str, Path]] = []
         steps: list[dict[str, Any]] = []
         active = {"step": 0}
@@ -415,6 +444,13 @@ def run_stage_b_episode(*, init_state: int, run_dir: Path, config: Mapping[str, 
             record = {
                 "status": "PRE_ACTION_READY", "semantic_option_id": SEMANTIC_OPTION_ID,
                 "alignment_step": step_index, "frame_id": state.frame_id,
+                "task_id": task_id, "task_instruction": environment.task_description,
+                "entity_key": entity_spec.key,
+                "entity_phrase": entity_spec.semantic_phrase,
+                "target_visible": bool(relative.target_visible),
+                "identity_valid": relative.target_identity_status in {"ANCHORED", "SAME_TARGET"},
+                "identity_status": relative.target_identity_status,
+                "reference_valid": bool(relative.target_reference_valid),
                 "selected_direction": spec.direction,
                 "selected_scale_m": spec.requested_displacement_m,
                 "selected_max_ticks": spec.max_ticks,
@@ -448,17 +484,36 @@ def run_stage_b_episode(*, init_state: int, run_dir: Path, config: Mapping[str, 
                 selector=MultiscaleSelector(), arbiter=arbiter, executor=executor,
                 effect_observer=EffectObserver(), logger=events.append,
             )
-            result = runner.run_episode(environment, task_id=f"{SUITE}:{TASK_ID}",
+            result = runner.run_episode(environment, task_id=f"{suite_name}:{task_id}",
                                         max_steps=1, reset=False)
             if not events:
                 state = result.get("state") or runner.state
                 termination = (_state_stop_reason(state) if state is not None else None) or result.get("status", "EXECUTION_FAILED")
+                current_error = error_from_state(state) if state is not None else None
+                if initial_error is None:
+                    initial_error = current_error
+                final_error = current_error
                 frame = observer.perception_history[-1] if observer.perception_history else None
+                relative = state.object_relative_state if state is not None else None
                 lattice = candidate_lattice_records(
                     state.relevant_geometry.get("candidate_lattice", []) if state else [])
                 row = {"alignment_step": step_index, "executed": False,
                        "termination_reason": termination,
+                       "task_id": task_id,
+                       "task_instruction": environment.task_description,
+                       "entity_key": entity_spec.key,
+                       "entity_phrase": entity_spec.semantic_phrase,
+                       "target_visible": bool(relative and relative.target_visible),
+                       "identity_valid": bool(relative and relative.target_identity_status
+                                              in {"ANCHORED", "SAME_TARGET"}),
+                       "identity_status": relative.target_identity_status if relative else None,
+                       "reference_valid": bool(relative and relative.target_reference_valid),
+                       "scene_ready": bool(relative and relative.scene_ready),
+                       "error_before_px": current_error,
                        "candidate_lattice": lattice,
+                       "approval_trace_id": None,
+                       "semantic_step": step_index,
+                       "effect_verification_success": None,
                        "authorization_calls_for_step": arbiter.authorization_calls - auth_before,
                        "approvals_for_step": arbiter.approval_count - approval_before}
                 steps.append(row)
@@ -495,17 +550,38 @@ def run_stage_b_episode(*, init_state: int, run_dir: Path, config: Mapping[str, 
             before_visual = make_step_visual(before_frame, frame_dir, prefix="before",
                                              selected_direction=spec.direction)
             after_visual = make_step_visual(after_frame, frame_dir, prefix="after")
+            effect_overlay = _save_effect_overlay(
+                before_visual["alignment_overlay"], after_visual["alignment_overlay"],
+                frame_dir / "effect_overlay.png",
+            )
             image_panels.append((f"step {step_index}: after {spec.direction} {spec.requested_displacement_m*1000:g}mm",
                                  Path(after_visual["alignment_overlay"])))
             execution = getattr(event.get("execution"), "result", None)
             relative_after = state_after.object_relative_state
+            relative_before = state_before.object_relative_state
+            effect_verified = bool(actual_improvement is not None and actual_improvement > 0.0)
+            termination_after = _post_action_stop(step_index, actual_improvement, state_after)
             row = {
                 "alignment_step": step_index, "executed": True,
                 "semantic_option_id": action.option_id,
+                "semantic_step": step_index,
+                "task_id": task_id,
+                "task_instruction": environment.task_description,
+                "approval_trace_id": arbiter.last_approval_trace_id,
+                "approval_id": arbiter.last_approval_trace_id,
+                "entity_key": entity_spec.key,
+                "entity_phrase": entity_spec.semantic_phrase,
+                "target_visible": bool(relative_before and relative_before.target_visible),
+                "identity_valid": bool(relative_before and relative_before.target_identity_status
+                                        in {"ANCHORED", "SAME_TARGET"}),
+                "identity_status_before": relative_before.target_identity_status if relative_before else None,
+                "reference_valid": bool(relative_before and relative_before.target_reference_valid),
+                "scene_ready": bool(relative_before and relative_before.scene_ready),
                 "direction": spec.direction, "scale_m": spec.requested_displacement_m,
                 "scale_mm": spec.requested_displacement_m * 1000.0,
                 "max_ticks": spec.max_ticks,
                 "frame_id_before": state_before.frame_id, "frame_id_after": state_after.frame_id,
+                "episode_initial_alignment_error_px": initial_error,
                 "error_before_px": error_before, "predicted_error_after_px": action.expected_effect.get("predicted_image_error_after_px"),
                 "predicted_improvement_px": action.expected_effect.get("predicted_improvement_px"),
                 "actual_improvement_px": actual_improvement, "error_after_px": error_after,
@@ -518,18 +594,22 @@ def run_stage_b_episode(*, init_state: int, run_dir: Path, config: Mapping[str, 
                 "target_identity_status_after": relative_after.target_identity_status if relative_after else None,
                 "target_visible_after": bool(relative_after and relative_after.target_visible),
                 "target_reference_valid_after": bool(relative_after and relative_after.target_reference_valid),
+                "effect_verification_success": effect_verified,
+                "termination_reason": termination_after,
                 "authorization_calls_for_step": arbiter.authorization_calls - auth_before,
                 "alignment_authorization_calls_for_step": arbiter.alignment_authorization_calls - align_auth_before,
                 "arbiter_approved_alignment_actions_for_step": arbiter.approval_count - approval_before,
                 "executor_calls_for_action": 1,
                 "execution": execution,
-                "visual_artifacts": {"before": before_visual, "after": after_visual},
-                "oracle_target_pose_after_diagnostic": oracle_target_world_position(environment),
+                "visual_artifacts": {"before": before_visual, "after": after_visual,
+                                     "effect_overlay": effect_overlay},
+                "oracle_target_pose_after_diagnostic": (
+                    oracle_target_world_position(environment) if diagnostic_oracle else None
+                ),
                 "oracle_used_by_runtime": False,
             }
             steps.append(row)
             write_json(frame_dir / "step.json", row)
-            termination_after = _post_action_stop(step_index, actual_improvement, state_after)
             if termination_after:
                 termination = termination_after
                 break
@@ -544,11 +624,16 @@ def run_stage_b_episode(*, init_state: int, run_dir: Path, config: Mapping[str, 
         tick_count = sum(int((step.get("execution") or {}).get("ticks_executed", 0)) for step in executed)
         physical_mm = sum(float(np.linalg.norm((step.get("execution") or {}).get(
             "total_displacement_xyz_mm", [0.0, 0.0, 0.0]))) for step in executed)
-        oracle_end = oracle_target_world_position(environment)
-        oracle_diag = _oracle_motion(oracle_start, oracle_end)
+        oracle_end = oracle_target_world_position(environment) if diagnostic_oracle else None
+        oracle_diag = (_oracle_motion(oracle_start, oracle_end) if diagnostic_oracle else {
+            "collected": False, "source": "not_collected_for_cross_object_experiment",
+        })
         episode = {
-            "init_state_index": init_state, "status": "COMPLETED", "suite": SUITE,
-            "task_id": TASK_ID, "seed": 0, "task_instruction": environment.task_description,
+            "init_state_index": init_state, "status": "COMPLETED", "suite": suite_name,
+            "task_id": task_id, "seed": seed, "task_instruction": environment.task_description,
+            "entity_key": entity_spec.key,
+            "entity_phrase": entity_spec.semantic_phrase,
+            "entity_role": entity_spec.role,
             "robot_ready_hold_ticks": len(holds), "scene_ready_initialization": scene,
             "scene_ready_trigger_environment_tick": scene_trigger,
             "verified_scales_mm": [scale * 1000 for scale in verified_scales],

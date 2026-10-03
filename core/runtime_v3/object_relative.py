@@ -24,7 +24,8 @@ from .metric_entity import MetricEntityReference, freeze_metric_reference
 from .observer import RobotObservation
 from .options import BoundedMicroMotionSpec, PrimitiveCommand, RuntimeOption
 from .scene_settling import SceneReadyEvidence
-from .state import BeliefState, ObjectRelativeState
+from .state import BeliefState, ObjectRelativeState, RuntimeEntityState
+from .task_spec import EntitySpec
 
 
 DIRECTION_ORDER = ("FWD", "BACK", "LEFT", "RIGHT", "UP", "DOWN")
@@ -655,7 +656,8 @@ def make_alignment_option(state: BeliefState) -> RuntimeOption | None:
             "relevant_geometry.object_relative_alignment_valid": True,
         },
         expected_effect={
-            "target_phrase": relative.target_phrase,
+            "entity_key": (state.runtime_entity_state.entity_key
+                           if state.runtime_entity_state is not None else "target"),
             "target_reference_px": list(relative.target_reference_point_px),
             "image_error_before_px": before,
             "predicted_image_error_after_px": predicted_after,
@@ -728,7 +730,8 @@ def make_multiscale_alignment_option(state: BeliefState) -> RuntimeOption | None
             "relevant_geometry.multiscale_alignment_valid": True,
         },
         expected_effect={
-            "target_phrase": relative.target_phrase,
+            "entity_key": (state.runtime_entity_state.entity_key
+                           if state.runtime_entity_state is not None else "target"),
             "target_reference_px": list(relative.target_reference_point_px),
             "image_error_before_px": before,
             "predicted_image_error_after_px": predicted_after,
@@ -762,7 +765,8 @@ class ObjectRelativePerceptionObserver:
         base_observer: Any,
         sam3: Any,
         *,
-        target_phrase: str,
+        target_phrase: str | None = None,
+        entity_spec: EntitySpec | None = None,
         move_vectors: Mapping[str, Sequence[float]],
         confidence_threshold: float = SAM3_CONFIDENCE_THRESHOLD,
         canonical_image_adapter: CanonicalImageAdapter | None = None,
@@ -773,7 +777,14 @@ class ObjectRelativePerceptionObserver:
     ) -> None:
         self.base_observer = base_observer
         self.sam3 = sam3
-        self.target_phrase = str(target_phrase)
+        if entity_spec is None:
+            if target_phrase is None:
+                raise ValueError("entity_spec is required")
+            entity_spec = EntitySpec("target", str(target_phrase), "MANIPULAND")
+        elif target_phrase is not None and str(target_phrase) != entity_spec.semantic_phrase:
+            raise ValueError("target_phrase must agree with entity_spec.semantic_phrase")
+        self.entity_spec = entity_spec
+        self.target_phrase = entity_spec.semantic_phrase
         self.confidence_threshold = float(confidence_threshold)
         self.move_vectors = {str(key): tuple(float(v) for v in value)
                              for key, value in move_vectors.items()}
@@ -927,7 +938,7 @@ class ObjectRelativePerceptionObserver:
                 estimate = self.metric_depth_provider.estimate(image)
                 metric_depth = estimate.depth_m
                 metric_candidate = metric_entity_reference_from_estimate(
-                    entity_key=self.target_phrase,
+                    entity_key=self.entity_spec.key,
                     camera="agentview",
                     source_frame_id=base.frame_id,
                     target_mask=(segmentation.mask if segmentation.visible else None),
@@ -1046,6 +1057,17 @@ class ObjectRelativePerceptionObserver:
             scene_ready=self.scene_ready,
             scene_ready_gate_enabled=self.scene_ready_required,
         )
+        runtime_entity_state = RuntimeEntityState(
+            entity_key=self.entity_spec.key,
+            semantic_phrase=self.entity_spec.semantic_phrase,
+            role=self.entity_spec.role,
+            identity_anchor=self.identity_anchor,
+            reference_anchor=self.reference_anchor,
+            visible=segmentation.visible,
+            valid=(segmentation.visible
+                   and segmentation.identity_status in {"ANCHORED", "SAME_TARGET"}
+                   and reference_valid),
+        )
         self.perception_history.append({
             "image": image.copy(),
             "raw_image": np.ascontiguousarray(raw_image).copy(),
@@ -1064,6 +1086,7 @@ class ObjectRelativePerceptionObserver:
             "resolution": dict(geometry),
             "dynamic_sam_error_px": dynamic_sam_error,
             "object_relative_state": relative,
+            "runtime_entity_state": runtime_entity_state,
             "frame_id": base.frame_id,
             "metric_entity_reference_candidate": metric_candidate,
             "metric_entity_reference_anchor": self.metric_reference_anchor,
@@ -1072,6 +1095,7 @@ class ObjectRelativePerceptionObserver:
         evidence = dict(base.evidence)
         evidence["target_identity"] = self.target_phrase
         evidence["object_relative_state"] = relative
+        evidence["runtime_entity_state"] = runtime_entity_state
         merged_geometry = dict(evidence.get("relevant_geometry", {}) or {})
         merged_geometry.update({
             "camera_projection_valid": bool(geometry.get("camera_projection_valid")),

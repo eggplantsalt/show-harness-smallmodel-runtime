@@ -260,6 +260,19 @@ def make_step_visual(
     overlay = source.copy()
     draw = ImageDraw.Draw(overlay)
     relative = frame.get("object_relative_state")
+    segmentation = frame.get("segmentation")
+    mask_path = None
+    mask = getattr(segmentation, "mask", None)
+    if mask is not None:
+        mask = np.asarray(mask, dtype=bool)
+        if mask.shape == (source.height, source.width):
+            mask_path = output_dir / f"{prefix}_sam_mask.png"
+            Image.fromarray(mask.astype(np.uint8) * 255, mode="L").save(mask_path)
+            tint = np.zeros((source.height, source.width, 4), dtype=np.uint8)
+            tint[mask] = (255, 35, 35, 92)
+            overlay = Image.alpha_composite(overlay.convert("RGBA"),
+                                            Image.fromarray(tint, mode="RGBA")).convert("RGB")
+            draw = ImageDraw.Draw(overlay)
 
     def point(raw: Any) -> tuple[float, float] | None:
         try:
@@ -281,23 +294,37 @@ def make_step_visual(
     colors = ((40, 210, 90), (60, 155, 255), (240, 150, 30),
               (180, 90, 255), (30, 220, 220), (255, 90, 160))
     resolution = frame.get("resolution", {})
-    for index, candidate in enumerate(resolution.get("candidate_directions", [])):
-        p = point(candidate.get("hypothetical_projection_px"))
+    lattice = resolution.get("candidate_lattice", [])
+    candidates = lattice if lattice else resolution.get("candidate_directions", [])
+    chosen = resolution.get("chosen_lattice_candidate")
+    for index, candidate in enumerate(candidates):
+        p = point(candidate.get("predicted_projection_px")
+                   or candidate.get("hypothetical_projection_px"))
         if p is None:
             continue
         direction = str(candidate.get("direction", "?"))
-        color = (255, 255, 255) if direction == selected_direction else colors[index % len(colors)]
-        radius = 8 if direction == selected_direction else 5
+        selected = direction == selected_direction
+        if chosen is not None:
+            selected = (direction == chosen.get("direction")
+                        and candidate.get("displacement_m") == chosen.get("displacement_m"))
+        color = (255, 255, 255) if selected else colors[index % len(colors)]
+        radius = 8 if selected else 4
         x, y = p
         draw.rectangle((x-radius, y-radius, x+radius, y+radius), outline=color, width=2)
-        draw.text((x + 7, y + 3), direction, fill=color)
+        label = direction
+        if candidate.get("displacement_mm") is not None:
+            label += f" {float(candidate['displacement_mm']):g}mm"
+        draw.text((x + 7, y + 3), label, fill=color)
     draw.rectangle((5, 5, min(source.width - 6, 268), 65), fill=(0, 0, 0))
     draw.text((10, 10), "yellow: fixed target reference", fill=(255, 215, 0))
     draw.text((10, 27), "cyan: EEF, red: current SAM centroid", fill=(245, 245, 245))
     draw.text((10, 44), f"white square: selected {selected_direction or 'none'}", fill=(255, 255, 255))
     overlay_path = output_dir / f"{prefix}_alignment_overlay.png"
     overlay.save(overlay_path)
-    return {"canonical_rgb": str(rgb_path), "alignment_overlay": str(overlay_path)}
+    result = {"canonical_rgb": str(rgb_path), "alignment_overlay": str(overlay_path)}
+    if mask_path is not None:
+        result["sam_mask"] = str(mask_path)
+    return result
 
 
 def save_contact_sheet(images: Sequence[tuple[str, Path]], output_path: Path) -> str | None:

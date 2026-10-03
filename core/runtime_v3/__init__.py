@@ -8,13 +8,15 @@ from .observer import Observer, RobotObservation
 from .options import OptionGenerator, PrimitiveCommand, RuntimeOption
 from .runner import RuntimeV3Runner
 from .selector import CompactVLMSelector, DeterministicSelector, Selection
-from .state import BeliefState, StateBuilder
+from .state import BeliefState, RuntimeEntityState, StateBuilder
+from .task_spec import EntitySpec, GoalKind, ReferenceTaskCompiler, TaskSpec
 
 __all__ = [
     "Arbiter", "ArbiterDecision", "BeliefState", "CompactVLMSelector",
     "DecisionKind", "DeterministicSelector", "EffectObserver", "EffectRecord",
-    "ExecutionRecord", "Executor", "ExpectedEffect", "ExperienceRecord",
+    "EntitySpec", "ExecutionRecord", "Executor", "ExpectedEffect", "ExperienceRecord",
     "ExperienceStore", "LiberoPrimitiveBackend", "Observer", "OptionGenerator",
-    "PrimitiveCommand", "RobotObservation", "RuntimeOption", "RuntimeV3Runner", "Selection",
-    "StateBuilder",
+    "GoalKind", "PrimitiveCommand", "ReferenceTaskCompiler", "RobotObservation",
+    "RuntimeEntityState", "RuntimeOption", "RuntimeV3Runner", "Selection", "StateBuilder",
+    "TaskSpec",
 ]

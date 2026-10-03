@@ -1,5 +1,27 @@
 # Runtime V3 Status
 
+## M3.6 zero-code-change cross-object ALIGN transfer (2026-10-03)
+
+- Baseline: branch `runtime-v3`, clean at `95c040d` before this milestone.
+- Added immutable `TaskSpec` / `EntitySpec`, a manifest-based reference
+  compiler, and `RuntimeEntityState` inside the existing canonical
+  `BeliefState`; there is no parallel world state.
+- Changed the experiment-facing perception adapter to accept an `EntitySpec`.
+  The semantic phrase reaches SAM grounding; the physical multi-scale option
+  reports the entity key and does not inspect an object name.
+- Frozen `experiments/runtime_v3/cross_object_align_manifest.json` before
+  formal rollout: task 2 anchor plus tasks 0 (alphabet soup), 6 (butter), and 7
+  (milk), seed 0. A reset-only canonical 512x512 agentview preview was manually
+  checked for each task and showed the named target visibly present. The preview
+  did not execute control or rank tasks by performance.
+- Added a cross-object Stage A runner that reuses the verified 3/6/9 mm
+  contracts and the existing six-direction candidate lattice, with automatic
+  same-code expansion to states 3–5 only after a 3/3 positive initial gate.
+  Simulator target-pose diagnostics are disabled for these runs.
+- `PYTHONPATH=. /root/autodl-tmp/OpenETA/sim/venvs/libero/bin/python -m pytest -q tests/runtime_v3`: 208 passed.
+- Formal Stage A and Qwen semantic binding results: pending execution after the
+  first implementation commit.
+
 ## M3.5 observation boundary and deployable metric depth (2026-10-03)
 
 - Started from stable commit `0973f4c107124415c790a214a98ec480c1076935` on

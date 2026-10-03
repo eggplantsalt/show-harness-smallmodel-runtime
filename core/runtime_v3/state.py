@@ -10,6 +10,28 @@ from .metric_entity import MetricEntityReference
 
 
 @dataclass(frozen=True)
+class RuntimeEntityState:
+    """Current evidence for one semantically bound entity in the canonical state."""
+
+    entity_key: str
+    semantic_phrase: str
+    role: str
+    identity_anchor: Any = None
+    reference_anchor: Any = None
+    visible: bool = False
+    valid: bool = False
+
+    def __post_init__(self) -> None:
+        for name in ("entity_key", "semantic_phrase", "role"):
+            value = str(getattr(self, name)).strip()
+            if not value:
+                raise ValueError(f"{name} must be non-empty")
+            object.__setattr__(self, name, value)
+        object.__setattr__(self, "visible", bool(self.visible))
+        object.__setattr__(self, "valid", bool(self.valid))
+
+
+@dataclass(frozen=True)
 class ObjectRelativeState:
     """Target identity evidence and the fixed visual control reference."""
 
@@ -46,6 +68,7 @@ class BeliefState:
     target_confidence: Optional[float] = None
     target_pose: Optional[tuple[float, ...]] = None
     target_image_position: Optional[tuple[float, float]] = None
+    runtime_entity_state: Optional[RuntimeEntityState] = None
     object_relative_state: Optional[ObjectRelativeState] = None
     end_effector_state: Optional[Mapping[str, Any]] = None
     gripper_state: Optional[str] = None
@@ -92,6 +115,9 @@ class StateBuilder:
             target_confidence=evidence.get("target_confidence", previous.target_confidence),
             target_pose=evidence.get("target_pose", previous.target_pose),
             target_image_position=evidence.get("target_image_position", previous.target_image_position),
+            runtime_entity_state=_runtime_entity_state(
+                evidence.get("runtime_entity_state", previous.runtime_entity_state)
+            ),
             object_relative_state=(object_relative if object_relative is not None
                                    else previous.object_relative_state),
             end_effector_state=proprioception.get("end_effector_state"),
@@ -184,6 +210,25 @@ def _object_relative_state(value: Any) -> Optional[ObjectRelativeState]:
         scene_ready=bool(value.get("scene_ready", True)),
         scene_ready_gate_enabled=bool(value.get("scene_ready_gate_enabled", False)),
     )
+
+
+def _runtime_entity_state(value: Any) -> Optional[RuntimeEntityState]:
+    if isinstance(value, RuntimeEntityState):
+        return value
+    if not isinstance(value, Mapping):
+        return None
+    try:
+        return RuntimeEntityState(
+            entity_key=str(value["entity_key"]),
+            semantic_phrase=str(value["semantic_phrase"]),
+            role=str(value["role"]),
+            identity_anchor=value.get("identity_anchor"),
+            reference_anchor=value.get("reference_anchor"),
+            visible=bool(value.get("visible", False)),
+            valid=bool(value.get("valid", False)),
+        )
+    except (KeyError, TypeError, ValueError):
+        return None
 
 
 def _metric_entity_reference(value: Any) -> Optional[MetricEntityReference]:
