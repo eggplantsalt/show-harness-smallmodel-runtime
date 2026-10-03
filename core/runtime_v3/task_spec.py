@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Mapping, Sequence
@@ -72,6 +73,11 @@ class ReferenceTaskCompiler:
     })
 
     def compile(self, entry: Mapping[str, Any]) -> TaskSpec:
+        forbidden = self._FORBIDDEN_FIELDS.intersection(
+            str(key).casefold() for key in entry
+        )
+        if forbidden:
+            raise ValueError(f"task binding contains physical fields: {sorted(forbidden)}")
         instruction = entry.get("instruction")
         entities_raw = entry.get("entities")
         focus = entry.get("focus_entity_key", "target")
@@ -94,3 +100,78 @@ class ReferenceTaskCompiler:
                 role=raw.get("role", ""),
             ))
         return TaskSpec(instruction, tuple(entities), str(focus), GoalKind(goal))
+
+
+class QwenTaskCompiler:
+    """Bind one instruction to one semantic manipuland with one Qwen response."""
+
+    _TOP_LEVEL_FIELDS = frozenset({"entities", "focus_entity_key", "goal_kind"})
+    _ENTITY_FIELDS = frozenset({"key", "semantic_phrase", "role"})
+
+    def __init__(self, client: Any, *, max_tokens: int = 128) -> None:
+        self.client = client
+        self.max_tokens = int(max_tokens)
+        if self.max_tokens <= 0:
+            raise ValueError("max_tokens must be positive")
+        self.last_raw_text: str | None = None
+
+    def compile(self, instruction: str, *, agentview_image: Any = None) -> TaskSpec:
+        if not isinstance(instruction, str) or not instruction.strip():
+            raise ValueError("instruction must be a non-empty string")
+        prompt = (
+            "Bind the primary manipuland named by the task instruction. Return exactly one "
+            "JSON object and no prose, markdown, or extra keys. Use one entity, key=target, "
+            "role=MANIPULAND, and a short semantic phrase copied from the instruction. "
+            "goal_kind must be ALIGN. Never return coordinates, pixels, directions, distances, "
+            "scales, thresholds, grasp points, robot actions, or controller fields.\n"
+            'Required shape: {"entities":[{"key":"target",'
+            '"semantic_phrase":"...","role":"MANIPULAND"}],'
+            '"focus_entity_key":"target","goal_kind":"ALIGN"}\n'
+            f"Task instruction: {instruction.strip()}"
+        )
+        self.last_raw_text = None
+        try:
+            response = self.client.complete_text(
+                prompt,
+                agentview_image=agentview_image,
+                wrist_image=None,
+                max_tokens=self.max_tokens,
+                temperature=0.0,
+                chat_template_kwargs={"enable_thinking": False, "thinking": False},
+            )
+        except Exception as exc:
+            self.last_raw_text = getattr(exc, "raw_text", None)
+            raise
+        raw_text = str(getattr(response, "raw_text", ""))
+        self.last_raw_text = raw_text
+        try:
+            parsed = json.loads(raw_text)
+        except json.JSONDecodeError as exc:
+            raise ValueError("Qwen semantic output is not strict JSON") from exc
+        if not isinstance(parsed, Mapping) or set(parsed) != self._TOP_LEVEL_FIELDS:
+            raise ValueError("Qwen semantic output does not match the required top-level schema")
+        raw_entities = parsed.get("entities")
+        if not isinstance(raw_entities, list) or len(raw_entities) != 1:
+            raise ValueError("Qwen semantic output must contain exactly one primary entity")
+        raw_entity = raw_entities[0]
+        if not isinstance(raw_entity, Mapping) or set(raw_entity) != self._ENTITY_FIELDS:
+            raise ValueError("Qwen entity does not match the required semantic-only schema")
+        if any(not isinstance(raw_entity[field], str) for field in self._ENTITY_FIELDS):
+            raise ValueError("Qwen entity fields must all be strings")
+        if not isinstance(parsed.get("focus_entity_key"), str):
+            raise ValueError("focus_entity_key must be a string")
+        if parsed.get("goal_kind") != GoalKind.ALIGN.value:
+            raise ValueError("Qwen task goal must be ALIGN")
+        entity = EntitySpec(
+            key=raw_entity["key"],
+            semantic_phrase=raw_entity["semantic_phrase"],
+            role=raw_entity["role"],
+        )
+        if entity.role != "MANIPULAND":
+            raise ValueError("Qwen primary entity role must be MANIPULAND")
+        return TaskSpec(
+            instruction=instruction,
+            entities=(entity,),
+            focus_entity_key=parsed["focus_entity_key"],
+            goal_kind=GoalKind.ALIGN,
+        )

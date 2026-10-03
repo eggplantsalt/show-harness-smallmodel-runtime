@@ -7,9 +7,11 @@ from core.runtime_v3.object_relative import MultiScaleAlignmentOptionGenerator
 from core.runtime_v3.arbiter import DecisionKind
 from core.runtime_v3.selector import Selection
 from core.runtime_v3.state import BeliefState, ObjectRelativeState, RuntimeEntityState, StateBuilder
-from core.runtime_v3.task_spec import EntitySpec, GoalKind, ReferenceTaskCompiler, TaskSpec
+from core.runtime_v3.task_spec import (
+    EntitySpec, GoalKind, QwenTaskCompiler, ReferenceTaskCompiler, TaskSpec,
+)
 from scripts.runtime_v3_multiscale_alignment import ExperimentArbiter
-from scripts.runtime_v3_cross_object_alignment import _episode_layers, _failure_layer
+from scripts.runtime_v3_cross_object_alignment import _episode_layers, _failure_layer, _task_metrics
 
 
 def _bound_state(key: str, phrase: str, direction: str = "DOWN") -> BeliefState:
@@ -90,6 +92,53 @@ def test_reference_task_compiler_accepts_semantics_and_rejects_physical_fields()
                 "direction": "DOWN",
             }], "focus_entity_key": "target",
         })
+    with pytest.raises(ValueError, match="physical fields"):
+        compiler.compile({
+            "instruction": "Align milk", "entities": [{
+                "key": "target", "semantic_phrase": "milk", "role": "MANIPULAND",
+            }], "focus_entity_key": "target", "direction": "DOWN",
+        })
+
+
+def test_qwen_task_compiler_accepts_only_one_semantic_manipuland():
+    class Client:
+        calls = 0
+
+        def complete_text(self, *_args, **_kwargs):
+            self.calls += 1
+            return type("Response", (), {"raw_text": (
+                '{"entities":[{"key":"target","semantic_phrase":"milk",'
+                '"role":"MANIPULAND"}],"focus_entity_key":"target",'
+                '"goal_kind":"ALIGN"}'
+            )})()
+
+    client = Client()
+    compiler = QwenTaskCompiler(client)
+    spec = compiler.compile("Pick the milk and place it in the basket")
+    assert client.calls == 1
+    assert spec.focus_entity == EntitySpec("target", "milk", "MANIPULAND")
+    assert spec.goal_kind is GoalKind.ALIGN
+
+
+@pytest.mark.parametrize("raw_text", [
+    '{"entities":[{"key":"target","semantic_phrase":"milk","role":"MANIPULAND",'
+    '"direction":"DOWN"}],"focus_entity_key":"target","goal_kind":"ALIGN"}',
+    '{"entities":[{"key":"target","semantic_phrase":"milk","role":"MANIPULAND"}],'
+    '"focus_entity_key":"target","goal_kind":"ALIGN","xyz":[0,0,0]}',
+    '```json {"entities": []} ```',
+])
+def test_qwen_task_compiler_fails_closed_without_schema_retries(raw_text):
+    class Client:
+        calls = 0
+
+        def complete_text(self, *_args, **_kwargs):
+            self.calls += 1
+            return type("Response", (), {"raw_text": raw_text})()
+
+    client = Client()
+    with pytest.raises(ValueError):
+        QwenTaskCompiler(client).compile("Pick the milk and place it in the basket")
+    assert client.calls == 1
 
 
 def test_runtime_alignment_option_uses_entity_key_and_same_contract_for_multiple_entities():
@@ -177,7 +226,35 @@ def test_failure_taxonomy_keeps_scene_and_perception_failures_distinct():
     assert _failure_layer("bounded Executor execution failed") == "PHYSICAL_EXECUTION_FAILURE"
     assert _failure_layer("TRIAL_FAILED") == "UNCLASSIFIED_FAILURE"
     assert _failure_layer("ARBITER_REJECTED") == "ARBITER_AUTHORIZATION_FAILURE"
+    assert _failure_layer("MAX_ALIGNMENT_STEPS") is None
     assert _episode_layers({
         "failure_layer": "SCENE_NOT_READY", "termination_reason": "TRIAL_FAILED",
         "error": "SceneReady failed", "alignment_steps": [],
     }) == ["SCENE_NOT_READY"]
+
+
+def test_failure_before_semantic_step_keeps_unobserved_rates_unknown():
+    metrics = _task_metrics([{
+        "failure_layer": "SCENE_NOT_READY", "alignment_steps": [],
+        "termination_reason": "TRIAL_FAILED", "scene_ready_initialization": {},
+    }])
+    assert metrics["grounding_success_rate"] is None
+    assert metrics["identity_success_rate"] is None
+    assert metrics["reference_validity_rate"] is None
+    assert metrics["scene_ready_success_rate"] == 0.0
+    assert metrics["scene_ready_attempts"] == 1
+    assert metrics["failure_layers"] == {"SCENE_NOT_READY": 1}
+
+
+def test_qwen_transfer_driver_feeds_only_entity_spec_to_the_frozen_runtime():
+    root = Path(__file__).resolve().parents[2]
+    offline = (root / "scripts/runtime_v3_qwen_task_binding.py").read_text(encoding="utf-8")
+    runtime = (root / "scripts/runtime_v3_qwen_cross_object_alignment.py").read_text(
+        encoding="utf-8")
+    assert "max_retries=0" in offline
+    assert "compiler.compile(row[\"instruction\"])" in offline
+    assert "robot_actions\": 0" in offline
+    assert "entity_spec=task_spec.focus_entity" in runtime
+    assert "diagnostic_oracle=False" in runtime
+    assert "QwenTaskCompiler" not in runtime
+    assert "physical_control_code_unchanged_from_reference_stage_a" in runtime

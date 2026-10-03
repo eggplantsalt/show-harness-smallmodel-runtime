@@ -81,6 +81,8 @@ def _failure_layer(reason: str | None) -> str | None:
     if not reason:
         return None
     value = str(reason).upper()
+    if value in {"MAX_ALIGNMENT_STEPS", "TARGET_REACHED", "STEP_LIMIT", "COMPLETED", "DONE"}:
+        return None
     compact = "".join(character for character in value if character.isalnum())
     if "INSTRUCTION" in value or "SEMANTIC" in value:
         return "SEMANTIC_BINDING_FAILURE"
@@ -114,7 +116,10 @@ def _episode_layers(episode: Mapping[str, Any]) -> list[str]:
         layer = _failure_layer(reason)
         if layer:
             layers.append(layer)
-    layer = _failure_layer(episode.get("error") or episode.get("termination_reason"))
+    fallback_reason = episode.get("error")
+    if fallback_reason is None and not episode.get("failure_layer"):
+        fallback_reason = episode.get("termination_reason")
+    layer = _failure_layer(fallback_reason)
     if layer:
         layers.append(layer)
     return list(dict.fromkeys(layers))
@@ -133,13 +138,14 @@ def _task_metrics(episodes: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         for item in errors if float(item["initial_error_px"]) > 0.0
     ]
     layers = Counter(layer for episode in episodes for layer in _episode_layers(episode))
-    grounded = [episode for episode in episodes
-                if next((bool(step.get("target_visible")) for step in episode.get("alignment_steps", [])), False)]
-    identity = [episode for episode in episodes
-                if next((bool(step.get("identity_valid")) for step in episode.get("alignment_steps", [])), False)]
-    reference = [episode for episode in episodes
-                 if next((bool(step.get("reference_valid")) for step in episode.get("alignment_steps", [])), False)]
-    scene = [episode for episode in episodes if episode.get("scene_ready_initialization", {}).get("ready")]
+    grounded = [episode for episode in episodes if episode.get("alignment_steps")]
+    identity = [episode for episode in episodes if episode.get("alignment_steps")]
+    reference = [episode for episode in episodes if episode.get("alignment_steps")]
+    scene_attempts = [episode for episode in episodes
+                      if episode.get("scene_ready_initialization")
+                      or episode.get("failure_layer") == "SCENE_NOT_READY"]
+    scene_ready_count = sum(bool(episode.get("scene_ready_initialization", {}).get("ready"))
+                            for episode in scene_attempts)
     net_positive = [episode for episode in episodes
                     if episode.get("initial_error_px") is not None
                     and episode.get("final_error_px") is not None
@@ -152,7 +158,14 @@ def _task_metrics(episodes: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
                       for item in errors]
     positive_effects = sum(value > 0.0 for value in improvements)
     count = len(episodes)
-    if len(net_positive) == count and count and len(grounded) == len(identity) == len(reference) == len(scene) == count:
+    grounding_rate = (sum(any(bool(step.get("target_visible")) for step in episode.get("alignment_steps", []))
+                          for episode in grounded) / len(grounded)) if grounded else None
+    identity_rate = (sum(any(bool(step.get("identity_valid")) for step in episode.get("alignment_steps", []))
+                         for episode in identity) / len(identity)) if identity else None
+    reference_rate = (sum(any(bool(step.get("reference_valid")) for step in episode.get("alignment_steps", []))
+                           for episode in reference) / len(reference)) if reference else None
+    scene_rate = scene_ready_count / len(scene_attempts) if scene_attempts else None
+    if (len(net_positive) == count and count and grounding_rate == identity_rate == reference_rate == scene_rate == 1.0):
         judgment = "PASS"
     elif net_positive:
         judgment = "PARTIAL"
@@ -160,10 +173,14 @@ def _task_metrics(episodes: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         judgment = "FAIL"
     return {
         "episodes": count,
-        "grounding_success_rate": len(grounded) / count if count else None,
-        "identity_success_rate": len(identity) / count if count else None,
-        "reference_validity_rate": len(reference) / count if count else None,
-        "scene_ready_success_rate": len(scene) / count if count else None,
+        "grounding_success_rate": grounding_rate,
+        "grounding_observed_episodes": len(grounded),
+        "identity_success_rate": identity_rate,
+        "identity_observed_episodes": len(identity),
+        "reference_validity_rate": reference_rate,
+        "reference_observed_episodes": len(reference),
+        "scene_ready_success_rate": scene_rate,
+        "scene_ready_attempts": len(scene_attempts),
         "align_actions_executed": len(executed),
         "positive_effect_fraction": positive_effects / len(improvements) if improvements else None,
         "monotonic_episodes": sum(bool(item.get("all_steps_positive")) for item in episodes),

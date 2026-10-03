@@ -18,16 +18,34 @@
   contracts and the existing six-direction candidate lattice, with automatic
   same-code expansion to states 3–5 only after a 3/3 positive initial gate.
   Simulator target-pose diagnostics are disabled for these runs.
-- `PYTHONPATH=. /root/autodl-tmp/OpenETA/sim/venvs/libero/bin/python -m pytest -q tests/runtime_v3`: 208 passed.
 - First Stage A attempt at `253afeb` is retained at
   `rollouts/runtime_v3_cross_object_alignment/run_20261003T082839Z_bac7770d`,
   but is invalid as transfer evidence: the harness raised `NameError: uuid is
   not defined` after PRE_ACTION_READY, so no ALIGN action was executed. The
   failure was found after the frozen run completed; the code was not changed
-  between task rollouts. A corrected frozen rerun is required before judgment.
-- `tests/runtime_v3` now has 209 tests, including a regression test for
-  approval trace creation and unique per-episode failure taxonomy counts.
-- Corrected formal Stage A and Qwen semantic binding results: pending.
+  between task rollouts. This attempt is excluded from all transfer metrics.
+- Corrected formal Stage A ran at `3ddc109791c5cca36294f61a8095195d690ff928`
+  in `rollouts/runtime_v3_cross_object_alignment/run_20261003T083700Z_9865926b/`.
+  Task 2 passed 3/3 episodes, task 0 expanded after its 3/3 gate and passed 6/6,
+  task 7 likewise passed 6/6, and task 6 failed SceneReady in 0/3 attempts before
+  any semantic ALIGN observation. The task 6 grounding, identity, and reference
+  rates are unknown because they were unobserved. No expansion or task-specific
+  recovery rule was applied to task 6.
+- The three tasks that reached ALIGN executed 90 steps; all 90 effects improved
+  the pixel alignment error and all 15 episodes were monotonic. Tasks 0 and 7
+  passed unseen-object transfer; the overall cross-object result is PARTIAL
+  because task 6 did not reach SceneReady. All selected scales were 9 mm, while
+  directions varied across target/layouts. Oracle target pose, GT depth, GT
+  contact, and task success were disabled.
+- Corrected reporting was recomputed from saved episode traces. The original raw
+  summary is retained as `summary_raw_metrics.json`; the corrected `summary.json`
+  records its source hash and marks the post-processing.
+- Added a strict one-call `QwenTaskCompiler` and an offline binding audit, plus a
+  Stage B driver that passes only the audited `EntitySpec` into the frozen ALIGN
+  runner. Qwen cannot provide physical fields or select direction/scale. The
+  offline Qwen binding and physical Stage B results are pending.
+- `PYTHONPATH=. /root/autodl-tmp/OpenETA/sim/venvs/libero/bin/python -m pytest -q tests/runtime_v3`:
+  215 passed. Compileall and `git diff --check` also pass.
 
 ## M3.5 observation boundary and deployable metric depth (2026-10-03)
 
