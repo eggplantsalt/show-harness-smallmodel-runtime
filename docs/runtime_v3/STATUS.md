@@ -259,3 +259,16 @@ the tested six states. That evidence supports the existing 2D objective only.
 The later M3.5 deployable metric-depth gate failed; it supersedes any suggestion
 that 3D metric alignment is the next milestone. Preserve the M3.4 capability, but
 do not use simulator depth to clear the M3.5 blocker.
+
+## M3.8 generalized grounding
+
+- The frozen heldout set is LIBERO_OBJECT tasks 3 (BBQ sauce), 4 (ketchup), 5
+  (tomato sauce), and 9 (orange juice), init states 0–2, seed 0.
+- Stage A completed with 12/12 valid Runtime references and 0 ALIGN actions.
+  Post-hoc visual review found the intended target proposal in all 12 pools,
+  but only 4/12 semantic selections were correct; 8/12 selected a wrong object.
+- Only task 4 init state 2 and task 9 init states 0–2 qualify for Stage B.
+  Stage B/C results will be recorded in the evidence ledger after those runs.
+- The implementation commit is `f0fc7b2` (`refactor: add general entity
+  grounding contract`). Development and Stage A visual evidence is archived in
+  `experiments/runtime_v3/m3_8/visual_audit/`.

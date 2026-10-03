@@ -1,0 +1,144 @@
+{
+  "task_id": 9,
+  "init_state_index": 0,
+  "seed": 0,
+  "task_instruction": "pick up the orange juice and place it in the basket",
+  "entity_key": "target",
+  "entity_phrase": "orange juice",
+  "robot_ready": true,
+  "robot_ready_hold_ticks": 4,
+  "scene_motion_ready": true,
+  "proposal_region_count": 1,
+  "candidate_proposal_count": 4,
+  "final_candidate_count": 4,
+  "raw_proposal_count": 21,
+  "filtered_proposal_count": 21,
+  "deduplicated_proposal_count": 17,
+  "target_candidate_present_human_review": null,
+  "selected_candidate_id": "C1",
+  "candidate_pool_k": 4,
+  "semantic_decision": "SELECT",
+  "selection_correct_human_review": null,
+  "no_match": false,
+  "entity_observation_ready": true,
+  "identity_valid": true,
+  "reference_valid": true,
+  "grounding_to_reference_success": true,
+  "readiness_ticks": 16,
+  "entity_observation_samples": 3,
+  "scene_motion_stable_frame_pairs": 3,
+  "agent_calls": 2,
+  "alignment_actions": 0,
+  "termination_reason": "READINESS_COMPLETE",
+  "grounding_audit": {
+    "entity_grounding_evidence": {
+      "entity_key": "target",
+      "semantic_query": "orange juice",
+      "candidate_id": "C1",
+      "decision": "SELECT",
+      "valid": true,
+      "source": "qwen_region_sam_point",
+      "invalid_reason": null,
+      "candidate_count": 4,
+      "proposal_region_count": 1,
+      "agent_calls": 2
+    },
+    "candidate_count": 4,
+    "candidate_details": [
+      {
+        "candidate_id": "C0",
+        "bbox_xyxy": [
+          177,
+          246,
+          214,
+          327
+        ],
+        "mask_area_px": 2736,
+        "proposal_score": 0.91015625,
+        "sources": [
+          "qwen_region_sam_point",
+          "text_sam"
+        ]
+      },
+      {
+        "candidate_id": "C1",
+        "bbox_xyxy": [
+          177,
+          246,
+          213,
+          302
+        ],
+        "mask_area_px": 1551,
+        "proposal_score": 0.486328125,
+        "sources": [
+          "qwen_region_sam_point"
+        ]
+      },
+      {
+        "candidate_id": "C2",
+        "bbox_xyxy": [
+          255,
+          272,
+          296,
+          364
+        ],
+        "mask_area_px": 2989,
+        "proposal_score": 0.400390625,
+        "sources": [
+          "text_sam"
+        ]
+      },
+      {
+        "candidate_id": "C3",
+        "bbox_xyxy": [
+          121,
+          272,
+          153,
+          338
+        ],
+        "mask_area_px": 1606,
+        "proposal_score": 0.3515625,
+        "sources": [
+          "text_sam"
+        ]
+      }
+    ],
+    "candidate_sources": {
+      "C0": [
+        "qwen_region_sam_point",
+        "text_sam"
+      ],
+      "C1": [
+        "qwen_region_sam_point"
+      ],
+      "C2": [
+        "text_sam"
+      ],
+      "C3": [
+        "text_sam"
+      ]
+    },
+    "pool_counts": {
+      "raw_proposals": 21,
+      "filtered_proposals": 21,
+      "deduplicated_proposals": 17,
+      "final_candidates": 4,
+      "candidate_pool_k": 4
+    },
+    "proposal_response": "{\"decision\": \"PROPOSE\", \"regions\": [{\"bbox_norm_1000\": [345, 484, 416, 634]}]}",
+    "selector_response": "{\"candidate_id\": \"C1\", \"decision\": \"SELECT\"}",
+    "candidate_sheet": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_a_20261003T135712Z_80982caa/task_9/init_state_0/semantic_candidate_sheet.png",
+    "runtime_reference_overlay": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_a_20261003T135712Z_80982caa/task_9/init_state_0/runtime_reference_overlay.png",
+    "agent_calls_per_initialization": 2
+  },
+  "formal_input_channels": [
+    "canonical_agentview_rgb",
+    "robot_proprioception"
+  ],
+  "formal_object_pose": false,
+  "formal_simulator_segmentation": false,
+  "formal_simulator_depth": false,
+  "formal_ground_truth_contact": false,
+  "formal_task_success": false,
+  "oracle_used_by_runtime": false
+}

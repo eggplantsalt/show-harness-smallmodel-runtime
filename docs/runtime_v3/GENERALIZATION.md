@@ -223,3 +223,17 @@ actions and is preserved in `experiments/runtime_v3/m3_6/`. Both were corrected
 before the formal Stage B commit. Qwen remained a semantic coprocessor: it
 provided `TaskSpec` semantic binding, while Runtime retained all physical
 authority.
+
+## M3.8 generalized grounding status
+
+The M3.8 manifest froze the remaining compatible unseen object tasks before
+formal runs: BBQ sauce, ketchup, tomato sauce, and orange juice, each at init
+states 0–2 with seed 0. The K=4 proposal pool plus frozen Qwen prompts reached
+Runtime reference readiness on 12/12 Stage A episodes. Human RGB review found
+the intended target mask in every pool, but the selector chose the correct
+object in only 4/12 and a wrong object in 8/12. The four correct cases are
+ketchup init state 2 and orange juice init states 0–2. Only those four qualify
+for M3.8 ALIGN evidence; stable temporal association and a valid reference do
+not establish correct semantic identity. The soup development path abstained
+instead of binding the previous Milk mask. Detailed candidate and final
+reference images are retained under `experiments/runtime_v3/m3_8/visual_audit/`.

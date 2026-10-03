@@ -1,0 +1,188 @@
+{
+  "milestone": "M3.8 held-out Stage A human visual audit",
+  "review_complete": true,
+  "protocol": "Post-hoc inspection of frozen Stage A canonical RGB, candidate ID/detail cards, Qwen decision/selected-mask highlight, and final Runtime reference overlay. Ground truth was not provided to proposal generation, selector, or Runtime.",
+  "stage_a_summary": "experiments/runtime_v3/m3_8/visual_audit/heldout/stage_a_summary.json",
+  "stage_a_summary_sha256": "617dcd8941e36ca7160f1b8d0aad03669f4598fa2619a1e9cc5c52b5bcf65e5f",
+  "manifest_sha256": "b5530e27547de4217fb2ba86016244245728456e8ece87ed441395d867161977",
+  "source_signature": {
+    "core/capabilities/sam3_client.py": "b26b6d636b65ff778e5655eab0f73d1bd79dc953749b65ed3c1968dd85d18065",
+    "core/runtime_v3/__init__.py": "48ad797cb6898099e8854e9e1ea52128c2dcb0d46a550b5fdbfba3368c95cb57",
+    "core/runtime_v3/adapters/__init__.py": "ed02ab922303715ba1574d6406470c936248f846d6fa46b08981bb18e03ce11d",
+    "core/runtime_v3/adapters/libero_env.py": "4e51c02f5836123ed8fa3889968bbff1b3544932ac6cefcc06dcde2a51e54db7",
+    "core/runtime_v3/adapters/libero_observation.py": "0ac10620f06b7f666f4dea972ee84c2649c2c9d1ffddba645c820e3f5f8b6dcf",
+    "core/runtime_v3/adapters/qwen_selector.py": "2fec1cbfa6aa62d8800abb2c88682f682f1f3f11895fabd9705cb9e2f0ac7c36",
+    "core/runtime_v3/arbiter.py": "619e3281c96a64fe031ad6433ef99a25fd7fe60afd1ae01fccd48c86095e67db",
+    "core/runtime_v3/calibration.py": "7a9050ab8e1d21b5d7568981620b57eee21b00ece7bb2f632b40bc65bbe0f454",
+    "core/runtime_v3/canonical_image.py": "b0ae7d5692eb3f2a027ab514e5369735b63bd22559d1bda301c9b9460eba1ee3",
+    "core/runtime_v3/depth.py": "19e11339409dd72f567cb143b7c2f6fc8b67727ef982da0f0a92d3569c3038f9",
+    "core/runtime_v3/effects.py": "e189954258a0ba50841d8e1dc388f3770f39a2aa1d8a82d550ea399b3b5d3251",
+    "core/runtime_v3/executor.py": "4bb9d611b145d899f3b0ee17be8a8eab0e145de01346239dfb77cd11cc58f294",
+    "core/runtime_v3/grounding.py": "d8b27670583a3f48174578ff8c9d8929a6eea6ad9874f38ebfa72c095f6004c7",
+    "core/runtime_v3/grounding_query.py": "1f7c6ccc1c381644984ea2723ac9550d85ac746b5df501d0ec746483e4ffbacb",
+    "core/runtime_v3/memory.py": "df5f6605acd6d8102d04feb22f7a3cc9cf301a4a32cffc3f579e97772b00be07",
+    "core/runtime_v3/metric_entity.py": "5cd353cec3090ff41211a4fe1b8ed87d75e6754c3424fc99982bd613bb4f4d0b",
+    "core/runtime_v3/micro_motion.py": "107fe2e6883666f57d1bebc09ea1b654c910d36f03d5bc26201ab7e6212b3586",
+    "core/runtime_v3/object_relative.py": "e56ca096e385fd7ffff0656aaf602a31624164a1b5fc0efc0fbdd3af96c4b50c",
+    "core/runtime_v3/observer.py": "dd9d50a6f228b40895b418fc93e24876c16c5588628f9b4f94da6de3b6196459",
+    "core/runtime_v3/options.py": "466c143825742ba7b3320c3e39b1a684bba9798b13732f80349dc4564b4fca3c",
+    "core/runtime_v3/readiness.py": "fd78722dd39bbf90c0ebe9a5286f025cbf3616014fa7f6bf83a8f4f89e1671dc",
+    "core/runtime_v3/runner.py": "f75333e3877128bef93e504ed6338f8566f6ccd5a046f167a34a517a238d9b75",
+    "core/runtime_v3/scene_initialization.py": "e2832fd0417ef34d4cf70420ba352f5091a66a077ea39d47841f86c2e7c89ed4",
+    "core/runtime_v3/scene_settling.py": "4495c3055161f4250a4f9af0980c1ff4a5ddc1a86a1d73703ec5093636caff4d",
+    "core/runtime_v3/selector.py": "67b47e9149f0222fee9592ec33a5afb4dc63faaab1c1f43319a9af7eec508000",
+    "core/runtime_v3/smoke_options.py": "f91fde5e91dd332007e8dd236c9227ea408b58df136ad563ece15e9b78135c26",
+    "core/runtime_v3/state.py": "52d44cc69f98dc58a8c8a764bccc25b2474a374d4573e1daa0abd56b51ed7ed3",
+    "core/runtime_v3/task_spec.py": "625445238d3c8e9841642c623dc690cd16051104e5ab15ed0725d2b5668fde15",
+    "core/runtime_v3/temporal_calibration.py": "80d94737043f627cf8c1d5bf3e4f4f0931c21974c1a15237e599cf3aabee0a54",
+    "scripts/runtime_v3_multiscale_alignment.py": "7422d2af7d9189344c2de7ff50e871e332014c7653eadd8d7230da208971721c",
+    "scripts/runtime_v3_semantic_grounding.py": "1790af1520a680acc987dff974406d8304d32568b3a48a1a55dcc95117342576"
+  },
+  "reviewed_episode_count": 12,
+  "episodes": [
+    {
+      "task_id": 3,
+      "init_state_index": 0,
+      "selected_candidate_id": "C1",
+      "target_candidate_ids": [
+        "C3"
+      ],
+      "target_candidate_present": true,
+      "selected_matches_target": false,
+      "visual_evidence": "experiments/runtime_v3/m3_8/visual_audit/heldout/stage_a/task_3/init_state_0/semantic_candidate_sheet.png",
+      "runtime_reference_evidence": "experiments/runtime_v3/m3_8/visual_audit/heldout/stage_a/task_3/init_state_0/runtime_reference_overlay.png"
+    },
+    {
+      "task_id": 3,
+      "init_state_index": 1,
+      "selected_candidate_id": "C1",
+      "target_candidate_ids": [
+        "C3"
+      ],
+      "target_candidate_present": true,
+      "selected_matches_target": false,
+      "visual_evidence": "experiments/runtime_v3/m3_8/visual_audit/heldout/stage_a/task_3/init_state_1/semantic_candidate_sheet.png",
+      "runtime_reference_evidence": "experiments/runtime_v3/m3_8/visual_audit/heldout/stage_a/task_3/init_state_1/runtime_reference_overlay.png"
+    },
+    {
+      "task_id": 3,
+      "init_state_index": 2,
+      "selected_candidate_id": "C3",
+      "target_candidate_ids": [
+        "C1"
+      ],
+      "target_candidate_present": true,
+      "selected_matches_target": false,
+      "visual_evidence": "experiments/runtime_v3/m3_8/visual_audit/heldout/stage_a/task_3/init_state_2/semantic_candidate_sheet.png",
+      "runtime_reference_evidence": "experiments/runtime_v3/m3_8/visual_audit/heldout/stage_a/task_3/init_state_2/runtime_reference_overlay.png"
+    },
+    {
+      "task_id": 4,
+      "init_state_index": 0,
+      "selected_candidate_id": "C1",
+      "target_candidate_ids": [
+        "C2"
+      ],
+      "target_candidate_present": true,
+      "selected_matches_target": false,
+      "visual_evidence": "experiments/runtime_v3/m3_8/visual_audit/heldout/stage_a/task_4/init_state_0/semantic_candidate_sheet.png",
+      "runtime_reference_evidence": "experiments/runtime_v3/m3_8/visual_audit/heldout/stage_a/task_4/init_state_0/runtime_reference_overlay.png"
+    },
+    {
+      "task_id": 4,
+      "init_state_index": 1,
+      "selected_candidate_id": "C0",
+      "target_candidate_ids": [
+        "C2"
+      ],
+      "target_candidate_present": true,
+      "selected_matches_target": false,
+      "visual_evidence": "experiments/runtime_v3/m3_8/visual_audit/heldout/stage_a/task_4/init_state_1/semantic_candidate_sheet.png",
+      "runtime_reference_evidence": "experiments/runtime_v3/m3_8/visual_audit/heldout/stage_a/task_4/init_state_1/runtime_reference_overlay.png"
+    },
+    {
+      "task_id": 4,
+      "init_state_index": 2,
+      "selected_candidate_id": "C3",
+      "target_candidate_ids": [
+        "C3"
+      ],
+      "target_candidate_present": true,
+      "selected_matches_target": true,
+      "visual_evidence": "experiments/runtime_v3/m3_8/visual_audit/heldout/stage_a/task_4/init_state_2/semantic_candidate_sheet.png",
+      "runtime_reference_evidence": "experiments/runtime_v3/m3_8/visual_audit/heldout/stage_a/task_4/init_state_2/runtime_reference_overlay.png"
+    },
+    {
+      "task_id": 5,
+      "init_state_index": 0,
+      "selected_candidate_id": "C1",
+      "target_candidate_ids": [
+        "C3"
+      ],
+      "target_candidate_present": true,
+      "selected_matches_target": false,
+      "visual_evidence": "experiments/runtime_v3/m3_8/visual_audit/heldout/stage_a/task_5/init_state_0/semantic_candidate_sheet.png",
+      "runtime_reference_evidence": "experiments/runtime_v3/m3_8/visual_audit/heldout/stage_a/task_5/init_state_0/runtime_reference_overlay.png"
+    },
+    {
+      "task_id": 5,
+      "init_state_index": 1,
+      "selected_candidate_id": "C1",
+      "target_candidate_ids": [
+        "C3"
+      ],
+      "target_candidate_present": true,
+      "selected_matches_target": false,
+      "visual_evidence": "experiments/runtime_v3/m3_8/visual_audit/heldout/stage_a/task_5/init_state_1/semantic_candidate_sheet.png",
+      "runtime_reference_evidence": "experiments/runtime_v3/m3_8/visual_audit/heldout/stage_a/task_5/init_state_1/runtime_reference_overlay.png"
+    },
+    {
+      "task_id": 5,
+      "init_state_index": 2,
+      "selected_candidate_id": "C1",
+      "target_candidate_ids": [
+        "C3"
+      ],
+      "target_candidate_present": true,
+      "selected_matches_target": false,
+      "visual_evidence": "experiments/runtime_v3/m3_8/visual_audit/heldout/stage_a/task_5/init_state_2/semantic_candidate_sheet.png",
+      "runtime_reference_evidence": "experiments/runtime_v3/m3_8/visual_audit/heldout/stage_a/task_5/init_state_2/runtime_reference_overlay.png"
+    },
+    {
+      "task_id": 9,
+      "init_state_index": 0,
+      "selected_candidate_id": "C1",
+      "target_candidate_ids": [
+        "C1"
+      ],
+      "target_candidate_present": true,
+      "selected_matches_target": true,
+      "visual_evidence": "experiments/runtime_v3/m3_8/visual_audit/heldout/stage_a/task_9/init_state_0/semantic_candidate_sheet.png",
+      "runtime_reference_evidence": "experiments/runtime_v3/m3_8/visual_audit/heldout/stage_a/task_9/init_state_0/runtime_reference_overlay.png"
+    },
+    {
+      "task_id": 9,
+      "init_state_index": 1,
+      "selected_candidate_id": "C1",
+      "target_candidate_ids": [
+        "C1"
+      ],
+      "target_candidate_present": true,
+      "selected_matches_target": true,
+      "visual_evidence": "experiments/runtime_v3/m3_8/visual_audit/heldout/stage_a/task_9/init_state_1/semantic_candidate_sheet.png",
+      "runtime_reference_evidence": "experiments/runtime_v3/m3_8/visual_audit/heldout/stage_a/task_9/init_state_1/runtime_reference_overlay.png"
+    },
+    {
+      "task_id": 9,
+      "init_state_index": 2,
+      "selected_candidate_id": "C1",
+      "target_candidate_ids": [
+        "C1"
+      ],
+      "target_candidate_present": true,
+      "selected_matches_target": true,
+      "visual_evidence": "experiments/runtime_v3/m3_8/visual_audit/heldout/stage_a/task_9/init_state_2/semantic_candidate_sheet.png",
+      "runtime_reference_evidence": "experiments/runtime_v3/m3_8/visual_audit/heldout/stage_a/task_9/init_state_2/runtime_reference_overlay.png"
+    }
+  ]
+}

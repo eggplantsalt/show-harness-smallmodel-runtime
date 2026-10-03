@@ -1,0 +1,146 @@
+{
+  "task_id": 3,
+  "init_state_index": 2,
+  "seed": 0,
+  "task_instruction": "pick up the bbq sauce and place it in the basket",
+  "entity_key": "target",
+  "entity_phrase": "bbq sauce",
+  "robot_ready": true,
+  "robot_ready_hold_ticks": 4,
+  "scene_motion_ready": true,
+  "proposal_region_count": 2,
+  "candidate_proposal_count": 4,
+  "final_candidate_count": 4,
+  "raw_proposal_count": 9,
+  "filtered_proposal_count": 9,
+  "deduplicated_proposal_count": 7,
+  "target_candidate_present_human_review": null,
+  "selected_candidate_id": "C3",
+  "candidate_pool_k": 4,
+  "semantic_decision": "SELECT",
+  "selection_correct_human_review": null,
+  "no_match": false,
+  "entity_observation_ready": true,
+  "identity_valid": true,
+  "reference_valid": true,
+  "grounding_to_reference_success": true,
+  "readiness_ticks": 14,
+  "entity_observation_samples": 3,
+  "scene_motion_stable_frame_pairs": 3,
+  "agent_calls": 2,
+  "alignment_actions": 0,
+  "termination_reason": "READINESS_COMPLETE",
+  "grounding_audit": {
+    "entity_grounding_evidence": {
+      "entity_key": "target",
+      "semantic_query": "bbq sauce",
+      "candidate_id": "C3",
+      "decision": "SELECT",
+      "valid": true,
+      "source": "qwen_region_sam_point",
+      "invalid_reason": null,
+      "candidate_count": 4,
+      "proposal_region_count": 2,
+      "agent_calls": 2
+    },
+    "candidate_count": 4,
+    "candidate_details": [
+      {
+        "candidate_id": "C0",
+        "bbox_xyxy": [
+          183,
+          255,
+          212,
+          319
+        ],
+        "mask_area_px": 1479,
+        "proposal_score": 0.91015625,
+        "sources": [
+          "qwen_region_sam_point",
+          "text_sam"
+        ]
+      },
+      {
+        "candidate_id": "C1",
+        "bbox_xyxy": [
+          270,
+          185,
+          303,
+          261
+        ],
+        "mask_area_px": 1983,
+        "proposal_score": 0.8125,
+        "sources": [
+          "qwen_region_sam_point",
+          "text_sam"
+        ]
+      },
+      {
+        "candidate_id": "C2",
+        "bbox_xyxy": [
+          184,
+          273,
+          212,
+          319
+        ],
+        "mask_area_px": 1013,
+        "proposal_score": 0.68359375,
+        "sources": [
+          "qwen_region_sam_point"
+        ]
+      },
+      {
+        "candidate_id": "C3",
+        "bbox_xyxy": [
+          271,
+          209,
+          303,
+          261
+        ],
+        "mask_area_px": 1382,
+        "proposal_score": 0.66015625,
+        "sources": [
+          "qwen_region_sam_point"
+        ]
+      }
+    ],
+    "candidate_sources": {
+      "C0": [
+        "qwen_region_sam_point",
+        "text_sam"
+      ],
+      "C1": [
+        "qwen_region_sam_point",
+        "text_sam"
+      ],
+      "C2": [
+        "qwen_region_sam_point"
+      ],
+      "C3": [
+        "qwen_region_sam_point"
+      ]
+    },
+    "pool_counts": {
+      "raw_proposals": 9,
+      "filtered_proposals": 9,
+      "deduplicated_proposals": 7,
+      "final_candidates": 4,
+      "candidate_pool_k": 4
+    },
+    "proposal_response": "{\"decision\": \"PROPOSE\", \"regions\": [{\"bbox_norm_1000\": [350, 488, 400, 630]}, {\"bbox_norm_1000\": [516, 360, 575, 510]}]}",
+    "selector_response": "{\"candidate_id\": \"C3\", \"decision\": \"SELECT\"}",
+    "candidate_sheet": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_a_20261003T135712Z_80982caa/task_3/init_state_2/semantic_candidate_sheet.png",
+    "runtime_reference_overlay": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_a_20261003T135712Z_80982caa/task_3/init_state_2/runtime_reference_overlay.png",
+    "agent_calls_per_initialization": 2
+  },
+  "formal_input_channels": [
+    "canonical_agentview_rgb",
+    "robot_proprioception"
+  ],
+  "formal_object_pose": false,
+  "formal_simulator_segmentation": false,
+  "formal_simulator_depth": false,
+  "formal_ground_truth_contact": false,
+  "formal_task_success": false,
+  "oracle_used_by_runtime": false
+}

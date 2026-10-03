@@ -1,0 +1,324 @@
+{
+  "milestone": "M3.8 generalized semantic entity grounding development",
+  "status": "VISUAL_REVIEW_COMPLETE_BEFORE_HELDOUT_STAGE_A",
+  "candidate_pool_k": 4,
+  "region_prompt_version": "m3.8-zero-shot-region-v1",
+  "selector_prompt_version": "m3.8-zero-shot-detail-card-v2",
+  "offline_reset_frame_diagnostic": {
+    "source_run": "rollouts/runtime_v3_m3_8/development_20261003T134927Z_60f0e5f7",
+    "protocol": "Canonical RGB only, no robot actions or privileged target inputs; candidate and baseline sheets visually inspected after both outputs were frozen.",
+    "metrics": {
+      "development_task_count": 6,
+      "target_candidate_coverage": "4/6",
+      "direct_text_sam_target_candidate_coverage": "3/6",
+      "semantic_correct_selection": "0/6 overall; 0/2 among SELECT outputs",
+      "semantic_wrong_entity": "2/6 overall; 2/2 among SELECT outputs",
+      "semantic_no_match": "4/6",
+      "direct_text_sam_top_correct": "2/6",
+      "direct_text_sam_top_wrong": "2/6",
+      "direct_text_sam_no_candidate": "2/6",
+      "agent_calls_per_initialization": "2 per episode; 12 total across six development frames"
+    },
+    "tasks": [
+      {
+        "task_id": 2,
+        "semantic_phrase": "salad dressing",
+        "candidate_pool_k": 4,
+        "frame": "experiments/runtime_v3/m3_8/development_frames/task_2_salad_dressing_canonical.png",
+        "frame_sha256": "a58bb53037234a68557dc664ab1c21d0addab86fb6eb1979268f17322a3928a5",
+        "candidate_sheet": "experiments/runtime_v3/m3_8/visual_audit/development/reset_candidate_sheets/task_2_salad_dressing_candidate_sheet.png",
+        "direct_text_sam_sheet": "experiments/runtime_v3/m3_8/visual_audit/development/direct_text_sam/task_2_salad_dressing_direct_text_sam_baseline.png",
+        "visually_confirmed_target_candidate_ids": [
+          "C3"
+        ],
+        "target_candidate_present": true,
+        "semantic_selected_candidate_id": "C1",
+        "semantic_decision": "SELECT",
+        "semantic_selection_audit": "WRONG_ENTITY",
+        "direct_text_sam_detection_count": 3,
+        "direct_text_sam_top_candidate_id": "C0",
+        "direct_text_sam_top_candidate_audit": "CORRECT",
+        "entity_observation_ready": "NOT_MEASURED_OFFLINE",
+        "agent_calls": 2,
+        "proposal_counts": {
+          "raw_proposals": 6,
+          "filtered_proposals": 6,
+          "deduplicated_proposals": 5,
+          "final_candidates": 4
+        }
+      },
+      {
+        "task_id": 7,
+        "semantic_phrase": "milk",
+        "candidate_pool_k": 4,
+        "frame": "experiments/runtime_v3/m3_8/development_frames/task_7_milk_canonical.png",
+        "frame_sha256": "9934beec2298323bec3e676c57d137c0ecd0eed23da69f356b8dd3a6cd858939",
+        "candidate_sheet": "experiments/runtime_v3/m3_8/visual_audit/development/reset_candidate_sheets/task_7_milk_candidate_sheet.png",
+        "direct_text_sam_sheet": "experiments/runtime_v3/m3_8/visual_audit/development/direct_text_sam/task_7_milk_direct_text_sam_baseline.png",
+        "visually_confirmed_target_candidate_ids": [
+          "C0"
+        ],
+        "target_candidate_present": true,
+        "semantic_selected_candidate_id": "C1",
+        "semantic_decision": "SELECT",
+        "semantic_selection_audit": "WRONG_ENTITY",
+        "direct_text_sam_detection_count": 6,
+        "direct_text_sam_top_candidate_id": "C0",
+        "direct_text_sam_top_candidate_audit": "CORRECT",
+        "entity_observation_ready": "NOT_MEASURED_OFFLINE",
+        "agent_calls": 2,
+        "proposal_counts": {
+          "raw_proposals": 9,
+          "filtered_proposals": 9,
+          "deduplicated_proposals": 7,
+          "final_candidates": 4
+        }
+      },
+      {
+        "task_id": 0,
+        "semantic_phrase": "alphabet soup",
+        "candidate_pool_k": 4,
+        "frame": "experiments/runtime_v3/m3_8/development_frames/task_0_alphabet_soup_canonical.png",
+        "frame_sha256": "4b1c4cfebb851663eafd6ac044bddc66449e40db2cb545c490e68cef607c987d",
+        "candidate_sheet": "experiments/runtime_v3/m3_8/visual_audit/development/reset_candidate_sheets/task_0_alphabet_soup_candidate_sheet.png",
+        "direct_text_sam_sheet": "experiments/runtime_v3/m3_8/visual_audit/development/direct_text_sam/task_0_alphabet_soup_direct_text_sam_baseline.png",
+        "visually_confirmed_target_candidate_ids": [
+          "C3"
+        ],
+        "target_candidate_present": true,
+        "semantic_selected_candidate_id": null,
+        "semantic_decision": "NO_MATCH",
+        "semantic_selection_audit": "NO_MATCH_WITH_TARGET_CANDIDATE_PRESENT",
+        "direct_text_sam_detection_count": 2,
+        "direct_text_sam_top_candidate_id": "C0",
+        "direct_text_sam_top_candidate_audit": "WRONG_ENTITY",
+        "entity_observation_ready": "NOT_MEASURED_OFFLINE",
+        "agent_calls": 2,
+        "proposal_counts": {
+          "raw_proposals": 5,
+          "filtered_proposals": 5,
+          "deduplicated_proposals": 4,
+          "final_candidates": 4
+        }
+      },
+      {
+        "task_id": 6,
+        "semantic_phrase": "butter",
+        "candidate_pool_k": 4,
+        "frame": "experiments/runtime_v3/m3_8/development_frames/task_6_butter_canonical.png",
+        "frame_sha256": "293ee315b4e08d5f225230eb36fb21d22c7d799e4e8868b951c84c01a1f6bc62",
+        "candidate_sheet": "experiments/runtime_v3/m3_8/visual_audit/development/reset_candidate_sheets/task_6_butter_candidate_sheet.png",
+        "direct_text_sam_sheet": "experiments/runtime_v3/m3_8/visual_audit/development/direct_text_sam/task_6_butter_direct_text_sam_baseline.png",
+        "visually_confirmed_target_candidate_ids": [],
+        "target_candidate_present": false,
+        "semantic_selected_candidate_id": null,
+        "semantic_decision": "NO_MATCH",
+        "semantic_selection_audit": "NO_MATCH_NO_TARGET_CANDIDATE",
+        "direct_text_sam_detection_count": 2,
+        "direct_text_sam_top_candidate_id": "C0",
+        "direct_text_sam_top_candidate_audit": "WRONG_ENTITY",
+        "entity_observation_ready": "NOT_MEASURED_OFFLINE",
+        "agent_calls": 2,
+        "proposal_counts": {
+          "raw_proposals": 5,
+          "filtered_proposals": 5,
+          "deduplicated_proposals": 4,
+          "final_candidates": 4
+        }
+      },
+      {
+        "task_id": 1,
+        "semantic_phrase": "cream cheese",
+        "candidate_pool_k": 4,
+        "frame": "experiments/runtime_v3/m3_8/development_frames/task_1_cream_cheese_canonical.png",
+        "frame_sha256": "be7b032025e38dfa334a21d5d0fe535b3b7f44b09f60c9d1024ff68843a5151b",
+        "candidate_sheet": "experiments/runtime_v3/m3_8/visual_audit/development/reset_candidate_sheets/task_1_cream_cheese_candidate_sheet.png",
+        "direct_text_sam_sheet": null,
+        "visually_confirmed_target_candidate_ids": [],
+        "target_candidate_present": false,
+        "semantic_selected_candidate_id": null,
+        "semantic_decision": "NO_MATCH",
+        "semantic_selection_audit": "NO_MATCH_NO_TARGET_CANDIDATE",
+        "direct_text_sam_detection_count": 0,
+        "direct_text_sam_top_candidate_id": null,
+        "direct_text_sam_top_candidate_audit": "NO_CANDIDATE",
+        "entity_observation_ready": "NOT_MEASURED_OFFLINE",
+        "agent_calls": 2,
+        "proposal_counts": {
+          "raw_proposals": 3,
+          "filtered_proposals": 3,
+          "deduplicated_proposals": 3,
+          "final_candidates": 3
+        }
+      },
+      {
+        "task_id": 8,
+        "semantic_phrase": "chocolate pudding",
+        "candidate_pool_k": 4,
+        "frame": "experiments/runtime_v3/m3_8/development_frames/task_8_chocolate_pudding_canonical.png",
+        "frame_sha256": "a97c9b52baff37cfc83aa4193d2820d808e9d3ac52c04b4727bcf2ee07c5738e",
+        "candidate_sheet": "experiments/runtime_v3/m3_8/visual_audit/development/reset_candidate_sheets/task_8_chocolate_pudding_candidate_sheet.png",
+        "direct_text_sam_sheet": null,
+        "visually_confirmed_target_candidate_ids": [
+          "C0",
+          "C1",
+          "C2"
+        ],
+        "target_candidate_present": true,
+        "semantic_selected_candidate_id": null,
+        "semantic_decision": "NO_MATCH",
+        "semantic_selection_audit": "NO_MATCH_WITH_TARGET_CANDIDATE_PRESENT",
+        "direct_text_sam_detection_count": 0,
+        "direct_text_sam_top_candidate_id": null,
+        "direct_text_sam_top_candidate_audit": "NO_CANDIDATE",
+        "entity_observation_ready": "NOT_MEASURED_OFFLINE",
+        "agent_calls": 2,
+        "proposal_counts": {
+          "raw_proposals": 3,
+          "filtered_proposals": 3,
+          "deduplicated_proposals": 3,
+          "final_candidates": 3
+        }
+      }
+    ]
+  },
+  "runtime_readiness_diagnostic": {
+    "source_run": "rollouts/runtime_v3_m3_8/development_runtime_20261003T134446Z_12ead6d5",
+    "protocol": "Seed 0, init state 0, actual Runtime hold-only path; only canonical agentview RGB and robot proprioception. Candidate sheets and final Runtime reference overlays visually inspected; zero ALIGN or robot-motion actions.",
+    "metrics": {
+      "development_task_count": 6,
+      "target_candidate_coverage": "4/6",
+      "semantically_correct_selection": "2/6 overall; 2/2 among SELECT outputs",
+      "wrong_entity": "0/6",
+      "no_match": "4/6",
+      "entity_observation_ready": "2/6",
+      "grounding_to_reference_success": "2/6",
+      "agent_calls_per_initialization": "2",
+      "alignment_actions": 0,
+      "robot_motion_actions": 0,
+      "formal_object_pose": false,
+      "formal_simulator_segmentation": false,
+      "formal_simulator_depth": false,
+      "formal_ground_truth_contact": false,
+      "formal_task_success": false
+    },
+    "tasks": [
+      {
+        "task_id": 2,
+        "semantic_phrase": "salad dressing",
+        "target_candidate_ids": [
+          "C0",
+          "C1"
+        ],
+        "target_candidate_present": true,
+        "selected_candidate_id": "C1",
+        "selected_matches_target": true,
+        "semantic_decision": "SELECT",
+        "entity_observation_ready": true,
+        "grounding_to_reference_success": true,
+        "readiness_ticks": 13,
+        "agent_calls": 2,
+        "alignment_actions": 0,
+        "robot_motion_actions": 0,
+        "candidate_sheet": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_2_salad_dressing_semantic_candidate_sheet.png",
+        "runtime_reference_overlay": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_2_salad_dressing_runtime_reference_overlay.png"
+      },
+      {
+        "task_id": 7,
+        "semantic_phrase": "milk",
+        "target_candidate_ids": [
+          "C0"
+        ],
+        "target_candidate_present": true,
+        "selected_candidate_id": "C0",
+        "selected_matches_target": true,
+        "semantic_decision": "SELECT",
+        "entity_observation_ready": true,
+        "grounding_to_reference_success": true,
+        "readiness_ticks": 14,
+        "agent_calls": 2,
+        "alignment_actions": 0,
+        "robot_motion_actions": 0,
+        "candidate_sheet": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_7_milk_semantic_candidate_sheet.png",
+        "runtime_reference_overlay": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_7_milk_runtime_reference_overlay.png"
+      },
+      {
+        "task_id": 0,
+        "semantic_phrase": "alphabet soup",
+        "target_candidate_ids": [],
+        "target_candidate_present": false,
+        "selected_candidate_id": null,
+        "selected_matches_target": false,
+        "semantic_decision": "NO_MATCH",
+        "entity_observation_ready": false,
+        "grounding_to_reference_success": false,
+        "readiness_ticks": 41,
+        "agent_calls": 2,
+        "alignment_actions": 0,
+        "robot_motion_actions": 0,
+        "candidate_sheet": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_0_alphabet_soup_semantic_candidate_sheet.png",
+        "runtime_reference_overlay": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_0_alphabet_soup_runtime_reference_overlay.png"
+      },
+      {
+        "task_id": 6,
+        "semantic_phrase": "butter",
+        "target_candidate_ids": [
+          "C0",
+          "C1"
+        ],
+        "target_candidate_present": true,
+        "selected_candidate_id": null,
+        "selected_matches_target": false,
+        "semantic_decision": "NO_MATCH",
+        "entity_observation_ready": false,
+        "grounding_to_reference_success": false,
+        "readiness_ticks": 41,
+        "agent_calls": 2,
+        "alignment_actions": 0,
+        "robot_motion_actions": 0,
+        "candidate_sheet": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_6_butter_semantic_candidate_sheet.png",
+        "runtime_reference_overlay": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_6_butter_runtime_reference_overlay.png"
+      },
+      {
+        "task_id": 1,
+        "semantic_phrase": "cream cheese",
+        "target_candidate_ids": [],
+        "target_candidate_present": false,
+        "selected_candidate_id": null,
+        "selected_matches_target": false,
+        "semantic_decision": "NO_MATCH",
+        "entity_observation_ready": false,
+        "grounding_to_reference_success": false,
+        "readiness_ticks": 41,
+        "agent_calls": 2,
+        "alignment_actions": 0,
+        "robot_motion_actions": 0,
+        "candidate_sheet": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_1_cream_cheese_semantic_candidate_sheet.png",
+        "runtime_reference_overlay": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_1_cream_cheese_runtime_reference_overlay.png"
+      },
+      {
+        "task_id": 8,
+        "semantic_phrase": "chocolate pudding",
+        "target_candidate_ids": [
+          "C0",
+          "C1",
+          "C2"
+        ],
+        "target_candidate_present": true,
+        "selected_candidate_id": null,
+        "selected_matches_target": false,
+        "semantic_decision": "NO_MATCH",
+        "entity_observation_ready": false,
+        "grounding_to_reference_success": false,
+        "readiness_ticks": 41,
+        "agent_calls": 2,
+        "alignment_actions": 0,
+        "robot_motion_actions": 0,
+        "candidate_sheet": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_8_chocolate_pudding_semantic_candidate_sheet.png",
+        "runtime_reference_overlay": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_8_chocolate_pudding_runtime_reference_overlay.png"
+      }
+    ]
+  },
+  "candidate_pool_selection": "K=4 is the smallest shared cap preserving the lowest-ranked visually confirmed target proposals at C3 in the reset-only soup and salad-dressing pools; the runtime-only butter and pudding pools add two more covered targets. K was selected before heldout rollout.",
+  "historical_m3_6_soup_claim": "INVALIDATED: the former selected stable mask was Milk; M3.8 runtime development returns NO_MATCH for soup rather than promoting that mask."
+}
