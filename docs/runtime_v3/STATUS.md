@@ -48,10 +48,33 @@
   dressing`, `the alphabet soup`, `the butter`, and `the milk`. A deterministic
   saved-response audit strips one leading English article when comparing with
   the manifest phrase; raw model text is retained and the runtime receives the
-  original Qwen phrase. No second model call or prompt change was made. The
-  reconciled semantic binding audit and physical Stage B results are pending.
+  original Qwen phrase. This gives 4/4 semantic matches; literal string matches
+  were 0/4. No second model call or prompt change was made.
+- A first Stage B driver preflight at `f431ff8` stopped before any simulated
+  episode: it used a strict article comparison and omitted the driver hash from
+  its own source snapshot. It ran zero ALIGN actions and is excluded. The audit
+  and signature checks were corrected before the formal Qwen rollout.
+- Formal Qwen Stage B ran at commit `b04742d1732ec2db05019352ffd07b89a1c637f5`
+  in `rollouts/runtime_v3_qwen_cross_object_alignment/run_20261003T090106Z_b9ac410e/`.
+  Task 2 passed 3/3; task 0 failed SceneReady in 0/3; task 6 failed SceneReady
+  in 0/3; task 7 passed 6/6 after its initial 3/3 gate. The two failed tasks
+  have unknown grounding, identity, and reference rates because no semantic
+  ALIGN observations were reached.
+- Qwen Stage B executed 54 ALIGN steps across nine episodes. All 54 effects were
+  positive and all nine episodes were monotonic. Task 2 improved 164.52→135.24
+  px (17.81% normalized reduction; +4.879 px/step; DOWN×18, 9mm×18). Task 7
+  improved 166.64→141.45 px (15.12%; +4.198 px/step; RIGHT×34, DOWN×2;
+  9mm×36). The cross-object physical and semantic-coprocessor judgments are
+  PARTIAL because Qwen-bound task 0 did not reach SceneReady. Failure taxonomy
+  is `SCENE_NOT_READY×6`.
+- Qwen and Stage A used the same physical config hash. Every ALIGN physical file
+  matched the Stage A reference; all four tasks ran on one commit, with no
+  per-object threshold or per-task direction/scale rule. The Qwen Stage B
+  contact sheet and task 2 / task 7 episode sheets were manually reviewed; the
+  target overlays matched the dressing bottle and milk carton. The frozen
+  task-6 preflight image also shows the named butter package.
 - `PYTHONPATH=. /root/autodl-tmp/OpenETA/sim/venvs/libero/bin/python -m pytest -q tests/runtime_v3`:
-  215 passed. Compileall and `git diff --check` also pass.
+  216 passed. Compileall and `git diff --check` also pass.
 
 ## M3.5 observation boundary and deployable metric depth (2026-10-03)
 

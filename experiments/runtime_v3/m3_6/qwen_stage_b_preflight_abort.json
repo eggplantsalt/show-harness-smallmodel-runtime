@@ -1,0 +1,15 @@
+{
+  "status": "ABORTED_BEFORE_PHYSICAL_EPISODES",
+  "attempt_commit": "f431ff8991f997349c27e56b8e0a38f531b01f03",
+  "failure": "The initial Stage B driver used strict phrase comparison and omitted its own source hash from the task signature snapshot.",
+  "task_2_init_states_skipped": [
+    0,
+    1,
+    2
+  ],
+  "robot_actions": 0,
+  "align_steps": 0,
+  "used_for_transfer_metrics": false,
+  "corrected_before_formal_stage_b": true,
+  "formal_stage_b_commit": "b04742d1732ec2db05019352ffd07b89a1c637f5"
+}

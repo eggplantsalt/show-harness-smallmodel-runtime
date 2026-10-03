@@ -1,0 +1,374 @@
+{
+  "phase": "M3.6 Stage B Qwen Semantic Coprocessor Cross-Object ALIGN",
+  "status": "COMPLETED",
+  "binding_mode": "qwen",
+  "suite": "LIBERO_OBJECT",
+  "seed": 0,
+  "manifest_sha256": "91703913dddf5f7794dc1063d52ed64eddd0cd3f0ca5fc425d5aea3007cd23ea",
+  "qwen_binding": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_qwen_task_binding/run_20261003T085941Z_77e127f7/qwen_binding.json",
+  "qwen_binding_model": "Qwen/Qwen3-VL-8B-Instruct",
+  "qwen_binding_matches": 4,
+  "semantic_binding_accuracy": 1.0,
+  "qwen_selected_physical_direction": false,
+  "qwen_selected_physical_scale": false,
+  "starting_commit": "b04742d1732ec2db05019352ffd07b89a1c637f5",
+  "final_commit": "b04742d1732ec2db05019352ffd07b89a1c637f5",
+  "branch": "runtime-v3",
+  "cross_object_physical_judgment": "PARTIAL",
+  "qwen_semantic_coprocessor_judgment": "PARTIAL",
+  "failure_taxonomy": {
+    "SCENE_NOT_READY": 6
+  },
+  "code_change_audit": {
+    "starting_commit": "b04742d1732ec2db05019352ffd07b89a1c637f5",
+    "final_commit": "b04742d1732ec2db05019352ffd07b89a1c637f5",
+    "branch": "runtime-v3",
+    "task_commits": {
+      "2": {
+        "before": "b04742d1732ec2db05019352ffd07b89a1c637f5",
+        "after": "b04742d1732ec2db05019352ffd07b89a1c637f5"
+      },
+      "0": {
+        "before": "b04742d1732ec2db05019352ffd07b89a1c637f5",
+        "after": "b04742d1732ec2db05019352ffd07b89a1c637f5"
+      },
+      "6": {
+        "before": "b04742d1732ec2db05019352ffd07b89a1c637f5",
+        "after": "b04742d1732ec2db05019352ffd07b89a1c637f5"
+      },
+      "7": {
+        "before": "b04742d1732ec2db05019352ffd07b89a1c637f5",
+        "after": "b04742d1732ec2db05019352ffd07b89a1c637f5"
+      }
+    },
+    "same_commit_across_tasks": true,
+    "runtime_core_changed_between_tasks": false,
+    "align_contract_changed_between_tasks": false,
+    "physical_files_unchanged_from_reference_stage_a": {
+      "core/runtime_v3/object_relative.py": true,
+      "core/runtime_v3/micro_motion.py": true,
+      "core/runtime_v3/options.py": true,
+      "core/runtime_v3/arbiter.py": true,
+      "core/runtime_v3/executor.py": true,
+      "core/runtime_v3/effects.py": true,
+      "core/runtime_v3/state.py": true,
+      "core/runtime_v3/scene_settling.py": true,
+      "core/runtime_v3/scene_initialization.py": true,
+      "scripts/runtime_v3_multiscale_alignment.py": true
+    },
+    "physical_control_code_unchanged_from_reference_stage_a": true,
+    "per_object_thresholds": false,
+    "per_task_direction_rules": false,
+    "per_task_scale_rules": false,
+    "qwen_selected_physical_direction": false,
+    "qwen_selected_physical_scale": false,
+    "physical_config_sha256": "90629860510e5019c388ad8f94462f3bfa77a59fc324021cc07e609f3b977474",
+    "reference_stage_a_commit": "3ddc109791c5cca36294f61a8095195d690ff928",
+    "reference_stage_a_config_sha256": "90629860510e5019c388ad8f94462f3bfa77a59fc324021cc07e609f3b977474",
+    "qwen_binding_sha256": "9a5da0ea53aabe63a58f2d11c01cb72a450cd0496d62967b32d953465ce17983",
+    "runtime_source_signature_unchanged": true,
+    "verified_scales_mm": [
+      3.0,
+      6.0,
+      9.0
+    ]
+  },
+  "privileged_information": {
+    "formal_runtime_target_pose": false,
+    "formal_runtime_gt_depth": false,
+    "formal_runtime_gt_contact": false,
+    "formal_runtime_task_success": false
+  },
+  "visual_audit": {
+    "cross_task_contact_sheet": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_qwen_cross_object_alignment/run_20261003T090106Z_b9ac410e/cross_task_contact_sheet.png"
+  },
+  "legacy_modified": false,
+  "source_summary": "rollouts/runtime_v3_qwen_cross_object_alignment/run_20261003T090106Z_b9ac410e/summary.json",
+  "source_summary_sha256": "e92a1f394f584ece06c58b83920d401b6454f2b04c93a1000b3b7c968df6d49b",
+  "tasks": [
+    {
+      "task_id": 2,
+      "instruction": "Pick the salad dressing and place it in the basket",
+      "reference_entity_phrase": "salad dressing",
+      "entity_phrase": "the salad dressing",
+      "binding_matches_reference": true,
+      "qwen_binding_status": "MATCH",
+      "metrics": {
+        "episodes": 3,
+        "grounding_success_rate": 1.0,
+        "grounding_observed_episodes": 3,
+        "identity_success_rate": 1.0,
+        "identity_observed_episodes": 3,
+        "reference_validity_rate": 1.0,
+        "reference_observed_episodes": 3,
+        "scene_ready_success_rate": 1.0,
+        "scene_ready_attempts": 3,
+        "align_actions_executed": 18,
+        "positive_effect_fraction": 1.0,
+        "monotonic_episodes": 3,
+        "initial_error_px_mean": 164.5177508828414,
+        "final_error_px_mean": 135.2445187741507,
+        "normalized_error_reduction_mean": 0.17809605173085638,
+        "net_improving_episodes": 3,
+        "mean_improvement_per_semantic_step_px": 4.878872018115122,
+        "control_ticks": 145,
+        "mean_control_ticks_per_semantic_step": 8.055555555555555,
+        "direction_distribution": {
+          "DOWN": 18
+        },
+        "scale_distribution": {
+          "9mm": 18
+        },
+        "failure_layers": {},
+        "judgment": "PASS"
+      },
+      "initial_gate_metrics": {
+        "episodes": 3,
+        "grounding_success_rate": 1.0,
+        "grounding_observed_episodes": 3,
+        "identity_success_rate": 1.0,
+        "identity_observed_episodes": 3,
+        "reference_validity_rate": 1.0,
+        "reference_observed_episodes": 3,
+        "scene_ready_success_rate": 1.0,
+        "scene_ready_attempts": 3,
+        "align_actions_executed": 18,
+        "positive_effect_fraction": 1.0,
+        "monotonic_episodes": 3,
+        "initial_error_px_mean": 164.5177508828414,
+        "final_error_px_mean": 135.2445187741507,
+        "normalized_error_reduction_mean": 0.17809605173085638,
+        "net_improving_episodes": 3,
+        "mean_improvement_per_semantic_step_px": 4.878872018115122,
+        "control_ticks": 145,
+        "mean_control_ticks_per_semantic_step": 8.055555555555555,
+        "direction_distribution": {
+          "DOWN": 18
+        },
+        "scale_distribution": {
+          "9mm": 18
+        },
+        "failure_layers": {},
+        "judgment": "PASS"
+      },
+      "expanded_init_states": [],
+      "episode_count": 3,
+      "episode_trace_paths": [
+        "rollouts/runtime_v3_qwen_cross_object_alignment/run_20261003T090106Z_b9ac410e/task_2/stage_b/init_state_0/episode.json",
+        "rollouts/runtime_v3_qwen_cross_object_alignment/run_20261003T090106Z_b9ac410e/task_2/stage_b/init_state_1/episode.json",
+        "rollouts/runtime_v3_qwen_cross_object_alignment/run_20261003T090106Z_b9ac410e/task_2/stage_b/init_state_2/episode.json"
+      ]
+    },
+    {
+      "task_id": 0,
+      "instruction": "Pick the alphabet soup and place it in the basket",
+      "reference_entity_phrase": "alphabet soup",
+      "entity_phrase": "the alphabet soup",
+      "binding_matches_reference": true,
+      "qwen_binding_status": "MATCH",
+      "metrics": {
+        "episodes": 3,
+        "grounding_success_rate": null,
+        "grounding_observed_episodes": 0,
+        "identity_success_rate": null,
+        "identity_observed_episodes": 0,
+        "reference_validity_rate": null,
+        "reference_observed_episodes": 0,
+        "scene_ready_success_rate": 0.0,
+        "scene_ready_attempts": 3,
+        "align_actions_executed": 0,
+        "positive_effect_fraction": null,
+        "monotonic_episodes": 0,
+        "initial_error_px_mean": null,
+        "final_error_px_mean": null,
+        "normalized_error_reduction_mean": null,
+        "net_improving_episodes": 0,
+        "mean_improvement_per_semantic_step_px": null,
+        "control_ticks": 0,
+        "mean_control_ticks_per_semantic_step": null,
+        "direction_distribution": {},
+        "scale_distribution": {},
+        "failure_layers": {
+          "SCENE_NOT_READY": 3
+        },
+        "judgment": "FAIL"
+      },
+      "initial_gate_metrics": {
+        "episodes": 3,
+        "grounding_success_rate": null,
+        "grounding_observed_episodes": 0,
+        "identity_success_rate": null,
+        "identity_observed_episodes": 0,
+        "reference_validity_rate": null,
+        "reference_observed_episodes": 0,
+        "scene_ready_success_rate": 0.0,
+        "scene_ready_attempts": 3,
+        "align_actions_executed": 0,
+        "positive_effect_fraction": null,
+        "monotonic_episodes": 0,
+        "initial_error_px_mean": null,
+        "final_error_px_mean": null,
+        "normalized_error_reduction_mean": null,
+        "net_improving_episodes": 0,
+        "mean_improvement_per_semantic_step_px": null,
+        "control_ticks": 0,
+        "mean_control_ticks_per_semantic_step": null,
+        "direction_distribution": {},
+        "scale_distribution": {},
+        "failure_layers": {
+          "SCENE_NOT_READY": 3
+        },
+        "judgment": "FAIL"
+      },
+      "expanded_init_states": [],
+      "episode_count": 3,
+      "episode_trace_paths": []
+    },
+    {
+      "task_id": 6,
+      "instruction": "Pick the butter and place it in the basket",
+      "reference_entity_phrase": "butter",
+      "entity_phrase": "the butter",
+      "binding_matches_reference": true,
+      "qwen_binding_status": "MATCH",
+      "metrics": {
+        "episodes": 3,
+        "grounding_success_rate": null,
+        "grounding_observed_episodes": 0,
+        "identity_success_rate": null,
+        "identity_observed_episodes": 0,
+        "reference_validity_rate": null,
+        "reference_observed_episodes": 0,
+        "scene_ready_success_rate": 0.0,
+        "scene_ready_attempts": 3,
+        "align_actions_executed": 0,
+        "positive_effect_fraction": null,
+        "monotonic_episodes": 0,
+        "initial_error_px_mean": null,
+        "final_error_px_mean": null,
+        "normalized_error_reduction_mean": null,
+        "net_improving_episodes": 0,
+        "mean_improvement_per_semantic_step_px": null,
+        "control_ticks": 0,
+        "mean_control_ticks_per_semantic_step": null,
+        "direction_distribution": {},
+        "scale_distribution": {},
+        "failure_layers": {
+          "SCENE_NOT_READY": 3
+        },
+        "judgment": "FAIL"
+      },
+      "initial_gate_metrics": {
+        "episodes": 3,
+        "grounding_success_rate": null,
+        "grounding_observed_episodes": 0,
+        "identity_success_rate": null,
+        "identity_observed_episodes": 0,
+        "reference_validity_rate": null,
+        "reference_observed_episodes": 0,
+        "scene_ready_success_rate": 0.0,
+        "scene_ready_attempts": 3,
+        "align_actions_executed": 0,
+        "positive_effect_fraction": null,
+        "monotonic_episodes": 0,
+        "initial_error_px_mean": null,
+        "final_error_px_mean": null,
+        "normalized_error_reduction_mean": null,
+        "net_improving_episodes": 0,
+        "mean_improvement_per_semantic_step_px": null,
+        "control_ticks": 0,
+        "mean_control_ticks_per_semantic_step": null,
+        "direction_distribution": {},
+        "scale_distribution": {},
+        "failure_layers": {
+          "SCENE_NOT_READY": 3
+        },
+        "judgment": "FAIL"
+      },
+      "expanded_init_states": [],
+      "episode_count": 3,
+      "episode_trace_paths": []
+    },
+    {
+      "task_id": 7,
+      "instruction": "Pick the milk and place it in the basket",
+      "reference_entity_phrase": "milk",
+      "entity_phrase": "the milk",
+      "binding_matches_reference": true,
+      "qwen_binding_status": "MATCH",
+      "metrics": {
+        "episodes": 6,
+        "grounding_success_rate": 1.0,
+        "grounding_observed_episodes": 6,
+        "identity_success_rate": 1.0,
+        "identity_observed_episodes": 6,
+        "reference_validity_rate": 1.0,
+        "reference_observed_episodes": 6,
+        "scene_ready_success_rate": 1.0,
+        "scene_ready_attempts": 6,
+        "align_actions_executed": 36,
+        "positive_effect_fraction": 1.0,
+        "monotonic_episodes": 6,
+        "initial_error_px_mean": 166.6386907798936,
+        "final_error_px_mean": 141.45246321958555,
+        "normalized_error_reduction_mean": 0.15123706275225177,
+        "net_improving_episodes": 6,
+        "mean_improvement_per_semantic_step_px": 4.197704593384674,
+        "control_ticks": 296,
+        "mean_control_ticks_per_semantic_step": 8.222222222222221,
+        "direction_distribution": {
+          "RIGHT": 34,
+          "DOWN": 2
+        },
+        "scale_distribution": {
+          "9mm": 36
+        },
+        "failure_layers": {},
+        "judgment": "PASS"
+      },
+      "initial_gate_metrics": {
+        "episodes": 3,
+        "grounding_success_rate": 1.0,
+        "grounding_observed_episodes": 3,
+        "identity_success_rate": 1.0,
+        "identity_observed_episodes": 3,
+        "reference_validity_rate": 1.0,
+        "reference_observed_episodes": 3,
+        "scene_ready_success_rate": 1.0,
+        "scene_ready_attempts": 3,
+        "align_actions_executed": 18,
+        "positive_effect_fraction": 1.0,
+        "monotonic_episodes": 3,
+        "initial_error_px_mean": 169.5540770250498,
+        "final_error_px_mean": 144.0913211614065,
+        "normalized_error_reduction_mean": 0.15031154530548166,
+        "net_improving_episodes": 3,
+        "mean_improvement_per_semantic_step_px": 4.243792643940547,
+        "control_ticks": 147,
+        "mean_control_ticks_per_semantic_step": 8.166666666666666,
+        "direction_distribution": {
+          "RIGHT": 18
+        },
+        "scale_distribution": {
+          "9mm": 18
+        },
+        "failure_layers": {},
+        "judgment": "PASS"
+      },
+      "expanded_init_states": [
+        3,
+        4,
+        5
+      ],
+      "episode_count": 6,
+      "episode_trace_paths": [
+        "rollouts/runtime_v3_qwen_cross_object_alignment/run_20261003T090106Z_b9ac410e/task_7/stage_b/init_state_0/episode.json",
+        "rollouts/runtime_v3_qwen_cross_object_alignment/run_20261003T090106Z_b9ac410e/task_7/stage_b/init_state_1/episode.json",
+        "rollouts/runtime_v3_qwen_cross_object_alignment/run_20261003T090106Z_b9ac410e/task_7/stage_b/init_state_2/episode.json",
+        "rollouts/runtime_v3_qwen_cross_object_alignment/run_20261003T090106Z_b9ac410e/task_7/stage_b/init_state_3/episode.json",
+        "rollouts/runtime_v3_qwen_cross_object_alignment/run_20261003T090106Z_b9ac410e/task_7/stage_b/init_state_4/episode.json",
+        "rollouts/runtime_v3_qwen_cross_object_alignment/run_20261003T090106Z_b9ac410e/task_7/stage_b/init_state_5/episode.json"
+      ]
+    }
+  ]
+}

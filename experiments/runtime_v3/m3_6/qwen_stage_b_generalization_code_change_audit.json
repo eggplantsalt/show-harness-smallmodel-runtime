@@ -1,0 +1,54 @@
+{
+  "starting_commit": "b04742d1732ec2db05019352ffd07b89a1c637f5",
+  "final_commit": "b04742d1732ec2db05019352ffd07b89a1c637f5",
+  "branch": "runtime-v3",
+  "task_commits": {
+    "2": {
+      "before": "b04742d1732ec2db05019352ffd07b89a1c637f5",
+      "after": "b04742d1732ec2db05019352ffd07b89a1c637f5"
+    },
+    "0": {
+      "before": "b04742d1732ec2db05019352ffd07b89a1c637f5",
+      "after": "b04742d1732ec2db05019352ffd07b89a1c637f5"
+    },
+    "6": {
+      "before": "b04742d1732ec2db05019352ffd07b89a1c637f5",
+      "after": "b04742d1732ec2db05019352ffd07b89a1c637f5"
+    },
+    "7": {
+      "before": "b04742d1732ec2db05019352ffd07b89a1c637f5",
+      "after": "b04742d1732ec2db05019352ffd07b89a1c637f5"
+    }
+  },
+  "same_commit_across_tasks": true,
+  "runtime_core_changed_between_tasks": false,
+  "align_contract_changed_between_tasks": false,
+  "physical_files_unchanged_from_reference_stage_a": {
+    "core/runtime_v3/object_relative.py": true,
+    "core/runtime_v3/micro_motion.py": true,
+    "core/runtime_v3/options.py": true,
+    "core/runtime_v3/arbiter.py": true,
+    "core/runtime_v3/executor.py": true,
+    "core/runtime_v3/effects.py": true,
+    "core/runtime_v3/state.py": true,
+    "core/runtime_v3/scene_settling.py": true,
+    "core/runtime_v3/scene_initialization.py": true,
+    "scripts/runtime_v3_multiscale_alignment.py": true
+  },
+  "physical_control_code_unchanged_from_reference_stage_a": true,
+  "per_object_thresholds": false,
+  "per_task_direction_rules": false,
+  "per_task_scale_rules": false,
+  "qwen_selected_physical_direction": false,
+  "qwen_selected_physical_scale": false,
+  "physical_config_sha256": "90629860510e5019c388ad8f94462f3bfa77a59fc324021cc07e609f3b977474",
+  "reference_stage_a_commit": "3ddc109791c5cca36294f61a8095195d690ff928",
+  "reference_stage_a_config_sha256": "90629860510e5019c388ad8f94462f3bfa77a59fc324021cc07e609f3b977474",
+  "qwen_binding_sha256": "9a5da0ea53aabe63a58f2d11c01cb72a450cd0496d62967b32d953465ce17983",
+  "runtime_source_signature_unchanged": true,
+  "verified_scales_mm": [
+    3.0,
+    6.0,
+    9.0
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "status": "INVALID_AS_TRANSFER_EVIDENCE",
+  "attempt_commit": "253afeb",
+  "run_path": "rollouts/runtime_v3_cross_object_alignment/run_20261003T082839Z_bac7770d",
+  "root_cause": "ExperimentArbiter.authorize raised NameError: uuid is not defined while creating the approval trace ID, before Executor invocation.",
+  "physical_align_actions": 0,
+  "approval_trace_failure": true,
+  "used_in_formal_metrics": false,
+  "corrected_by_commit": "3ddc109791c5cca36294f61a8095195d690ff928"
+}

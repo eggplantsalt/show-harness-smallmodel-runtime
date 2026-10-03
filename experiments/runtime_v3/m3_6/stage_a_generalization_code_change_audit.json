@@ -1,0 +1,38 @@
+{
+  "starting_commit": "3ddc109791c5cca36294f61a8095195d690ff928",
+  "final_commit": "3ddc109791c5cca36294f61a8095195d690ff928",
+  "branch": "runtime-v3",
+  "task_commits": {
+    "2": {
+      "before": "3ddc109791c5cca36294f61a8095195d690ff928",
+      "after": "3ddc109791c5cca36294f61a8095195d690ff928"
+    },
+    "0": {
+      "before": "3ddc109791c5cca36294f61a8095195d690ff928",
+      "after": "3ddc109791c5cca36294f61a8095195d690ff928"
+    },
+    "6": {
+      "before": "3ddc109791c5cca36294f61a8095195d690ff928",
+      "after": "3ddc109791c5cca36294f61a8095195d690ff928"
+    },
+    "7": {
+      "before": "3ddc109791c5cca36294f61a8095195d690ff928",
+      "after": "3ddc109791c5cca36294f61a8095195d690ff928"
+    }
+  },
+  "same_commit_across_tasks": true,
+  "runtime_core_changed_between_tasks": false,
+  "align_contract_changed_between_tasks": false,
+  "per_object_thresholds": false,
+  "per_task_direction_rules": false,
+  "per_task_scale_rules": false,
+  "runtime_source_signature_unchanged": true,
+  "physical_config_sha256": "90629860510e5019c388ad8f94462f3bfa77a59fc324021cc07e609f3b977474",
+  "scale_evidence_path": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_multiscale_alignment/run_20261002T133108Z_c21b2a84/stage_a/calibration_summary.json",
+  "scale_evidence_sha256": "4e3cb8d7b6320832ae6e1769e8844f83d1ac0d8e7bb9ce81a709d8ff9276654d",
+  "verified_scales_mm": [
+    3.0,
+    6.0,
+    9.0
+  ]
+}
