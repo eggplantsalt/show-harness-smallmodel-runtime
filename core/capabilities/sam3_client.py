@@ -107,6 +107,50 @@ class Sam3Client:
             last["client_attempts"] = self.max_attempts
             return last
 
+    def segment_points(
+        self,
+        image: np.ndarray,
+        points: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Refine a visual region with the existing OpenETA point-prompt tool."""
+        array = np.ascontiguousarray(np.asarray(image, dtype=np.uint8))
+        with io.BytesIO() as buffer:
+            Image.fromarray(array, mode="RGB").save(buffer, format="PNG")
+            encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+        request = {
+            "tool": "segment_points",
+            "arguments": {
+                "image_base64": encoded,
+                "points": points,
+                "image_format": "png",
+            },
+        }
+        with self._lock:
+            last: dict[str, Any] = {
+                "success": False,
+                "error": "sam3_client: no attempt executed",
+            }
+            for attempt in range(1, self.max_attempts + 1):
+                try:
+                    self._start()
+                    if self._process is None or self._process.stdin is None:
+                        last = {"success": False, "error": "sam3_bridge_not_started"}
+                    else:
+                        self._process.stdin.write(json.dumps(request) + "\n")
+                        self._process.stdin.flush()
+                        last = self._responses.get(timeout=self.timeout_s)
+                    if isinstance(last, dict) and bool(last.get("success", False)):
+                        if attempt > 1:
+                            last = dict(last)
+                            last["client_attempts"] = attempt
+                        return last
+                except (OSError, queue.Empty, BrokenPipeError) as exc:
+                    last = {"success": False, "error": f"sam3_client: {exc}"}
+                self.close()
+            last = dict(last)
+            last["client_attempts"] = self.max_attempts
+            return last
+
     def close(self) -> None:
         process = self._process
         self._process = None

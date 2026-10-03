@@ -1,0 +1,101 @@
+{
+  "milestone": "M3.8 Generalized Semantic Entity Grounding",
+  "status": "FROZEN_BEFORE_FORMAL_ROLLOUT",
+  "suite": "LIBERO_OBJECT",
+  "seed": 0,
+  "selected_init_states": [
+    0,
+    1,
+    2
+  ],
+  "task_selection_manifest_sha256_at_initial_freeze": "089c7a2fb8e91995e0a3685143edcbb1b35f8e2a9e999748d864272b3a119ecf",
+  "candidate_pool_k": 4,
+  "candidate_pool_k_selection_basis": "Development-only visual audits found the lowest-ranked present target proposal at C3 on alphabet soup; K=4 is the smallest shared cap preserving all visually confirmed target proposals in the six init-state-0 development frames. Butter and cream-cheese target coverage remain misses.",
+  "region_prompt_version": "m3.8-zero-shot-region-v1",
+  "selector_prompt_version": "m3.8-zero-shot-detail-card-v2",
+  "selection_basis": "Reviewed reset-only canonical agentview images and benchmark task definitions; all remaining compatible non-articulated object-pick tasks are included. No proposal, semantic-selection, readiness, or ALIGN performance data were collected for these tasks before freezing.",
+  "preflight_directory": "experiments/runtime_v3/m3_8/preflight/",
+  "heldout_tasks": [
+    {
+      "task_id": 3,
+      "task_name": "pick_up_the_bbq_sauce_and_place_it_in_the_basket",
+      "instruction": "pick up the bbq sauce and place it in the basket",
+      "reference_entity_phrase": "bbq sauce",
+      "bddl_file": "pick_up_the_bbq_sauce_and_place_it_in_the_basket.bddl",
+      "reset_image": "experiments/runtime_v3/m3_8/preflight/task_3_reset_canonical.png",
+      "reset_image_sha256": "fa57639b8a5198cf6fd4fbe526747043d453ef18034bfc7b077d182842f06844",
+      "init_states": [
+        0,
+        1,
+        2
+      ],
+      "seed": 0,
+      "selection_rationale": "BBQ-sauce bottle is visible in the reset agentview; same non-articulated pick-and-place basket family."
+    },
+    {
+      "task_id": 4,
+      "task_name": "pick_up_the_ketchup_and_place_it_in_the_basket",
+      "instruction": "pick up the ketchup and place it in the basket",
+      "reference_entity_phrase": "ketchup",
+      "bddl_file": "pick_up_the_ketchup_and_place_it_in_the_basket.bddl",
+      "reset_image": "experiments/runtime_v3/m3_8/preflight/task_4_reset_canonical.png",
+      "reset_image_sha256": "674c1486beb8e87db9cd1681e59ead18697118bbe0e94f960cdee990342eda01",
+      "init_states": [
+        0,
+        1,
+        2
+      ],
+      "seed": 0,
+      "selection_rationale": "Ketchup bottle is visible in the reset agentview; same non-articulated pick-and-place basket family."
+    },
+    {
+      "task_id": 5,
+      "task_name": "pick_up_the_tomato_sauce_and_place_it_in_the_basket",
+      "instruction": "pick up the tomato sauce and place it in the basket",
+      "reference_entity_phrase": "tomato sauce",
+      "bddl_file": "pick_up_the_tomato_sauce_and_place_it_in_the_basket.bddl",
+      "reset_image": "experiments/runtime_v3/m3_8/preflight/task_5_reset_canonical.png",
+      "reset_image_sha256": "e3f0e3e6897cba7de140b4bbef2aef1d2d31541274a1331957dbfa866494eafd",
+      "init_states": [
+        0,
+        1,
+        2
+      ],
+      "seed": 0,
+      "selection_rationale": "Tomato-sauce can is visible in the reset agentview; same non-articulated pick-and-place basket family."
+    },
+    {
+      "task_id": 9,
+      "task_name": "pick_up_the_orange_juice_and_place_it_in_the_basket",
+      "instruction": "pick up the orange juice and place it in the basket",
+      "reference_entity_phrase": "orange juice",
+      "bddl_file": "pick_up_the_orange_juice_and_place_it_in_the_basket.bddl",
+      "reset_image": "experiments/runtime_v3/m3_8/preflight/task_9_reset_canonical.png",
+      "reset_image_sha256": "d79f5d3da0765000d0bbeae0b37e173692ca4b195bf1936e1a6f04022a786eeb",
+      "init_states": [
+        0,
+        1,
+        2
+      ],
+      "seed": 0,
+      "selection_rationale": "Orange-juice bottle is visible in the reset agentview; same non-articulated pick-and-place basket family."
+    }
+  ],
+  "development_tasks": [
+    0,
+    1,
+    2,
+    6,
+    7,
+    8
+  ],
+  "excluded_reason": "Task IDs 0,1,2,6,7,8 informed M3.6/M3.7 design and are development-only.",
+  "replacement_policy": "No held-out task or init state will be replaced after formal rollout begins.",
+  "formal_privileged_inputs": {
+    "object_pose": false,
+    "simulator_segmentation": false,
+    "simulator_depth": false,
+    "ground_truth_contact": false,
+    "task_success": false
+  }
+}

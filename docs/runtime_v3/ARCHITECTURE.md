@@ -70,6 +70,63 @@ ALIGN geometry and physical authority use observed geometry and the canonical
 entity state, with no object-name or task-ID control branch. See
 [`GENERALIZATION.md`](GENERALIZATION.md).
 
+M3.8 inserts a semantic grounding boundary between `EntitySpec` and the
+existing Runtime identity/reference chain:
+
+```text
+TaskSpec / EntitySpec
+    ↓
+Proposal Provider: direct text-SAM baseline + Qwen RGB semantic region
+    ↓
+SAM point refinement → generic Candidate Pool (K ≤ 4)
+    ↓
+Semantic Agent Selector: strict {candidate_id | NO_MATCH}
+    ↓
+Runtime Verifier: SceneMotionReady → SAM point association → EntityObservationReady
+    ↓
+RuntimeEntityState in the canonical BeliefState
+    ↓
+unchanged physical ALIGN contract
+```
+
+The proposal path has no class-agnostic automatic-mask API in the OpenETA
+service. Qwen proposes bounded image regions from the named `EntitySpec`; the
+existing OpenETA SAM3 point-prompt tool refines each region into masks. The
+direct normalized text-SAM request remains in the same candidate pool and is
+also measured as the baseline. Pool filtering and deduplication use only
+generic mask score, normalized area, bounds, and overlap. Candidate IDs are
+synthetic `C0`–`C3`; no task or simulator identifier reaches the selector.
+
+The local capability audit found that OpenETA MCP exposes semantic `segment`
+and positive/negative point `segment_points` prompts (up to 64 points, with
+three multimask results). It does not expose an automatic-mask generator,
+class-agnostic object proposals, a point-grid auto-proposal mode, or a box
+endpoint. The underlying SAM3 processor has a box geometric-prompt method,
+but the current OpenETA service does not expose it. M3.8 therefore uses the
+specified fallback: Qwen supplies a semantic RGB region and SAM refines its
+center point. Qwen is part of visual-semantic grounding only; its region never
+becomes a robot coordinate or physical control input.
+
+The selector receives the instruction, semantic phrase, full canonical RGB,
+and candidate cards that pair a full-scene mask with a magnified candidate
+detail. Its one bounded output is strict JSON selecting an existing candidate
+or `NO_MATCH`. It cannot access direction, scale, pose, Arbiter, Executor, or
+controller interfaces. A selected mask is not immediately promoted: proposals
+wait until `SceneMotionReady`, then Runtime applies temporal mask association
+and `EntityObservationReady` before establishing the visual reference in the
+canonical state. Semantic selection accuracy is measured separately from this
+temporal/physical validity check. Formal reports also require a post-hoc visual
+audit before allowing an episode into ALIGN evaluation.
+
+Responsibility ownership is explicit: proposal generation belongs to the
+Perception/Runtime service; semantic candidate identity belongs to the Agent;
+temporal and physical entity validity belongs to Runtime; physical action
+selection and execution remain Runtime-owned. The Agent performs no physical
+decision and cannot alter the ALIGN lattice, ranking, Arbiter approval,
+Executor, or effect verification. See
+[`OBSERVATION_BOUNDARY.md`](OBSERVATION_BOUNDARY.md) and
+[`EVIDENCE_LEDGER.md`](EVIDENCE_LEDGER.md).
+
 For pre-contact object-relative alignment, semantic target identity and the
 control reference are separate. `TargetIdentityAnchor` associates later SAM
 candidates with the selected instance. A stage-local `TargetReferenceAnchor`

@@ -119,7 +119,9 @@ def _setup_trial(*, init_state: int, config: Mapping[str, Any], sam3: Any,
                  scales: Sequence[float] | None = None,
                  contracts: Mapping[float, Mapping[str, Any]] | None = None,
                  suite_name: str = SUITE, task_id: int = TASK_ID,
-                 entity_spec: EntitySpec | None = None, seed: int = 0):
+                 entity_spec: EntitySpec | None = None, seed: int = 0,
+                 semantic_grounding_binder: Any = None,
+                 require_scene_ready: bool = True):
     from core.runtime_v3.adapters.libero_env import LiberoEnvironmentAdapter
     from core.runtime_v3.adapters.libero_observation import LiberoObservationAdapter
     from core.runtime_v3.canonical_image import CanonicalImageAdapter
@@ -160,21 +162,71 @@ def _setup_trial(*, init_state: int, config: Mapping[str, Any], sam3: Any,
         base_observer, sam3, entity_spec=entity_spec,
         move_vectors=config["move_vectors"], canonical_image_adapter=CanonicalImageAdapter(),
         scene_ready_required=True, alignment_scales_m=scales, scale_contracts=contracts,
+        semantic_grounding_binder=semantic_grounding_binder,
     )
     scene_ready = run_scene_ready_holds(
         environment, observer, controller, task_id=f"{suite_name}:{task_id}",
         commanded_step_m=CONTROL_TICK_MM / 1000.0,
         workspace_z_bounds_m=workspace, max_hold_ticks=40,
     )
-    if not scene_ready.get("ready") or not observer.scene_ready:
+    if require_scene_ready and (not scene_ready.get("ready") or not observer.scene_ready):
         environment.close()
         raise RuntimeError(f"SceneReady failed: {scene_ready}")
     trigger = next((int(row["environment_step"]) for row in scene_ready.get("samples", [])
                     if row.get("scene_ready")), None)
-    if trigger is None:
+    if trigger is None and require_scene_ready:
         environment.close()
         raise RuntimeError("SceneReady evidence omitted its trigger tick")
     return environment, controller, base_observer, observer, holds, scene_ready, trigger
+
+
+def _save_semantic_grounding_audit(observer: Any, output_dir: Path) -> dict[str, Any] | None:
+    result = getattr(observer, "semantic_grounding_result", None)
+    if result is None:
+        return None
+    output_dir.mkdir(parents=True, exist_ok=True)
+    candidate_sheet_path = output_dir / "semantic_candidate_sheet.png"
+    if result.candidate_sheet is not None:
+        Image.fromarray(np.asarray(result.candidate_sheet, dtype=np.uint8), mode="RGB").save(
+            candidate_sheet_path
+        )
+    final_reference_path = output_dir / "runtime_reference_overlay.png"
+    if observer.perception_history:
+        frame = observer.perception_history[-1]
+        image = Image.fromarray(np.asarray(frame["image"], dtype=np.uint8), mode="RGB").convert("RGBA")
+        segmentation = frame.get("segmentation")
+        mask = getattr(segmentation, "mask", None)
+        if mask is not None:
+            rgba = np.zeros((*np.asarray(mask).shape, 4), dtype=np.uint8)
+            rgba[np.asarray(mask, dtype=bool)] = (255, 30, 30, 120)
+            image = Image.alpha_composite(image, Image.fromarray(rgba, mode="RGBA"))
+        draw = ImageDraw.Draw(image)
+        anchor = getattr(observer, "reference_anchor", None)
+        if anchor is not None:
+            x, y = anchor.reference_point_px
+            draw.ellipse((x - 7, y - 7, x + 7, y + 7), outline=(0, 255, 255, 255), width=3)
+        image.convert("RGB").save(final_reference_path)
+    return {
+        "entity_grounding_evidence": result.evidence,
+        "candidate_count": len(result.candidates),
+        "candidate_details": [
+            {
+                "candidate_id": item.candidate_id,
+                "bbox_xyxy": list(item.bbox_xyxy),
+                "mask_area_px": int(item.mask.sum()),
+                "proposal_score": item.proposal_score,
+                "sources": list(item.sources),
+            }
+            for item in result.candidates
+        ],
+        "candidate_sources": {item.candidate_id: list(item.sources) for item in result.candidates},
+        "pool_counts": dict(result.pool_counts),
+        "proposal_response": result.proposal_response_text,
+        "selector_response": result.selector_response_text,
+        "candidate_sheet": str(candidate_sheet_path) if candidate_sheet_path.exists() else None,
+        "runtime_reference_overlay": str(final_reference_path) if final_reference_path.exists() else None,
+        "agent_calls_per_initialization": int(result.evidence.agent_calls),
+    }
 
 
 def _initial_state(observer, environment, task_id: str):
@@ -408,7 +460,9 @@ def run_stage_b_episode(*, init_state: int, run_dir: Path, config: Mapping[str, 
                         verified_scales: Sequence[float], contracts: Mapping[float, Mapping[str, Any]],
                         suite_name: str = SUITE, task_id: int = TASK_ID,
                         entity_spec: EntitySpec | None = None,
-                        diagnostic_oracle: bool = True, seed: int = 0) -> dict[str, Any]:
+                        diagnostic_oracle: bool = True, seed: int = 0,
+                        semantic_grounding_binder: Any = None,
+                        expected_grounding_candidate_id: str | None = None) -> dict[str, Any]:
     entity_spec = entity_spec or EntitySpec("target", TARGET_PHRASE, "MANIPULAND")
     episode_dir = run_dir / f"stage_b/init_state_{init_state}"
     episode_dir.mkdir(parents=True, exist_ok=False)
@@ -420,7 +474,16 @@ def run_stage_b_episode(*, init_state: int, run_dir: Path, config: Mapping[str, 
             init_state=init_state, config=config, sam3=sam3, workspace=workspace,
             camera_resolution=camera_resolution, scales=verified_scales, contracts=contracts,
             suite_name=suite_name, task_id=task_id, entity_spec=entity_spec, seed=seed,
+            semantic_grounding_binder=semantic_grounding_binder,
         )
+        if (expected_grounding_candidate_id is not None
+                and (observer.grounding_evidence is None
+                     or observer.grounding_evidence.candidate_id
+                     != str(expected_grounding_candidate_id))):
+            raise RuntimeError(
+                "semantic re-grounding did not reproduce the visually audited candidate ID"
+            )
+        grounding_audit = _save_semantic_grounding_audit(observer, episode_dir)
         oracle_start = (oracle_target_world_position(environment) if diagnostic_oracle else None)
         image_panels: list[tuple[str, Path]] = []
         steps: list[dict[str, Any]] = []
@@ -649,6 +712,7 @@ def run_stage_b_episode(*, init_state: int, run_dir: Path, config: Mapping[str, 
             "entity_phrase": entity_spec.semantic_phrase,
             "entity_role": entity_spec.role,
             "robot_ready_hold_ticks": len(holds), "scene_ready_initialization": scene,
+            "semantic_grounding": grounding_audit,
             "scene_ready_trigger_environment_tick": scene_trigger,
             "verified_scales_mm": [scale * 1000 for scale in verified_scales],
             "max_alignment_steps": MAX_ALIGNMENT_STEPS,

@@ -28,6 +28,9 @@
   Both newly frozen held-out tasks failed SAM grounding 0/3, despite all 6/6
   SceneMotionReady passes. This leaves unseen-object readiness generalization
   **PARTIAL** and semantic grounding as the remaining general contract failure.
+  This later visual audit invalidates the M3.6 alphabet-soup correct-target
+  ALIGN claim: the stable reference mask was Milk. Historical numerical effects
+  remain in the reports but do not establish soup transfer.
 - Stage B, on valid reference bindings only, ran task 2 for 3 episodes / 18
   ALIGN steps and task 7 for 6 episodes / 36 steps. All 54 effects were
   positive and all nine episodes monotonic. Normalized error reduction was
@@ -78,8 +81,10 @@
   rates are unknown because they were unobserved. No expansion or task-specific
   recovery rule was applied to task 6.
 - The three tasks that reached ALIGN executed 90 steps; all 90 effects improved
-  the pixel alignment error and all 15 episodes were monotonic. Tasks 0 and 7
-  passed unseen-object transfer; the overall cross-object result is PARTIAL
+  the pixel alignment error and all 15 episodes were monotonic. The original
+  report counted tasks 0 and 7 as unseen-object passes; later visual audit
+  invalidated task 0 because its mask was Milk. Task 7 remains a valid
+  unseen-object transfer; the overall cross-object result is PARTIAL
   because task 6 did not reach SceneReady. All selected scales were 9 mm, while
   directions varied across target/layouts. Oracle target pose, GT depth, GT
   contact, and task success were disabled.

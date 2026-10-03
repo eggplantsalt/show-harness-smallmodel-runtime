@@ -124,9 +124,17 @@ scale rule is permitted.
 
 Reports distinguish semantic binding, perception, SceneReady, identity,
 reference, lack of a valid physical candidate, execution, and effect
-verification. Reference binding is reported separately from any later Qwen
-binding experiment so a semantic parse failure is not miscounted as physical
-transfer failure.
+verification. M3.8 uses `GROUNDING_PROPOSAL_MISS` when the pool has no target
+proposal, `SEMANTIC_SELECTION_WRONG` when a different entity is selected,
+`SEMANTIC_SELECTION_NO_MATCH` when the selector abstains,
+`ENTITY_OBSERVATION_NOT_READY` when the selected mask cannot pass Runtime's
+temporal gate, `IDENTITY_FAILURE` when association is lost,
+`SCENE_MOTION_NOT_READY` for the independent scene gate, and
+`PHYSICAL_ALIGNMENT_FAILURE` for failed ALIGN execution or effects. These
+states are reported separately; low proposal coverage is not called
+perception jitter. Reference binding is reported separately from any later
+Qwen binding experiment so a semantic parse failure is not miscounted as
+physical transfer failure.
 
 ## Corrected Stage A result
 
@@ -138,15 +146,18 @@ and 7 with seed 0.
 | Task | Episodes / SceneReady | Grounding / identity / reference | ALIGN steps; positive effects | Monotonic episodes | Initial → final error (normalized reduction) | Mean improvement / step | Control ticks / step | Directions / scales | Judgment |
 |---|---:|---:|---:|---:|---:|---:|---:|---|---|
 | 2, salad dressing | 3 / 3 | 3/3 / 3/3 / 3/3 | 18; 18/18 | 3/3 | 164.50 → 135.26 px (17.79%) | 4.874 px | 145 / 18 = 8.06 | DOWN×18 / 9mm×18 | PASS |
-| 0, alphabet soup | 6 / 6 | 6/6 / 6/6 / 6/6 | 36; 36/36 | 6/6 | 208.81 → 184.31 px (11.74%) | 4.083 px | 291 / 36 = 8.08 | DOWN×32, RIGHT×4 / 9mm×36 | PASS |
+| 0, alphabet soup | 6 / 6 | 6/6 / 6/6 / 6/6 | 36; 36/36 | 6/6 | 208.81 → 184.31 px (11.74%) | 4.083 px | 291 / 36 = 8.08 | DOWN×32, RIGHT×4 / 9mm×36 | NUMERIC PASS; TARGET INVALIDATED |
 | 6, butter | 3 / 0 | unobserved / unobserved / unobserved | 0; unobserved | 0/3 | unobserved | unobserved | 0 | — | FAIL before ALIGN |
 | 7, milk | 6 / 6 | 6/6 / 6/6 / 6/6 | 36; 36/36 | 6/6 | 166.61 → 141.42 px (15.13%) | 4.198 px | 296 / 36 = 8.22 | RIGHT×34, DOWN×2 / 9mm×36 | PASS |
 
 All 15 episodes that reached ALIGN were monotonic, with 90/90 positive
-per-step effects. The unseen-object transfer passes are tasks 0 and 7. The
-overall cross-object judgment is PARTIAL because butter failed SceneReady before
-semantic ALIGN evidence existed; its grounding, identity, and reference rates
-are unknown, rather than zero. Every executed choice used 9 mm, while selected
+per-step effects. M3.6's task-0 measurements remain historical numerical
+results, but M3.7 visual review showed its stable mask was the neighboring Milk
+carton. The M3.6 alphabet-soup correct-target ALIGN claim is therefore
+**INVALIDATED**; only task 7 counts as valid unseen-object transfer from that
+run. The overall cross-object judgment remains PARTIAL because butter failed
+SceneReady before semantic ALIGN evidence existed; its grounding, identity,
+and reference rates are unknown, rather than zero. Every executed choice used 9 mm, while selected
 directions varied across tasks. This is an observation about the run, not an
 object-specific rule. Metrics were post-processed from saved traces to correct
 failure taxonomy and unobserved-rate reporting; both raw and corrected summaries

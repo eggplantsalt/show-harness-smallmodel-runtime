@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping, Optional
 
 from .metric_entity import MetricEntityReference
+from .grounding import EntityGroundingEvidence
 
 
 @dataclass(frozen=True)
@@ -20,6 +21,7 @@ class RuntimeEntityState:
     reference_anchor: Any = None
     visible: bool = False
     valid: bool = False
+    grounding_evidence: EntityGroundingEvidence | None = None
 
     def __post_init__(self) -> None:
         for name in ("entity_key", "semantic_phrase", "role"):
@@ -232,8 +234,33 @@ def _runtime_entity_state(value: Any) -> Optional[RuntimeEntityState]:
             reference_anchor=value.get("reference_anchor"),
             visible=bool(value.get("visible", False)),
             valid=bool(value.get("valid", False)),
+            grounding_evidence=_entity_grounding_evidence(value.get("grounding_evidence")),
         )
     except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _entity_grounding_evidence(value: Any) -> Optional[EntityGroundingEvidence]:
+    if isinstance(value, EntityGroundingEvidence):
+        return value
+    if not isinstance(value, Mapping):
+        return None
+    try:
+        return EntityGroundingEvidence(
+            entity_key=str(value["entity_key"]),
+            semantic_query=str(value["semantic_query"]),
+            candidate_id=(str(value["candidate_id"])
+                          if value.get("candidate_id") is not None else None),
+            decision=str(value["decision"]),
+            valid=bool(value.get("valid", False)),
+            source=str(value.get("source", "")),
+            invalid_reason=(str(value["invalid_reason"])
+                            if value.get("invalid_reason") is not None else None),
+            candidate_count=int(value.get("candidate_count", 0)),
+            proposal_region_count=int(value.get("proposal_region_count", 0)),
+            agent_calls=int(value.get("agent_calls", 0)),
+        )
+    except (KeyError, TypeError, ValueError, OverflowError):
         return None
 
 

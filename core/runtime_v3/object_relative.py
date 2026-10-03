@@ -21,6 +21,7 @@ from core.capabilities.camera_geometry import (
 from .canonical_image import CanonicalImageAdapter
 from .depth import DepthProvider, metric_entity_reference_from_estimate
 from .grounding_query import GroundingQueryNormalizer
+from .grounding import EntityGroundingEvidence, SemanticGroundingBinder, SemanticGroundingResult
 from .metric_entity import MetricEntityReference, freeze_metric_reference
 from .observer import RobotObservation
 from .options import BoundedMicroMotionSpec, PrimitiveCommand, RuntimeOption
@@ -282,6 +283,39 @@ def segmentation_from_response(
         response=response,
         candidates=candidates,
         selected_candidate_id=candidate.candidate_id,
+    )
+
+
+def _segmentation_from_grounding_result(
+    result: SemanticGroundingResult, image_shape: tuple[int, int]
+) -> TargetSegmentation:
+    candidates: list[TargetCandidate] = []
+    for rank, item in enumerate(result.candidates):
+        mask = np.asarray(item.mask, dtype=bool)
+        if mask.shape != image_shape or not bool(mask.any()):
+            continue
+        ys, xs = np.nonzero(mask)
+        candidates.append(TargetCandidate(
+            candidate_id=item.candidate_id,
+            rank=rank,
+            backend_index=None,
+            mask=mask,
+            centroid_px=(float(xs.mean()), float(ys.mean())),
+            bbox_xyxy=(int(xs.min()), int(ys.min()), int(xs.max() + 1), int(ys.max() + 1)),
+            area_px=int(mask.sum()),
+            score=item.proposal_score,
+        ))
+    selected = next((item for item in candidates
+                     if item.candidate_id == result.evidence.candidate_id), None)
+    if selected is None:
+        return TargetSegmentation(
+            False, None, None, None, None, None, result.baseline_response,
+            candidates=tuple(candidates),
+        )
+    return TargetSegmentation(
+        True, selected.mask, selected.centroid_px, selected.bbox_xyxy,
+        selected.area_px, selected.score, result.baseline_response,
+        candidates=tuple(candidates), selected_candidate_id=selected.candidate_id,
     )
 
 
@@ -777,6 +811,7 @@ class ObjectRelativePerceptionObserver:
         alignment_scales_m: Sequence[float] | None = None,
         scale_contracts: Mapping[float, Mapping[str, Any]] | None = None,
         metric_depth_provider: DepthProvider | None = None,
+        semantic_grounding_binder: SemanticGroundingBinder | None = None,
     ) -> None:
         self.base_observer = base_observer
         self.sam3 = sam3
@@ -797,6 +832,10 @@ class ObjectRelativePerceptionObserver:
                                    if alignment_scales_m is not None else None)
         self.scale_contracts = dict(scale_contracts or {})
         self.metric_depth_provider = metric_depth_provider
+        self.semantic_grounding_binder = semantic_grounding_binder
+        self.grounding_evidence: EntityGroundingEvidence | None = None
+        self.semantic_grounding_result: SemanticGroundingResult | None = None
+        self._grounding_attempted = False
         self.metric_reference_anchor: MetricEntityReference | None = None
         # SceneReadyEvidence remains for historical/offline comparisons only. The
         # formal gate is the conjunction of target-independent RGB motion and
@@ -892,12 +931,62 @@ class ObjectRelativePerceptionObserver:
             raise ValueError("agentview source must be an HxWx3 RGB array")
         image = self.canonical_image_adapter.transform_image(raw_image)
         height, width = image.shape[:2]
+        if self._reference_reground_requested:
+            self.identity_anchor = None
+            self.reference_anchor = None
+            self.metric_reference_anchor = None
+            self.grounding_evidence = None
+            self.semantic_grounding_result = None
+            self._grounding_attempted = False
+            if self.scene_ready_evidence is not None:
+                self.scene_ready_evidence.reset()
+            if self.entity_observation_evidence is not None:
+                self.entity_observation_evidence.reset()
+            if self.scene_motion_evidence is not None:
+                self.scene_motion_evidence.reset()
+            self._readiness_active = True
+            self._reference_reground_requested = False
         if self._readiness_active and self.scene_motion_evidence is not None:
             self.scene_motion_evidence.update(image)
-        response = self.sam3.segment(
-            image, self.grounding_query, confidence_threshold=self.confidence_threshold
-        )
-        candidate_segmentation = segmentation_from_response(response, (height, width))
+        if (self.semantic_grounding_binder is not None
+                and not self._grounding_attempted and self.scene_motion_ready):
+            self._grounding_attempted = True
+            self.semantic_grounding_result = self.semantic_grounding_binder.ground(
+                image,
+                entity_key=self.entity_spec.key,
+                semantic_phrase=self.entity_spec.semantic_phrase,
+                semantic_query=self.grounding_query,
+            )
+            self.grounding_evidence = self.semantic_grounding_result.evidence
+            response = self.semantic_grounding_result.baseline_response
+            candidate_segmentation = _segmentation_from_grounding_result(
+                self.semantic_grounding_result, (height, width)
+            )
+        elif (self.semantic_grounding_binder is not None
+              and not self._grounding_attempted):
+            response = {"success": False, "deferred_until_scene_motion_ready": True}
+            candidate_segmentation = TargetSegmentation(
+                False, None, None, None, None, None, response,
+            )
+        elif self.semantic_grounding_binder is not None and self.identity_anchor is None:
+            response = (self.semantic_grounding_result.baseline_response
+                        if self.semantic_grounding_result is not None else {"success": False})
+            candidate_segmentation = TargetSegmentation(
+                False, None, None, None, None, None, response,
+                candidates=(self.last_segmentation.candidates
+                            if self.last_segmentation is not None else ()),
+            )
+        elif self.semantic_grounding_binder is not None:
+            center_x, center_y = self.identity_anchor.centroid_px
+            response = self.sam3.segment_points(
+                image, [{"x": float(center_x), "y": float(center_y), "label": 1}],
+            )
+            candidate_segmentation = segmentation_from_response(response, (height, width))
+        else:
+            response = self.sam3.segment(
+                image, self.grounding_query, confidence_threshold=self.confidence_threshold
+            )
+            candidate_segmentation = segmentation_from_response(response, (height, width))
         details = response.get("details") if isinstance(response, Mapping) else None
         metadata = details.get("metadata") if isinstance(details, Mapping) else None
         reported_size = metadata.get("image_size") if isinstance(metadata, Mapping) else None
@@ -910,18 +999,6 @@ class ObjectRelativePerceptionObserver:
                 }},
                 candidates=candidate_segmentation.candidates,
             )
-        if self._reference_reground_requested:
-            self.identity_anchor = None
-            self.reference_anchor = None
-            self.metric_reference_anchor = None
-            if self.scene_ready_evidence is not None:
-                self.scene_ready_evidence.reset()
-            if self.entity_observation_evidence is not None:
-                self.entity_observation_evidence.reset()
-            if self.scene_motion_evidence is not None:
-                self.scene_motion_evidence.reset()
-            self._readiness_active = True
-            self._reference_reground_requested = False
         if self.identity_anchor is None:
             self.identity_anchor = make_target_identity_anchor(
                 candidate_segmentation,
@@ -1149,7 +1226,10 @@ class ObjectRelativePerceptionObserver:
             visible=segmentation.visible,
             valid=(segmentation.visible
                    and segmentation.identity_status in {"ANCHORED", "SAME_TARGET"}
-                   and reference_valid),
+                   and reference_valid
+                   and (self.semantic_grounding_binder is None
+                        or bool(self.grounding_evidence and self.grounding_evidence.valid))),
+            grounding_evidence=self.grounding_evidence,
         )
         self.perception_history.append({
             "image": image.copy(),
@@ -1173,6 +1253,8 @@ class ObjectRelativePerceptionObserver:
             "scene_ready_evidence": (self.scene_ready_evidence.to_record()
                                      if self.scene_ready_evidence is not None else None),
             "grounding_query": self.grounding_query,
+            "grounding_evidence": self.grounding_evidence,
+            "semantic_grounding_result": self.semantic_grounding_result,
             "scene_motion_evidence": (self.scene_motion_evidence.to_record()
                                       if self.scene_motion_evidence is not None else None),
             "entity_observation_evidence": (self.entity_observation_evidence.to_record()

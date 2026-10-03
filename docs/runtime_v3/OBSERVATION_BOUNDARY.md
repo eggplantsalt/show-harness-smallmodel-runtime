@@ -11,6 +11,16 @@
 | Visual target mask | SAM output from RGB | Same deployable segmentation service/model class |
 | Monocular metric depth | Pinned MoGe-2 ViT-L estimate from canonical RGB only | Same RGB-only model on the robot's RGB stream |
 | Formal metric entity reference | Robust mask-conditioned estimated depth plus camera calibration | Same visual mask, depth estimate, and calibrated geometry |
+| Semantic region proposal and candidate choice (M3.8) | Task instruction, `EntitySpec` phrase, canonical RGB, and numbered RGB candidate cards | Same bounded task text and robot RGB stream |
+
+The M3.8 Qwen calls receive only the task instruction, semantic phrase, and
+RGB imagery. Region coordinates are used only to prompt the existing SAM3
+segmentation service. Candidate selection returns a synthetic candidate ID or
+`NO_MATCH`; it has no parameter or interface for object pose, simulator
+segmentation, depth, contact, task success, direction, scale, or robot action.
+The direct text-SAM baseline also receives only RGB and the normalized semantic
+phrase. Runtime temporal association and readiness consume the resulting mask
+and canonical RGB observations.
 
 The formal estimator has no parameter for depth render, object pose, body ID,
 contact, or task success. Camera calibration is sensor calibration, not scene
