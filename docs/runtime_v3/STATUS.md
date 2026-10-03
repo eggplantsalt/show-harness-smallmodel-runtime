@@ -42,8 +42,14 @@
   records its source hash and marks the post-processing.
 - Added a strict one-call `QwenTaskCompiler` and an offline binding audit, plus a
   Stage B driver that passes only the audited `EntitySpec` into the frozen ALIGN
-  runner. Qwen cannot provide physical fields or select direction/scale. The
-  offline Qwen binding and physical Stage B results are pending.
+  runner. Qwen cannot provide physical fields or select direction/scale.
+- Offline Qwen ran once per frozen instruction (4 calls total); all four outputs
+  had valid schemas and no physical fields. The raw phrases were `the salad
+  dressing`, `the alphabet soup`, `the butter`, and `the milk`. A deterministic
+  saved-response audit strips one leading English article when comparing with
+  the manifest phrase; raw model text is retained and the runtime receives the
+  original Qwen phrase. No second model call or prompt change was made. The
+  reconciled semantic binding audit and physical Stage B results are pending.
 - `PYTHONPATH=. /root/autodl-tmp/OpenETA/sim/venvs/libero/bin/python -m pytest -q tests/runtime_v3`:
   215 passed. Compileall and `git diff --check` also pass.
 

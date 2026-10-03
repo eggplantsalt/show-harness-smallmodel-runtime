@@ -98,5 +98,11 @@ failure was discovered after the frozen run ended and is excluded from the
 metrics above. The corrected Stage A run is
 `rollouts/runtime_v3_cross_object_alignment/run_20261003T083700Z_9865926b/`.
 The one-call Qwen semantic compiler and offline/physical Stage B drivers are
-implemented. Stage B is pending; Qwen may output only semantic entity binding
-and cannot select a physical direction or scale.
+implemented. Offline Qwen was called once per frozen instruction. Its four
+outputs passed the strict schema and contained no physical fields. The model
+copied each noun phrase with a leading `the`; the saved-response audit removes
+one leading English article only for reference-phrase comparison. It preserves
+the raw response and passes Qwen's original semantic phrase to the runtime. No
+prompt was tuned and no second model call was made. The reconciled binding audit
+and physical Stage B rollout are pending. Qwen may output only semantic entity
+binding and cannot select a physical direction or scale.

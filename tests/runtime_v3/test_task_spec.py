@@ -12,6 +12,7 @@ from core.runtime_v3.task_spec import (
 )
 from scripts.runtime_v3_multiscale_alignment import ExperimentArbiter
 from scripts.runtime_v3_cross_object_alignment import _episode_layers, _failure_layer, _task_metrics
+from scripts.runtime_v3_qwen_task_binding import _normalise_phrase
 
 
 def _bound_state(key: str, phrase: str, direction: str = "DOWN") -> BeliefState:
@@ -139,6 +140,12 @@ def test_qwen_task_compiler_fails_closed_without_schema_retries(raw_text):
     with pytest.raises(ValueError):
         QwenTaskCompiler(client).compile("Pick the milk and place it in the basket")
     assert client.calls == 1
+
+
+def test_qwen_phrase_match_ignores_one_english_article_without_rewording_content():
+    assert _normalise_phrase("the Milk") == _normalise_phrase("milk")
+    assert _normalise_phrase("An alphabet soup") == _normalise_phrase("alphabet soup")
+    assert _normalise_phrase("salad dressing") == "salad dressing"
 
 
 def test_runtime_alignment_option_uses_entity_key_and_same_contract_for_multiple_entities():
