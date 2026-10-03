@@ -25,6 +25,7 @@ from scripts.runtime_v3_cross_object_alignment import (
 from scripts.runtime_v3_multiscale_alignment import (
     new_run_dir, run_stage_b_episode, write_json,
 )
+from scripts.runtime_v3_qwen_task_binding import _normalise_phrase
 
 
 MANIFEST = ROOT / "experiments/runtime_v3/cross_object_align_manifest.json"
@@ -57,10 +58,6 @@ def _git_file_sha(commit: str, relative: str) -> str:
     result = subprocess.run(["git", "show", f"{commit}:{relative}"], cwd=ROOT,
                             check=True, capture_output=True)
     return hashlib.sha256(result.stdout).hexdigest()
-
-
-def _normalise_phrase(value: str) -> str:
-    return " ".join(value.casefold().split())
 
 
 def _binding_by_task(binding_data: Mapping[str, Any]) -> dict[int, Mapping[str, Any]]:
@@ -174,7 +171,10 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             task_dir = run_dir / f"task_{task_id}"
             task_dir.mkdir(parents=True, exist_ok=False)
             head_before = _git("rev-parse", "HEAD")
-            signature_before = _runtime_signature()
+            signature_before = {
+                **_runtime_signature(),
+                "scripts/runtime_v3_qwen_cross_object_alignment.py": _sha256(Path(__file__).resolve()),
+            }
             config_hash_before = _sha256(config_path)
             binding_hash_before = _sha256(binding_path)
             episodes: list[dict[str, Any]] = []

@@ -262,6 +262,7 @@ def test_qwen_transfer_driver_feeds_only_entity_spec_to_the_frozen_runtime():
     assert "compiler.compile(row[\"instruction\"])" in offline
     assert "robot_actions\": 0" in offline
     assert "entity_spec=task_spec.focus_entity" in runtime
+    assert "from scripts.runtime_v3_qwen_task_binding import _normalise_phrase" in runtime
     assert "diagnostic_oracle=False" in runtime
     assert "QwenTaskCompiler" not in runtime
     assert "physical_control_code_unchanged_from_reference_stage_a" in runtime
