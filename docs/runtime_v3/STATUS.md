@@ -1,6 +1,6 @@
 # Runtime V3 Status
 
-## M3.7 readiness evidence boundary (in progress)
+## M3.7 generalized readiness and cross-object ALIGN (2026-10-03)
 
 - Forensic audit is complete and recorded in
   `experiments/runtime_v3/m3_7/readiness_forensic_audit.json`. It supports
@@ -16,8 +16,35 @@
   phrase sensitivity result; raw TaskSpec text stays unchanged.
 - Held-out tasks 1 (cream cheese) and 8 (chocolate pudding), init states 0–2,
   are frozen in `experiments/runtime_v3/m3_7/readiness_heldout_manifest.json`.
-- Formal Stage A, Stage B, and Qwen Stage C results are pending. Do not infer
-  transfer or readiness generalization from the forensic development set.
+- Stage A ran all six frozen tasks at init states 0–2 (18 episodes), HOLD only.
+  RobotReady and SceneMotionReady passed 18/18. EntityObservationReady,
+  grounding, identity, and reference passed 9/18. There were 0 false-ready and
+  9 false-not-ready episodes using the predeclared post-hoc 1 mm/tick oracle
+  materiality check; all nine false-not-ready cases had settled objects and no
+  stable SAM grounding (butter, cream cheese, chocolate pudding). Full traces:
+  [`readiness_stage_a_summary.json`](../../experiments/runtime_v3/m3_7/readiness_stage_a_summary.json).
+- Task 0 reached numerical readiness 3/3 but its associated top mask was the
+  neighboring Milk carton. It does not count as valid alphabet-soup grounding.
+  Both newly frozen held-out tasks failed SAM grounding 0/3, despite all 6/6
+  SceneMotionReady passes. This leaves unseen-object readiness generalization
+  **PARTIAL** and semantic grounding as the remaining general contract failure.
+- Stage B, on valid reference bindings only, ran task 2 for 3 episodes / 18
+  ALIGN steps and task 7 for 6 episodes / 36 steps. All 54 effects were
+  positive and all nine episodes monotonic. Normalized error reduction was
+  17.90% for task 2 and 15.11% for task 7; selected direction and scale varied
+  by task/layout as before. Task 7 passed the unchanged expansion gate to
+  states 3–5.
+- Qwen Stage C made one semantic binding call per task. Both task 2 and task 7
+  schemas and normalized bindings matched. Its 54 ALIGN steps reproduced the
+  same per-task effect and readiness rates; Qwen physical direction/scale
+  fields and actions were zero. Semantic-coprocessor judgment is **PARTIAL**
+  because the two held-out objects were not groundable, so Stage C covered only
+  one valid unseen object.
+- Runtime Core and ALIGN sources stayed unchanged between formal tasks at
+  commit `3aae19d29d5840641dc94b0c17432127f3904119`. No object-specific
+  thresholds or per-task physical branches were introduced. The legacy tree
+  was not modified. Full formal reports, frozen Stage B manifest, and reviewed
+  visual artifacts are under `experiments/runtime_v3/m3_7/`.
 
 ## M3.6 zero-code-change cross-object ALIGN transfer (2026-10-03)
 

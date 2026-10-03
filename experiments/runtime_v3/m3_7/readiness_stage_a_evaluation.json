@@ -1,0 +1,181 @@
+{
+  "milestone": "M3.7 Generalized Readiness and Evidence Boundary",
+  "status": "COMPLETED_WITH_PARTIAL_GENERALIZATION",
+  "source_run": "rollouts/runtime_v3_m3_7_readiness_stage_a/run_20261003T1059Z_frozen_stage_a",
+  "frozen_manifest": "experiments/runtime_v3/m3_7/readiness_heldout_manifest.json",
+  "frozen_manifest_sha256": "7b54583b666f30cefb66c1dc2e571a777f5202df0f35de8eb2c17a09f70bc720",
+  "starting_commit": "3aae19d29d5840641dc94b0c17432127f3904119",
+  "branch": "runtime-v3",
+  "protocol": {
+    "tasks": [
+      0,
+      2,
+      6,
+      7,
+      1,
+      8
+    ],
+    "init_states": [
+      0,
+      1,
+      2
+    ],
+    "seed": 0,
+    "robot_ready_holds": 4,
+    "max_readiness_holds": 40,
+    "alignment_actions": 0,
+    "scene_motion_threshold": 5e-05,
+    "stable_rgb_frame_pairs": 3,
+    "entity_observation_window": 3,
+    "oracle_used_by_runtime": false,
+    "oracle_grading_threshold_m_per_observation": 0.001
+  },
+  "episode_count": 18,
+  "alignment_actions": 0,
+  "false_ready_count": 0,
+  "false_not_ready_count": 9,
+  "oracle_used_by_runtime": false,
+  "tasks": {
+    "0": {
+      "episodes": 3,
+      "robot_ready": 3,
+      "scene_motion_ready": 3,
+      "entity_observation_ready": 3,
+      "grounding_success": 3,
+      "identity_valid": 3,
+      "reference_valid": 3,
+      "ready": 3,
+      "timeouts": 0,
+      "ticks_to_ready": [
+        14,
+        13,
+        11
+      ],
+      "termination_reasons": {
+        "READINESS_COMPLETE": 3
+      },
+      "false_ready_count": 0,
+      "false_not_ready_count": 0
+    },
+    "2": {
+      "episodes": 3,
+      "robot_ready": 3,
+      "scene_motion_ready": 3,
+      "entity_observation_ready": 3,
+      "grounding_success": 3,
+      "identity_valid": 3,
+      "reference_valid": 3,
+      "ready": 3,
+      "timeouts": 0,
+      "ticks_to_ready": [
+        10,
+        12,
+        13
+      ],
+      "termination_reasons": {
+        "READINESS_COMPLETE": 3
+      },
+      "false_ready_count": 0,
+      "false_not_ready_count": 0
+    },
+    "6": {
+      "episodes": 3,
+      "robot_ready": 3,
+      "scene_motion_ready": 3,
+      "entity_observation_ready": 0,
+      "grounding_success": 0,
+      "identity_valid": 0,
+      "reference_valid": 0,
+      "ready": 0,
+      "timeouts": 3,
+      "ticks_to_ready": [
+        null,
+        null,
+        null
+      ],
+      "termination_reasons": {
+        "SEMANTIC_GROUNDING_FAILURE": 3
+      },
+      "false_ready_count": 0,
+      "false_not_ready_count": 3
+    },
+    "7": {
+      "episodes": 3,
+      "robot_ready": 3,
+      "scene_motion_ready": 3,
+      "entity_observation_ready": 3,
+      "grounding_success": 3,
+      "identity_valid": 3,
+      "reference_valid": 3,
+      "ready": 3,
+      "timeouts": 0,
+      "ticks_to_ready": [
+        11,
+        12,
+        15
+      ],
+      "termination_reasons": {
+        "READINESS_COMPLETE": 3
+      },
+      "false_ready_count": 0,
+      "false_not_ready_count": 0
+    },
+    "1": {
+      "episodes": 3,
+      "robot_ready": 3,
+      "scene_motion_ready": 3,
+      "entity_observation_ready": 0,
+      "grounding_success": 0,
+      "identity_valid": 0,
+      "reference_valid": 0,
+      "ready": 0,
+      "timeouts": 3,
+      "ticks_to_ready": [
+        null,
+        null,
+        null
+      ],
+      "termination_reasons": {
+        "SEMANTIC_GROUNDING_FAILURE": 3
+      },
+      "false_ready_count": 0,
+      "false_not_ready_count": 3
+    },
+    "8": {
+      "episodes": 3,
+      "robot_ready": 3,
+      "scene_motion_ready": 3,
+      "entity_observation_ready": 0,
+      "grounding_success": 0,
+      "identity_valid": 0,
+      "reference_valid": 0,
+      "ready": 0,
+      "timeouts": 3,
+      "ticks_to_ready": [
+        null,
+        null,
+        null
+      ],
+      "termination_reasons": {
+        "SEMANTIC_GROUNDING_FAILURE": 3
+      },
+      "false_ready_count": 0,
+      "false_not_ready_count": 3
+    }
+  },
+  "per_episode_records": "readiness_stage_a_summary.json",
+  "readiness_review_contact_sheets": [
+    "visuals/task_0_readiness_review.png",
+    "visuals/task_0_qwen_phrase_normalized_review.png",
+    "visuals/task_6_readiness_review.png",
+    "visuals/task_1_readiness_review.png",
+    "visuals/task_8_readiness_review.png"
+  ],
+  "interpretation": {
+    "scene_motion_ready": "18/18; generic RGB motion gate passed for all six object/task classes.",
+    "entity_observation_ready": "9/18; SAM grounding availability is still the primary limit.",
+    "false_ready": "0/18 under the frozen 1 mm per-observation diagnostic materiality rule.",
+    "false_not_ready": "9/18; butter, cream cheese, and chocolate pudding were physically settled at the tail but never had stable associated SAM evidence.",
+    "task_0_semantic_correctness": "Not established. The stable top-scored associated mask visually covered the neighboring Milk carton rather than the requested alphabet soup can."
+  }
+}

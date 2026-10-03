@@ -1,0 +1,62 @@
+{
+  "manifest_id": "M3.7-stage-b-reference-binding-valid-readiness-v1",
+  "stage": "STAGE_B_CROSS_OBJECT_ALIGN_REVALIDATION",
+  "created_after_stage_a_before_stage_b_rollout": true,
+  "selection_frozen_before_rollout": true,
+  "suite": "LIBERO_OBJECT",
+  "seed": 0,
+  "goal_kind": "ALIGN",
+  "selection_basis": "Only reference-binding episodes with valid grounding, identity and reference evidence in completed M3.7 Stage A; task 0 is excluded after visual review showed the associated mask selected the neighboring Milk carton, and tasks 6, 1 and 8 are excluded because SAM grounding failed.",
+  "tasks": [
+    {
+      "task_id": 2,
+      "instruction": "Pick the salad dressing and place it in the basket",
+      "reference_entity_phrase": "salad dressing",
+      "entity_key": "target",
+      "role": "MANIPULAND",
+      "object_category": "bottled dressing / condiment container",
+      "reason_for_inclusion": "Existing anchor task; 3/3 M3.7 init-state episodes had valid readiness, identity and reference.",
+      "initial_observation_basis": "Correct bottle grounding was visually reviewed in the frozen M3.6 and M3.7 diagnostic contact sheets."
+    },
+    {
+      "task_id": 7,
+      "instruction": "Pick the milk and place it in the basket",
+      "reference_entity_phrase": "milk",
+      "entity_key": "target",
+      "role": "MANIPULAND",
+      "object_category": "milk carton",
+      "reason_for_inclusion": "Cross-object reference task; 3/3 M3.7 init-state episodes had valid readiness, identity and reference.",
+      "initial_observation_basis": "Milk carton grounding was visually reviewed in the frozen M3.6 diagnostic contact sheets."
+    }
+  ],
+  "excluded_after_readiness_audit": [
+    {
+      "task_id": 0,
+      "reason": "Runtime readiness passed but SAM associated the neighboring Milk carton, not the requested alphabet soup can; semantic target correctness is unresolved."
+    },
+    {
+      "task_id": 6,
+      "reason": "Scene motion passed but grounding/identity/reference failed in 3/3 episodes."
+    },
+    {
+      "task_id": 1,
+      "reason": "Held-out cream cheese grounding failed in 3/3 episodes."
+    },
+    {
+      "task_id": 8,
+      "reason": "Held-out chocolate pudding grounding failed in 3/3 episodes."
+    }
+  ],
+  "initial_gate": {
+    "init_states": [
+      0,
+      1,
+      2
+    ],
+    "max_semantic_align_steps_per_episode": 6,
+    "expansion_rule": "The unchanged M3.6 runner may expand task 7 to init states 3-5 only if its initial three episodes all show positive net alignment improvement and valid grounding, identity, reference, and readiness."
+  },
+  "runtime_source_commit": "3aae19d",
+  "heldout_readiness_manifest": "experiments/runtime_v3/m3_7/readiness_heldout_manifest.json",
+  "stage_a_run": "rollouts/runtime_v3_m3_7_readiness_stage_a/run_20261003T1059Z_frozen_stage_a"
+}

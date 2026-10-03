@@ -1,6 +1,6 @@
 # Runtime V3 Cross-Object Generalization
 
-## M3.7 readiness evidence boundary
+## M3.7 readiness evidence boundary and results
 
 M3.6 exposed two different pre-ALIGN failures: physically settled butter lost
 SAM evidence, and the same alphabet-soup RGB frames produced candidates for
@@ -11,13 +11,59 @@ scene stability and semantic entity evidence. M3.7 separates those inputs into
 `EntityObservationReady` (one associated entity's normalized visual window).
 See [`READINESS_EVIDENCE.md`](READINESS_EVIDENCE.md) for the frozen rules.
 
-The M3.7 held-out manifest freezes tasks 1 (cream cheese) and 8 (chocolate
-pudding), init states 0–2, before formal post-refactor runs. Stage A uses HOLD
-only and reports grounding, identity, reference, both readiness gates, and
-post-hoc oracle grades for false-ready / false-not-ready. No ALIGN or Qwen
-physical rollout is allowed until Stage A and reference-binding Stage B are
-complete. Results will be appended after evaluation; the frozen manifest will
-not change in response to results.
+The held-out manifest freezes tasks 1 (cream cheese) and 8 (chocolate pudding),
+init states 0–2, before formal post-refactor runs. Stage A completed all 18
+HOLD-only episodes. RobotReady and SceneMotionReady passed 18/18. Entity
+observation, grounding, identity, and reference were valid in 9/18. Oracle
+grading found zero false-ready episodes and nine false-not-ready episodes:
+butter, cream cheese, and chocolate pudding each remained without stable SAM
+evidence across all three states, even though their target pose was settled at
+the diagnostic tail. Oracle measurements were not passed into Runtime.
+
+| Task | Episodes | SceneMotionReady | EntityObservationReady | Grounding / identity / reference | Ticks to ready | Timeouts | Oracle false-ready / false-not-ready |
+|---|---:|---:|---:|---:|---|---:|---:|
+| 0 alphabet soup | 3 | 3/3 | 3/3 | 3/3 / 3/3 / 3/3 | 14, 13, 11 | 0 | 0 / 0 |
+| 2 salad dressing | 3 | 3/3 | 3/3 | 3/3 / 3/3 / 3/3 | 10, 12, 13 | 0 | 0 / 0 |
+| 6 butter | 3 | 3/3 | 0/3 | 0/3 / 0/3 / 0/3 | — | 3 | 0 / 3 |
+| 7 milk | 3 | 3/3 | 3/3 | 3/3 / 3/3 / 3/3 | 11, 12, 15 | 0 | 0 / 0 |
+| 1 cream cheese (held out) | 3 | 3/3 | 0/3 | 0/3 / 0/3 / 0/3 | — | 3 | 0 / 3 |
+| 8 chocolate pudding (held out) | 3 | 3/3 | 0/3 | 0/3 / 0/3 / 0/3 | — | 3 | 0 / 3 |
+
+Task 0 is not a valid target-grounding pass: visual review shows SAM consistently
+associated the neighboring Milk carton instead of the requested soup can. The
+raw phrase sensitivity result remains `QUERY_SENSITIVITY`: the same saved RGB
+frames returned zero candidates for `the alphabet soup` and candidates for
+`alphabet soup`. The generic determiner normalizer makes both inputs use the
+same query, but it cannot correct the wrong selected entity. The frozen held-out
+tasks are retained as failures; no replacements were selected.
+
+Reference-binding Stage B was selected after Stage A and frozen in
+`experiments/runtime_v3/m3_7/stage_b_reference_manifest.json`. Task 2 passed
+3/3 episodes and task 7 passed 6/6 after the existing expansion rule. All 54
+ALIGN effects were positive and all nine episodes monotonic. Task 2 improved
+164.56 → 135.13 px (17.90% normalized reduction, DOWN×18, 9mm×18). Task 7
+improved 166.70 → 141.53 px (15.11%, RIGHT×34 / DOWN×2, 9mm×36). One approval
+per semantic step was preserved. The runtime and ALIGN source signatures were
+constant across tasks. Full trace:
+[`align_stage_b_summary.json`](../../experiments/runtime_v3/m3_7/align_stage_b_summary.json).
+
+After Stage B, Qwen Stage C made one call per instruction. Its semantic-only
+outputs were `the salad dressing` and `the milk`; both schemas and bindings
+matched (2/2), and the uniform runtime normalizer sent `salad dressing` and
+`milk` to SAM. Both tasks reached valid readiness in all episodes. The 54 ALIGN
+steps had the same positive-effect, monotonicity, direction, scale, and
+normalized-reduction results as reference binding. Qwen emitted no physical
+direction or scale and authorized zero actions. This supports transfer across
+the tested salad-dressing / milk pair and article variation, but not across the
+two held-out package appearances because both failed semantic grounding.
+
+The overall M3.7 judgment is **PARTIAL**. Target-independent scene-motion
+readiness generalizes across all six tested task IDs. Same-entity observation
+readiness still depends on SAM grounding availability and semantic correctness;
+the frozen held-out evaluation exposes this as the remaining general contract
+failure. Do not proceed to NearTarget on this evidence alone. Stage A, Stage B,
+Stage C, binding, and contact-sheet artifacts are recorded under
+`experiments/runtime_v3/m3_7/`.
 
 ## M3.6 question
 
