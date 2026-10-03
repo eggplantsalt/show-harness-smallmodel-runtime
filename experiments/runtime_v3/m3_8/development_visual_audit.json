@@ -221,7 +221,24 @@
         "alignment_actions": 0,
         "robot_motion_actions": 0,
         "candidate_sheet": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_2_salad_dressing_semantic_candidate_sheet.png",
-        "runtime_reference_overlay": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_2_salad_dressing_runtime_reference_overlay.png"
+        "runtime_reference_overlay": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_2_salad_dressing_runtime_reference_overlay.png",
+        "proposal_counts": {
+          "raw_proposals": 5,
+          "filtered_proposals": 5,
+          "deduplicated_proposals": 4,
+          "final_candidates": 4,
+          "candidate_pool_k": 4
+        },
+        "proposal_region_count": 1,
+        "final_candidate_count": 4,
+        "runtime_reference_valid": true,
+        "formally_privileged_inputs": {
+          "object_pose": false,
+          "simulator_segmentation": false,
+          "simulator_depth": false,
+          "ground_truth_contact": false,
+          "task_success": false
+        }
       },
       {
         "task_id": 7,
@@ -240,7 +257,24 @@
         "alignment_actions": 0,
         "robot_motion_actions": 0,
         "candidate_sheet": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_7_milk_semantic_candidate_sheet.png",
-        "runtime_reference_overlay": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_7_milk_runtime_reference_overlay.png"
+        "runtime_reference_overlay": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_7_milk_runtime_reference_overlay.png",
+        "proposal_counts": {
+          "raw_proposals": 9,
+          "filtered_proposals": 9,
+          "deduplicated_proposals": 7,
+          "final_candidates": 4,
+          "candidate_pool_k": 4
+        },
+        "proposal_region_count": 1,
+        "final_candidate_count": 4,
+        "runtime_reference_valid": true,
+        "formally_privileged_inputs": {
+          "object_pose": false,
+          "simulator_segmentation": false,
+          "simulator_depth": false,
+          "ground_truth_contact": false,
+          "task_success": false
+        }
       },
       {
         "task_id": 0,
@@ -257,7 +291,24 @@
         "alignment_actions": 0,
         "robot_motion_actions": 0,
         "candidate_sheet": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_0_alphabet_soup_semantic_candidate_sheet.png",
-        "runtime_reference_overlay": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_0_alphabet_soup_runtime_reference_overlay.png"
+        "runtime_reference_overlay": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_0_alphabet_soup_runtime_reference_overlay.png",
+        "proposal_counts": {
+          "raw_proposals": 9,
+          "filtered_proposals": 9,
+          "deduplicated_proposals": 9,
+          "final_candidates": 4,
+          "candidate_pool_k": 4
+        },
+        "proposal_region_count": 1,
+        "final_candidate_count": 4,
+        "runtime_reference_valid": false,
+        "formally_privileged_inputs": {
+          "object_pose": false,
+          "simulator_segmentation": false,
+          "simulator_depth": false,
+          "ground_truth_contact": false,
+          "task_success": false
+        }
       },
       {
         "task_id": 6,
@@ -277,7 +328,24 @@
         "alignment_actions": 0,
         "robot_motion_actions": 0,
         "candidate_sheet": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_6_butter_semantic_candidate_sheet.png",
-        "runtime_reference_overlay": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_6_butter_runtime_reference_overlay.png"
+        "runtime_reference_overlay": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_6_butter_runtime_reference_overlay.png",
+        "proposal_counts": {
+          "raw_proposals": 6,
+          "filtered_proposals": 6,
+          "deduplicated_proposals": 6,
+          "final_candidates": 4,
+          "candidate_pool_k": 4
+        },
+        "proposal_region_count": 2,
+        "final_candidate_count": 4,
+        "runtime_reference_valid": false,
+        "formally_privileged_inputs": {
+          "object_pose": false,
+          "simulator_segmentation": false,
+          "simulator_depth": false,
+          "ground_truth_contact": false,
+          "task_success": false
+        }
       },
       {
         "task_id": 1,
@@ -294,7 +362,24 @@
         "alignment_actions": 0,
         "robot_motion_actions": 0,
         "candidate_sheet": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_1_cream_cheese_semantic_candidate_sheet.png",
-        "runtime_reference_overlay": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_1_cream_cheese_runtime_reference_overlay.png"
+        "runtime_reference_overlay": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_1_cream_cheese_runtime_reference_overlay.png",
+        "proposal_counts": {
+          "raw_proposals": 3,
+          "filtered_proposals": 3,
+          "deduplicated_proposals": 3,
+          "final_candidates": 3,
+          "candidate_pool_k": 4
+        },
+        "proposal_region_count": 1,
+        "final_candidate_count": 3,
+        "runtime_reference_valid": false,
+        "formally_privileged_inputs": {
+          "object_pose": false,
+          "simulator_segmentation": false,
+          "simulator_depth": false,
+          "ground_truth_contact": false,
+          "task_success": false
+        }
       },
       {
         "task_id": 8,
@@ -315,7 +400,24 @@
         "alignment_actions": 0,
         "robot_motion_actions": 0,
         "candidate_sheet": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_8_chocolate_pudding_semantic_candidate_sheet.png",
-        "runtime_reference_overlay": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_8_chocolate_pudding_runtime_reference_overlay.png"
+        "runtime_reference_overlay": "experiments/runtime_v3/m3_8/visual_audit/development/runtime_readiness/task_8_chocolate_pudding_runtime_reference_overlay.png",
+        "proposal_counts": {
+          "raw_proposals": 3,
+          "filtered_proposals": 3,
+          "deduplicated_proposals": 3,
+          "final_candidates": 3,
+          "candidate_pool_k": 4
+        },
+        "proposal_region_count": 1,
+        "final_candidate_count": 3,
+        "runtime_reference_valid": false,
+        "formally_privileged_inputs": {
+          "object_pose": false,
+          "simulator_segmentation": false,
+          "simulator_depth": false,
+          "ground_truth_contact": false,
+          "task_success": false
+        }
       }
     ]
   },

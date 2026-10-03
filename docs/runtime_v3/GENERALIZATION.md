@@ -234,6 +234,13 @@ the intended target mask in every pool, but the selector chose the correct
 object in only 4/12 and a wrong object in 8/12. The four correct cases are
 ketchup init state 2 and orange juice init states 0–2. Only those four qualify
 for M3.8 ALIGN evidence; stable temporal association and a valid reference do
-not establish correct semantic identity. The soup development path abstained
-instead of binding the previous Milk mask. Detailed candidate and final
-reference images are retained under `experiments/runtime_v3/m3_8/visual_audit/`.
+not establish correct semantic identity. Stage B completed 18/18 positive
+effects across three executions (3/3 monotonic; 17.37% mean normalized error
+reduction), with one eligible rerun failing closed on candidate-ID mismatch
+before action. Stage C completed the orange-juice instruction in all three
+states (18/18 positive; 3/3 monotonic; 18.46% mean normalized reduction); its
+ketchup run failed closed before ALIGN. There is partial cross-object ALIGN
+evidence for ketchup and orange juice, and partial Agent-coprocessor evidence;
+generic grounding remains the blocker. The soup development path abstained
+instead of binding the previous Milk mask. Detailed candidate, Runtime
+reference, and ALIGN reports are in `experiments/runtime_v3/m3_8/`.

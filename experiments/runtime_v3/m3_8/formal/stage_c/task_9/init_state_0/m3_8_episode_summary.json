@@ -1,0 +1,5340 @@
+{
+  "init_state_index": 0,
+  "status": "COMPLETED",
+  "suite": "LIBERO_OBJECT",
+  "task_id": 9,
+  "seed": 0,
+  "task_instruction": "pick up the orange juice and place it in the basket",
+  "entity_key": "target",
+  "entity_phrase": "the orange juice",
+  "entity_role": "MANIPULAND",
+  "robot_ready_hold_ticks": 4,
+  "scene_ready_initialization": {
+    "ready": true,
+    "robot_ready": true,
+    "scene_motion_ready": true,
+    "entity_observation_ready": true,
+    "grounding_success": true,
+    "identity_valid": true,
+    "reference_valid": true,
+    "hold_ticks": 15,
+    "ticks_to_ready": 15,
+    "termination_reason": "READINESS_COMPLETE",
+    "samples": [
+      {
+        "environment_step": 4,
+        "frame_id": 9,
+        "scene_ready": false,
+        "robot_ready": true,
+        "scene_motion_ready": false,
+        "entity_observation_ready": false,
+        "grounding_success": false,
+        "identity_valid": false,
+        "reference_valid": false,
+        "scene_motion_evidence": {
+          "ready": false,
+          "max_normalized_rgb_difference": 5e-05,
+          "required_stable_frame_pairs": 3,
+          "stable_frame_pair_count": 0,
+          "stable_frame_pair_scores": [],
+          "last_normalized_rgb_difference": null,
+          "metric": "mean_absolute_full_frame_rgb_difference_divided_by_255",
+          "roi": null,
+          "threshold_source": "M3.7 development HOLD captures: the largest per-task p95 of stable-tail full-frame normalized RGB differences was 0.0000351; 0.00005 is rounded above that value and below the measured settling-motion differences. Frozen before held-out evaluation.",
+          "evidence_source": "canonical_rgb_temporal_observation"
+        },
+        "entity_observation_evidence": {
+          "ready": false,
+          "entity_key": "target",
+          "grounding_query": "orange juice",
+          "stable_observation_count": 0,
+          "required_observations": 3,
+          "max_centroid_shift_over_bbox_diagonal": 0.02,
+          "max_bbox_edge_shift_over_bbox_diagonal": 0.1,
+          "min_adjacent_mask_iou": 0.5,
+          "max_relative_area_change": 0.2,
+          "threshold_source": "M3.7 development SAM control traces had stable-mask p95 normalized centroid changes below 0.0004, adjacent-mask IoU p10 above 0.999, and relative area changes below 0.001. Generic bounds of 0.02 bbox-diagonal centroid shift, 0.10 bbox-diagonal edge shift, 0.50 IoU, and 0.20 relative area change allow visibly non-identical masks; frozen before held-out evaluation.",
+          "last_visual_interval": null,
+          "last_failure": "IDENTITY_FAILURE",
+          "representative_reference": null,
+          "evidence_source": "associated_sam_visual_observation"
+        }
+      },
+      {
+        "environment_step": 5,
+        "frame_id": 12,
+        "scene_ready": false,
+        "robot_ready": true,
+        "scene_motion_ready": false,
+        "entity_observation_ready": false,
+        "grounding_success": false,
+        "identity_valid": false,
+        "reference_valid": false,
+        "scene_motion_evidence": {
+          "ready": false,
+          "max_normalized_rgb_difference": 5e-05,
+          "required_stable_frame_pairs": 3,
+          "stable_frame_pair_count": 0,
+          "stable_frame_pair_scores": [],
+          "last_normalized_rgb_difference": 0.008992383370991626,
+          "metric": "mean_absolute_full_frame_rgb_difference_divided_by_255",
+          "roi": null,
+          "threshold_source": "M3.7 development HOLD captures: the largest per-task p95 of stable-tail full-frame normalized RGB differences was 0.0000351; 0.00005 is rounded above that value and below the measured settling-motion differences. Frozen before held-out evaluation.",
+          "evidence_source": "canonical_rgb_temporal_observation"
+        },
+        "entity_observation_evidence": {
+          "ready": false,
+          "entity_key": "target",
+          "grounding_query": "orange juice",
+          "stable_observation_count": 0,
+          "required_observations": 3,
+          "max_centroid_shift_over_bbox_diagonal": 0.02,
+          "max_bbox_edge_shift_over_bbox_diagonal": 0.1,
+          "min_adjacent_mask_iou": 0.5,
+          "max_relative_area_change": 0.2,
+          "threshold_source": "M3.7 development SAM control traces had stable-mask p95 normalized centroid changes below 0.0004, adjacent-mask IoU p10 above 0.999, and relative area changes below 0.001. Generic bounds of 0.02 bbox-diagonal centroid shift, 0.10 bbox-diagonal edge shift, 0.50 IoU, and 0.20 relative area change allow visibly non-identical masks; frozen before held-out evaluation.",
+          "last_visual_interval": null,
+          "last_failure": "IDENTITY_FAILURE",
+          "representative_reference": null,
+          "evidence_source": "associated_sam_visual_observation"
+        }
+      },
+      {
+        "environment_step": 6,
+        "frame_id": 15,
+        "scene_ready": false,
+        "robot_ready": true,
+        "scene_motion_ready": false,
+        "entity_observation_ready": false,
+        "grounding_success": false,
+        "identity_valid": false,
+        "reference_valid": false,
+        "scene_motion_evidence": {
+          "ready": false,
+          "max_normalized_rgb_difference": 5e-05,
+          "required_stable_frame_pairs": 3,
+          "stable_frame_pair_count": 0,
+          "stable_frame_pair_scores": [],
+          "last_normalized_rgb_difference": 0.004572201398463031,
+          "metric": "mean_absolute_full_frame_rgb_difference_divided_by_255",
+          "roi": null,
+          "threshold_source": "M3.7 development HOLD captures: the largest per-task p95 of stable-tail full-frame normalized RGB differences was 0.0000351; 0.00005 is rounded above that value and below the measured settling-motion differences. Frozen before held-out evaluation.",
+          "evidence_source": "canonical_rgb_temporal_observation"
+        },
+        "entity_observation_evidence": {
+          "ready": false,
+          "entity_key": "target",
+          "grounding_query": "orange juice",
+          "stable_observation_count": 0,
+          "required_observations": 3,
+          "max_centroid_shift_over_bbox_diagonal": 0.02,
+          "max_bbox_edge_shift_over_bbox_diagonal": 0.1,
+          "min_adjacent_mask_iou": 0.5,
+          "max_relative_area_change": 0.2,
+          "threshold_source": "M3.7 development SAM control traces had stable-mask p95 normalized centroid changes below 0.0004, adjacent-mask IoU p10 above 0.999, and relative area changes below 0.001. Generic bounds of 0.02 bbox-diagonal centroid shift, 0.10 bbox-diagonal edge shift, 0.50 IoU, and 0.20 relative area change allow visibly non-identical masks; frozen before held-out evaluation.",
+          "last_visual_interval": null,
+          "last_failure": "IDENTITY_FAILURE",
+          "representative_reference": null,
+          "evidence_source": "associated_sam_visual_observation"
+        }
+      },
+      {
+        "environment_step": 7,
+        "frame_id": 18,
+        "scene_ready": false,
+        "robot_ready": true,
+        "scene_motion_ready": false,
+        "entity_observation_ready": false,
+        "grounding_success": false,
+        "identity_valid": false,
+        "reference_valid": false,
+        "scene_motion_evidence": {
+          "ready": false,
+          "max_normalized_rgb_difference": 5e-05,
+          "required_stable_frame_pairs": 3,
+          "stable_frame_pair_count": 0,
+          "stable_frame_pair_scores": [],
+          "last_normalized_rgb_difference": 0.0009383955812142565,
+          "metric": "mean_absolute_full_frame_rgb_difference_divided_by_255",
+          "roi": null,
+          "threshold_source": "M3.7 development HOLD captures: the largest per-task p95 of stable-tail full-frame normalized RGB differences was 0.0000351; 0.00005 is rounded above that value and below the measured settling-motion differences. Frozen before held-out evaluation.",
+          "evidence_source": "canonical_rgb_temporal_observation"
+        },
+        "entity_observation_evidence": {
+          "ready": false,
+          "entity_key": "target",
+          "grounding_query": "orange juice",
+          "stable_observation_count": 0,
+          "required_observations": 3,
+          "max_centroid_shift_over_bbox_diagonal": 0.02,
+          "max_bbox_edge_shift_over_bbox_diagonal": 0.1,
+          "min_adjacent_mask_iou": 0.5,
+          "max_relative_area_change": 0.2,
+          "threshold_source": "M3.7 development SAM control traces had stable-mask p95 normalized centroid changes below 0.0004, adjacent-mask IoU p10 above 0.999, and relative area changes below 0.001. Generic bounds of 0.02 bbox-diagonal centroid shift, 0.10 bbox-diagonal edge shift, 0.50 IoU, and 0.20 relative area change allow visibly non-identical masks; frozen before held-out evaluation.",
+          "last_visual_interval": null,
+          "last_failure": "IDENTITY_FAILURE",
+          "representative_reference": null,
+          "evidence_source": "associated_sam_visual_observation"
+        }
+      },
+      {
+        "environment_step": 8,
+        "frame_id": 21,
+        "scene_ready": false,
+        "robot_ready": true,
+        "scene_motion_ready": false,
+        "entity_observation_ready": false,
+        "grounding_success": false,
+        "identity_valid": false,
+        "reference_valid": false,
+        "scene_motion_evidence": {
+          "ready": false,
+          "max_normalized_rgb_difference": 5e-05,
+          "required_stable_frame_pairs": 3,
+          "stable_frame_pair_count": 0,
+          "stable_frame_pair_scores": [],
+          "last_normalized_rgb_difference": 0.0003254410488153595,
+          "metric": "mean_absolute_full_frame_rgb_difference_divided_by_255",
+          "roi": null,
+          "threshold_source": "M3.7 development HOLD captures: the largest per-task p95 of stable-tail full-frame normalized RGB differences was 0.0000351; 0.00005 is rounded above that value and below the measured settling-motion differences. Frozen before held-out evaluation.",
+          "evidence_source": "canonical_rgb_temporal_observation"
+        },
+        "entity_observation_evidence": {
+          "ready": false,
+          "entity_key": "target",
+          "grounding_query": "orange juice",
+          "stable_observation_count": 0,
+          "required_observations": 3,
+          "max_centroid_shift_over_bbox_diagonal": 0.02,
+          "max_bbox_edge_shift_over_bbox_diagonal": 0.1,
+          "min_adjacent_mask_iou": 0.5,
+          "max_relative_area_change": 0.2,
+          "threshold_source": "M3.7 development SAM control traces had stable-mask p95 normalized centroid changes below 0.0004, adjacent-mask IoU p10 above 0.999, and relative area changes below 0.001. Generic bounds of 0.02 bbox-diagonal centroid shift, 0.10 bbox-diagonal edge shift, 0.50 IoU, and 0.20 relative area change allow visibly non-identical masks; frozen before held-out evaluation.",
+          "last_visual_interval": null,
+          "last_failure": "IDENTITY_FAILURE",
+          "representative_reference": null,
+          "evidence_source": "associated_sam_visual_observation"
+        }
+      },
+      {
+        "environment_step": 9,
+        "frame_id": 24,
+        "scene_ready": false,
+        "robot_ready": true,
+        "scene_motion_ready": false,
+        "entity_observation_ready": false,
+        "grounding_success": false,
+        "identity_valid": false,
+        "reference_valid": false,
+        "scene_motion_evidence": {
+          "ready": false,
+          "max_normalized_rgb_difference": 5e-05,
+          "required_stable_frame_pairs": 3,
+          "stable_frame_pair_count": 0,
+          "stable_frame_pair_scores": [],
+          "last_normalized_rgb_difference": 0.00019904242621527778,
+          "metric": "mean_absolute_full_frame_rgb_difference_divided_by_255",
+          "roi": null,
+          "threshold_source": "M3.7 development HOLD captures: the largest per-task p95 of stable-tail full-frame normalized RGB differences was 0.0000351; 0.00005 is rounded above that value and below the measured settling-motion differences. Frozen before held-out evaluation.",
+          "evidence_source": "canonical_rgb_temporal_observation"
+        },
+        "entity_observation_evidence": {
+          "ready": false,
+          "entity_key": "target",
+          "grounding_query": "orange juice",
+          "stable_observation_count": 0,
+          "required_observations": 3,
+          "max_centroid_shift_over_bbox_diagonal": 0.02,
+          "max_bbox_edge_shift_over_bbox_diagonal": 0.1,
+          "min_adjacent_mask_iou": 0.5,
+          "max_relative_area_change": 0.2,
+          "threshold_source": "M3.7 development SAM control traces had stable-mask p95 normalized centroid changes below 0.0004, adjacent-mask IoU p10 above 0.999, and relative area changes below 0.001. Generic bounds of 0.02 bbox-diagonal centroid shift, 0.10 bbox-diagonal edge shift, 0.50 IoU, and 0.20 relative area change allow visibly non-identical masks; frozen before held-out evaluation.",
+          "last_visual_interval": null,
+          "last_failure": "IDENTITY_FAILURE",
+          "representative_reference": null,
+          "evidence_source": "associated_sam_visual_observation"
+        }
+      },
+      {
+        "environment_step": 10,
+        "frame_id": 27,
+        "scene_ready": false,
+        "robot_ready": true,
+        "scene_motion_ready": false,
+        "entity_observation_ready": false,
+        "grounding_success": false,
+        "identity_valid": false,
+        "reference_valid": false,
+        "scene_motion_evidence": {
+          "ready": false,
+          "max_normalized_rgb_difference": 5e-05,
+          "required_stable_frame_pairs": 3,
+          "stable_frame_pair_count": 0,
+          "stable_frame_pair_scores": [],
+          "last_normalized_rgb_difference": 0.00014450970818014706,
+          "metric": "mean_absolute_full_frame_rgb_difference_divided_by_255",
+          "roi": null,
+          "threshold_source": "M3.7 development HOLD captures: the largest per-task p95 of stable-tail full-frame normalized RGB differences was 0.0000351; 0.00005 is rounded above that value and below the measured settling-motion differences. Frozen before held-out evaluation.",
+          "evidence_source": "canonical_rgb_temporal_observation"
+        },
+        "entity_observation_evidence": {
+          "ready": false,
+          "entity_key": "target",
+          "grounding_query": "orange juice",
+          "stable_observation_count": 0,
+          "required_observations": 3,
+          "max_centroid_shift_over_bbox_diagonal": 0.02,
+          "max_bbox_edge_shift_over_bbox_diagonal": 0.1,
+          "min_adjacent_mask_iou": 0.5,
+          "max_relative_area_change": 0.2,
+          "threshold_source": "M3.7 development SAM control traces had stable-mask p95 normalized centroid changes below 0.0004, adjacent-mask IoU p10 above 0.999, and relative area changes below 0.001. Generic bounds of 0.02 bbox-diagonal centroid shift, 0.10 bbox-diagonal edge shift, 0.50 IoU, and 0.20 relative area change allow visibly non-identical masks; frozen before held-out evaluation.",
+          "last_visual_interval": null,
+          "last_failure": "IDENTITY_FAILURE",
+          "representative_reference": null,
+          "evidence_source": "associated_sam_visual_observation"
+        }
+      },
+      {
+        "environment_step": 11,
+        "frame_id": 30,
+        "scene_ready": false,
+        "robot_ready": true,
+        "scene_motion_ready": false,
+        "entity_observation_ready": false,
+        "grounding_success": false,
+        "identity_valid": false,
+        "reference_valid": false,
+        "scene_motion_evidence": {
+          "ready": false,
+          "max_normalized_rgb_difference": 5e-05,
+          "required_stable_frame_pairs": 3,
+          "stable_frame_pair_count": 0,
+          "stable_frame_pair_scores": [],
+          "last_normalized_rgb_difference": 8.260190876480801e-05,
+          "metric": "mean_absolute_full_frame_rgb_difference_divided_by_255",
+          "roi": null,
+          "threshold_source": "M3.7 development HOLD captures: the largest per-task p95 of stable-tail full-frame normalized RGB differences was 0.0000351; 0.00005 is rounded above that value and below the measured settling-motion differences. Frozen before held-out evaluation.",
+          "evidence_source": "canonical_rgb_temporal_observation"
+        },
+        "entity_observation_evidence": {
+          "ready": false,
+          "entity_key": "target",
+          "grounding_query": "orange juice",
+          "stable_observation_count": 0,
+          "required_observations": 3,
+          "max_centroid_shift_over_bbox_diagonal": 0.02,
+          "max_bbox_edge_shift_over_bbox_diagonal": 0.1,
+          "min_adjacent_mask_iou": 0.5,
+          "max_relative_area_change": 0.2,
+          "threshold_source": "M3.7 development SAM control traces had stable-mask p95 normalized centroid changes below 0.0004, adjacent-mask IoU p10 above 0.999, and relative area changes below 0.001. Generic bounds of 0.02 bbox-diagonal centroid shift, 0.10 bbox-diagonal edge shift, 0.50 IoU, and 0.20 relative area change allow visibly non-identical masks; frozen before held-out evaluation.",
+          "last_visual_interval": null,
+          "last_failure": "IDENTITY_FAILURE",
+          "representative_reference": null,
+          "evidence_source": "associated_sam_visual_observation"
+        }
+      },
+      {
+        "environment_step": 12,
+        "frame_id": 33,
+        "scene_ready": false,
+        "robot_ready": true,
+        "scene_motion_ready": false,
+        "entity_observation_ready": false,
+        "grounding_success": false,
+        "identity_valid": false,
+        "reference_valid": false,
+        "scene_motion_evidence": {
+          "ready": false,
+          "max_normalized_rgb_difference": 5e-05,
+          "required_stable_frame_pairs": 3,
+          "stable_frame_pair_count": 0,
+          "stable_frame_pair_scores": [],
+          "last_normalized_rgb_difference": 6.63458132276348e-05,
+          "metric": "mean_absolute_full_frame_rgb_difference_divided_by_255",
+          "roi": null,
+          "threshold_source": "M3.7 development HOLD captures: the largest per-task p95 of stable-tail full-frame normalized RGB differences was 0.0000351; 0.00005 is rounded above that value and below the measured settling-motion differences. Frozen before held-out evaluation.",
+          "evidence_source": "canonical_rgb_temporal_observation"
+        },
+        "entity_observation_evidence": {
+          "ready": false,
+          "entity_key": "target",
+          "grounding_query": "orange juice",
+          "stable_observation_count": 0,
+          "required_observations": 3,
+          "max_centroid_shift_over_bbox_diagonal": 0.02,
+          "max_bbox_edge_shift_over_bbox_diagonal": 0.1,
+          "min_adjacent_mask_iou": 0.5,
+          "max_relative_area_change": 0.2,
+          "threshold_source": "M3.7 development SAM control traces had stable-mask p95 normalized centroid changes below 0.0004, adjacent-mask IoU p10 above 0.999, and relative area changes below 0.001. Generic bounds of 0.02 bbox-diagonal centroid shift, 0.10 bbox-diagonal edge shift, 0.50 IoU, and 0.20 relative area change allow visibly non-identical masks; frozen before held-out evaluation.",
+          "last_visual_interval": null,
+          "last_failure": "IDENTITY_FAILURE",
+          "representative_reference": null,
+          "evidence_source": "associated_sam_visual_observation"
+        }
+      },
+      {
+        "environment_step": 13,
+        "frame_id": 36,
+        "scene_ready": false,
+        "robot_ready": true,
+        "scene_motion_ready": false,
+        "entity_observation_ready": false,
+        "grounding_success": false,
+        "identity_valid": false,
+        "reference_valid": false,
+        "scene_motion_evidence": {
+          "ready": false,
+          "max_normalized_rgb_difference": 5e-05,
+          "required_stable_frame_pairs": 3,
+          "stable_frame_pair_count": 0,
+          "stable_frame_pair_scores": [],
+          "last_normalized_rgb_difference": 5.660711550245098e-05,
+          "metric": "mean_absolute_full_frame_rgb_difference_divided_by_255",
+          "roi": null,
+          "threshold_source": "M3.7 development HOLD captures: the largest per-task p95 of stable-tail full-frame normalized RGB differences was 0.0000351; 0.00005 is rounded above that value and below the measured settling-motion differences. Frozen before held-out evaluation.",
+          "evidence_source": "canonical_rgb_temporal_observation"
+        },
+        "entity_observation_evidence": {
+          "ready": false,
+          "entity_key": "target",
+          "grounding_query": "orange juice",
+          "stable_observation_count": 0,
+          "required_observations": 3,
+          "max_centroid_shift_over_bbox_diagonal": 0.02,
+          "max_bbox_edge_shift_over_bbox_diagonal": 0.1,
+          "min_adjacent_mask_iou": 0.5,
+          "max_relative_area_change": 0.2,
+          "threshold_source": "M3.7 development SAM control traces had stable-mask p95 normalized centroid changes below 0.0004, adjacent-mask IoU p10 above 0.999, and relative area changes below 0.001. Generic bounds of 0.02 bbox-diagonal centroid shift, 0.10 bbox-diagonal edge shift, 0.50 IoU, and 0.20 relative area change allow visibly non-identical masks; frozen before held-out evaluation.",
+          "last_visual_interval": null,
+          "last_failure": "IDENTITY_FAILURE",
+          "representative_reference": null,
+          "evidence_source": "associated_sam_visual_observation"
+        }
+      },
+      {
+        "environment_step": 14,
+        "frame_id": 39,
+        "scene_ready": false,
+        "robot_ready": true,
+        "scene_motion_ready": false,
+        "entity_observation_ready": false,
+        "grounding_success": false,
+        "identity_valid": false,
+        "reference_valid": false,
+        "scene_motion_evidence": {
+          "ready": false,
+          "max_normalized_rgb_difference": 5e-05,
+          "required_stable_frame_pairs": 3,
+          "stable_frame_pair_count": 1,
+          "stable_frame_pair_scores": [
+            4.050560246885212e-05
+          ],
+          "last_normalized_rgb_difference": 4.050560246885212e-05,
+          "metric": "mean_absolute_full_frame_rgb_difference_divided_by_255",
+          "roi": null,
+          "threshold_source": "M3.7 development HOLD captures: the largest per-task p95 of stable-tail full-frame normalized RGB differences was 0.0000351; 0.00005 is rounded above that value and below the measured settling-motion differences. Frozen before held-out evaluation.",
+          "evidence_source": "canonical_rgb_temporal_observation"
+        },
+        "entity_observation_evidence": {
+          "ready": false,
+          "entity_key": "target",
+          "grounding_query": "orange juice",
+          "stable_observation_count": 0,
+          "required_observations": 3,
+          "max_centroid_shift_over_bbox_diagonal": 0.02,
+          "max_bbox_edge_shift_over_bbox_diagonal": 0.1,
+          "min_adjacent_mask_iou": 0.5,
+          "max_relative_area_change": 0.2,
+          "threshold_source": "M3.7 development SAM control traces had stable-mask p95 normalized centroid changes below 0.0004, adjacent-mask IoU p10 above 0.999, and relative area changes below 0.001. Generic bounds of 0.02 bbox-diagonal centroid shift, 0.10 bbox-diagonal edge shift, 0.50 IoU, and 0.20 relative area change allow visibly non-identical masks; frozen before held-out evaluation.",
+          "last_visual_interval": null,
+          "last_failure": "IDENTITY_FAILURE",
+          "representative_reference": null,
+          "evidence_source": "associated_sam_visual_observation"
+        }
+      },
+      {
+        "environment_step": 15,
+        "frame_id": 42,
+        "scene_ready": false,
+        "robot_ready": true,
+        "scene_motion_ready": false,
+        "entity_observation_ready": false,
+        "grounding_success": false,
+        "identity_valid": false,
+        "reference_valid": false,
+        "scene_motion_evidence": {
+          "ready": false,
+          "max_normalized_rgb_difference": 5e-05,
+          "required_stable_frame_pairs": 3,
+          "stable_frame_pair_count": 2,
+          "stable_frame_pair_scores": [
+            4.050560246885212e-05,
+            3.6376753663705065e-05
+          ],
+          "last_normalized_rgb_difference": 3.6376753663705065e-05,
+          "metric": "mean_absolute_full_frame_rgb_difference_divided_by_255",
+          "roi": null,
+          "threshold_source": "M3.7 development HOLD captures: the largest per-task p95 of stable-tail full-frame normalized RGB differences was 0.0000351; 0.00005 is rounded above that value and below the measured settling-motion differences. Frozen before held-out evaluation.",
+          "evidence_source": "canonical_rgb_temporal_observation"
+        },
+        "entity_observation_evidence": {
+          "ready": false,
+          "entity_key": "target",
+          "grounding_query": "orange juice",
+          "stable_observation_count": 0,
+          "required_observations": 3,
+          "max_centroid_shift_over_bbox_diagonal": 0.02,
+          "max_bbox_edge_shift_over_bbox_diagonal": 0.1,
+          "min_adjacent_mask_iou": 0.5,
+          "max_relative_area_change": 0.2,
+          "threshold_source": "M3.7 development SAM control traces had stable-mask p95 normalized centroid changes below 0.0004, adjacent-mask IoU p10 above 0.999, and relative area changes below 0.001. Generic bounds of 0.02 bbox-diagonal centroid shift, 0.10 bbox-diagonal edge shift, 0.50 IoU, and 0.20 relative area change allow visibly non-identical masks; frozen before held-out evaluation.",
+          "last_visual_interval": null,
+          "last_failure": "IDENTITY_FAILURE",
+          "representative_reference": null,
+          "evidence_source": "associated_sam_visual_observation"
+        }
+      },
+      {
+        "environment_step": 16,
+        "frame_id": 45,
+        "scene_ready": false,
+        "robot_ready": true,
+        "scene_motion_ready": true,
+        "entity_observation_ready": false,
+        "grounding_success": true,
+        "identity_valid": true,
+        "reference_valid": false,
+        "scene_motion_evidence": {
+          "ready": true,
+          "max_normalized_rgb_difference": 5e-05,
+          "required_stable_frame_pairs": 3,
+          "stable_frame_pair_count": 3,
+          "stable_frame_pair_scores": [
+            4.050560246885212e-05,
+            3.6376753663705065e-05,
+            3.3529443678513075e-05
+          ],
+          "last_normalized_rgb_difference": 3.3529443678513075e-05,
+          "metric": "mean_absolute_full_frame_rgb_difference_divided_by_255",
+          "roi": null,
+          "threshold_source": "M3.7 development HOLD captures: the largest per-task p95 of stable-tail full-frame normalized RGB differences was 0.0000351; 0.00005 is rounded above that value and below the measured settling-motion differences. Frozen before held-out evaluation.",
+          "evidence_source": "canonical_rgb_temporal_observation"
+        },
+        "entity_observation_evidence": {
+          "ready": false,
+          "entity_key": "target",
+          "grounding_query": "orange juice",
+          "stable_observation_count": 1,
+          "required_observations": 3,
+          "max_centroid_shift_over_bbox_diagonal": 0.02,
+          "max_bbox_edge_shift_over_bbox_diagonal": 0.1,
+          "min_adjacent_mask_iou": 0.5,
+          "max_relative_area_change": 0.2,
+          "threshold_source": "M3.7 development SAM control traces had stable-mask p95 normalized centroid changes below 0.0004, adjacent-mask IoU p10 above 0.999, and relative area changes below 0.001. Generic bounds of 0.02 bbox-diagonal centroid shift, 0.10 bbox-diagonal edge shift, 0.50 IoU, and 0.20 relative area change allow visibly non-identical masks; frozen before held-out evaluation.",
+          "last_visual_interval": null,
+          "last_failure": null,
+          "representative_reference": {
+            "method": "same-entity mask medoid with coordinate-wise median centroid",
+            "candidate_id": "C1",
+            "frame_id": 45,
+            "centroid_px": [
+              193.86911669890392,
+              275.3765312701483
+            ],
+            "bbox_xyxy": [
+              177.0,
+              246.0,
+              213.0,
+              302.0
+            ],
+            "mask_area_px": 1551
+          },
+          "evidence_source": "associated_sam_visual_observation"
+        }
+      },
+      {
+        "environment_step": 17,
+        "frame_id": 48,
+        "scene_ready": false,
+        "robot_ready": true,
+        "scene_motion_ready": true,
+        "entity_observation_ready": false,
+        "grounding_success": true,
+        "identity_valid": true,
+        "reference_valid": false,
+        "scene_motion_evidence": {
+          "ready": true,
+          "max_normalized_rgb_difference": 5e-05,
+          "required_stable_frame_pairs": 3,
+          "stable_frame_pair_count": 3,
+          "stable_frame_pair_scores": [
+            4.050560246885212e-05,
+            3.6376753663705065e-05,
+            3.3529443678513075e-05
+          ],
+          "last_normalized_rgb_difference": 3.3529443678513075e-05,
+          "metric": "mean_absolute_full_frame_rgb_difference_divided_by_255",
+          "roi": null,
+          "threshold_source": "M3.7 development HOLD captures: the largest per-task p95 of stable-tail full-frame normalized RGB differences was 0.0000351; 0.00005 is rounded above that value and below the measured settling-motion differences. Frozen before held-out evaluation.",
+          "evidence_source": "canonical_rgb_temporal_observation"
+        },
+        "entity_observation_evidence": {
+          "ready": false,
+          "entity_key": "target",
+          "grounding_query": "orange juice",
+          "stable_observation_count": 1,
+          "required_observations": 3,
+          "max_centroid_shift_over_bbox_diagonal": 0.02,
+          "max_bbox_edge_shift_over_bbox_diagonal": 0.1,
+          "min_adjacent_mask_iou": 0.5,
+          "max_relative_area_change": 0.2,
+          "threshold_source": "M3.7 development SAM control traces had stable-mask p95 normalized centroid changes below 0.0004, adjacent-mask IoU p10 above 0.999, and relative area changes below 0.001. Generic bounds of 0.02 bbox-diagonal centroid shift, 0.10 bbox-diagonal edge shift, 0.50 IoU, and 0.20 relative area change allow visibly non-identical masks; frozen before held-out evaluation.",
+          "last_visual_interval": {
+            "centroid_shift_over_previous_bbox_diagonal": 0.04353091313780274,
+            "bbox_max_edge_shift_over_previous_bbox_diagonal": 0.30042088406305484,
+            "adjacent_mask_iou": 0.7834051724137931,
+            "relative_area_change": 0.134107027724049
+          },
+          "last_failure": "ENTITY_OBSERVATION_NOT_READY",
+          "representative_reference": {
+            "method": "same-entity mask medoid with coordinate-wise median centroid",
+            "candidate_id": "2",
+            "frame_id": 48,
+            "centroid_px": [
+              194.29846503695282,
+              272.5105173393974
+            ],
+            "bbox_xyxy": [
+              177.0,
+              246.0,
+              213.0,
+              322.0
+            ],
+            "mask_area_px": 1759
+          },
+          "evidence_source": "associated_sam_visual_observation"
+        }
+      },
+      {
+        "environment_step": 18,
+        "frame_id": 51,
+        "scene_ready": false,
+        "robot_ready": true,
+        "scene_motion_ready": true,
+        "entity_observation_ready": false,
+        "grounding_success": true,
+        "identity_valid": true,
+        "reference_valid": false,
+        "scene_motion_evidence": {
+          "ready": true,
+          "max_normalized_rgb_difference": 5e-05,
+          "required_stable_frame_pairs": 3,
+          "stable_frame_pair_count": 3,
+          "stable_frame_pair_scores": [
+            4.050560246885212e-05,
+            3.6376753663705065e-05,
+            3.3529443678513075e-05
+          ],
+          "last_normalized_rgb_difference": 3.3529443678513075e-05,
+          "metric": "mean_absolute_full_frame_rgb_difference_divided_by_255",
+          "roi": null,
+          "threshold_source": "M3.7 development HOLD captures: the largest per-task p95 of stable-tail full-frame normalized RGB differences was 0.0000351; 0.00005 is rounded above that value and below the measured settling-motion differences. Frozen before held-out evaluation.",
+          "evidence_source": "canonical_rgb_temporal_observation"
+        },
+        "entity_observation_evidence": {
+          "ready": false,
+          "entity_key": "target",
+          "grounding_query": "orange juice",
+          "stable_observation_count": 2,
+          "required_observations": 3,
+          "max_centroid_shift_over_bbox_diagonal": 0.02,
+          "max_bbox_edge_shift_over_bbox_diagonal": 0.1,
+          "min_adjacent_mask_iou": 0.5,
+          "max_relative_area_change": 0.2,
+          "threshold_source": "M3.7 development SAM control traces had stable-mask p95 normalized centroid changes below 0.0004, adjacent-mask IoU p10 above 0.999, and relative area changes below 0.001. Generic bounds of 0.02 bbox-diagonal centroid shift, 0.10 bbox-diagonal edge shift, 0.50 IoU, and 0.20 relative area change allow visibly non-identical masks; frozen before held-out evaluation.",
+          "last_visual_interval": {
+            "centroid_shift_over_previous_bbox_diagonal": 0.0035454054484974026,
+            "bbox_max_edge_shift_over_previous_bbox_diagonal": 0.011891287353862351,
+            "adjacent_mask_iou": 0.9859786876051598,
+            "relative_area_change": 0.013075611142694713
+          },
+          "last_failure": null,
+          "representative_reference": {
+            "method": "same-entity mask medoid with coordinate-wise median centroid",
+            "candidate_id": "2",
+            "frame_id": 48,
+            "centroid_px": [
+              194.30046708637764,
+              272.659579657353
+            ],
+            "bbox_xyxy": [
+              177.0,
+              246.0,
+              213.0,
+              322.0
+            ],
+            "mask_area_px": 1759
+          },
+          "evidence_source": "associated_sam_visual_observation"
+        }
+      },
+      {
+        "environment_step": 19,
+        "frame_id": 54,
+        "scene_ready": true,
+        "robot_ready": true,
+        "scene_motion_ready": true,
+        "entity_observation_ready": true,
+        "grounding_success": true,
+        "identity_valid": true,
+        "reference_valid": true,
+        "scene_motion_evidence": {
+          "ready": true,
+          "max_normalized_rgb_difference": 5e-05,
+          "required_stable_frame_pairs": 3,
+          "stable_frame_pair_count": 3,
+          "stable_frame_pair_scores": [
+            4.050560246885212e-05,
+            3.6376753663705065e-05,
+            3.3529443678513075e-05
+          ],
+          "last_normalized_rgb_difference": 3.3529443678513075e-05,
+          "metric": "mean_absolute_full_frame_rgb_difference_divided_by_255",
+          "roi": null,
+          "threshold_source": "M3.7 development HOLD captures: the largest per-task p95 of stable-tail full-frame normalized RGB differences was 0.0000351; 0.00005 is rounded above that value and below the measured settling-motion differences. Frozen before held-out evaluation.",
+          "evidence_source": "canonical_rgb_temporal_observation"
+        },
+        "entity_observation_evidence": {
+          "ready": true,
+          "entity_key": "target",
+          "grounding_query": "orange juice",
+          "stable_observation_count": 3,
+          "required_observations": 3,
+          "max_centroid_shift_over_bbox_diagonal": 0.02,
+          "max_bbox_edge_shift_over_bbox_diagonal": 0.1,
+          "min_adjacent_mask_iou": 0.5,
+          "max_relative_area_change": 0.2,
+          "threshold_source": "M3.7 development SAM control traces had stable-mask p95 normalized centroid changes below 0.0004, adjacent-mask IoU p10 above 0.999, and relative area changes below 0.001. Generic bounds of 0.02 bbox-diagonal centroid shift, 0.10 bbox-diagonal edge shift, 0.50 IoU, and 0.20 relative area change allow visibly non-identical masks; frozen before held-out evaluation.",
+          "last_visual_interval": {
+            "centroid_shift_over_previous_bbox_diagonal": 7.465669934192707e-05,
+            "bbox_max_edge_shift_over_previous_bbox_diagonal": 0.0,
+            "adjacent_mask_iou": 0.9983174425126192,
+            "relative_area_change": 0.0005611672278338945
+          },
+          "last_failure": null,
+          "representative_reference": {
+            "method": "same-entity mask medoid with coordinate-wise median centroid",
+            "candidate_id": "2",
+            "frame_id": 54,
+            "centroid_px": [
+              194.30246913580248,
+              272.80864197530866
+            ],
+            "bbox_xyxy": [
+              177.0,
+              246.0,
+              213.0,
+              323.0
+            ],
+            "mask_area_px": 1781
+          },
+          "evidence_source": "associated_sam_visual_observation"
+        }
+      }
+    ],
+    "commands": [
+      {
+        "kind": "HOLD",
+        "translation_command_count": 0,
+        "approved_option": "CALIBRATION_HOLD",
+        "environment_step": 5
+      },
+      {
+        "kind": "HOLD",
+        "translation_command_count": 0,
+        "approved_option": "CALIBRATION_HOLD",
+        "environment_step": 6
+      },
+      {
+        "kind": "HOLD",
+        "translation_command_count": 0,
+        "approved_option": "CALIBRATION_HOLD",
+        "environment_step": 7
+      },
+      {
+        "kind": "HOLD",
+        "translation_command_count": 0,
+        "approved_option": "CALIBRATION_HOLD",
+        "environment_step": 8
+      },
+      {
+        "kind": "HOLD",
+        "translation_command_count": 0,
+        "approved_option": "CALIBRATION_HOLD",
+        "environment_step": 9
+      },
+      {
+        "kind": "HOLD",
+        "translation_command_count": 0,
+        "approved_option": "CALIBRATION_HOLD",
+        "environment_step": 10
+      },
+      {
+        "kind": "HOLD",
+        "translation_command_count": 0,
+        "approved_option": "CALIBRATION_HOLD",
+        "environment_step": 11
+      },
+      {
+        "kind": "HOLD",
+        "translation_command_count": 0,
+        "approved_option": "CALIBRATION_HOLD",
+        "environment_step": 12
+      },
+      {
+        "kind": "HOLD",
+        "translation_command_count": 0,
+        "approved_option": "CALIBRATION_HOLD",
+        "environment_step": 13
+      },
+      {
+        "kind": "HOLD",
+        "translation_command_count": 0,
+        "approved_option": "CALIBRATION_HOLD",
+        "environment_step": 14
+      },
+      {
+        "kind": "HOLD",
+        "translation_command_count": 0,
+        "approved_option": "CALIBRATION_HOLD",
+        "environment_step": 15
+      },
+      {
+        "kind": "HOLD",
+        "translation_command_count": 0,
+        "approved_option": "CALIBRATION_HOLD",
+        "environment_step": 16
+      },
+      {
+        "kind": "HOLD",
+        "translation_command_count": 0,
+        "approved_option": "CALIBRATION_HOLD",
+        "environment_step": 17
+      },
+      {
+        "kind": "HOLD",
+        "translation_command_count": 0,
+        "approved_option": "CALIBRATION_HOLD",
+        "environment_step": 18
+      },
+      {
+        "kind": "HOLD",
+        "translation_command_count": 0,
+        "approved_option": "CALIBRATION_HOLD",
+        "environment_step": 19
+      }
+    ]
+  },
+  "semantic_grounding": {
+    "entity_grounding_evidence": {
+      "entity_key": "target",
+      "semantic_query": "orange juice",
+      "candidate_id": "C1",
+      "decision": "SELECT",
+      "valid": true,
+      "source": "qwen_region_sam_point",
+      "invalid_reason": null,
+      "candidate_count": 4,
+      "proposal_region_count": 1,
+      "agent_calls": 2
+    },
+    "candidate_count": 4,
+    "candidate_details": [
+      {
+        "candidate_id": "C0",
+        "bbox_xyxy": [
+          177,
+          246,
+          214,
+          327
+        ],
+        "mask_area_px": 2736,
+        "proposal_score": 0.91015625,
+        "sources": [
+          "qwen_region_sam_point",
+          "text_sam"
+        ]
+      },
+      {
+        "candidate_id": "C1",
+        "bbox_xyxy": [
+          177,
+          246,
+          213,
+          302
+        ],
+        "mask_area_px": 1551,
+        "proposal_score": 0.486328125,
+        "sources": [
+          "qwen_region_sam_point"
+        ]
+      },
+      {
+        "candidate_id": "C2",
+        "bbox_xyxy": [
+          255,
+          272,
+          296,
+          364
+        ],
+        "mask_area_px": 2989,
+        "proposal_score": 0.400390625,
+        "sources": [
+          "text_sam"
+        ]
+      },
+      {
+        "candidate_id": "C3",
+        "bbox_xyxy": [
+          121,
+          272,
+          153,
+          338
+        ],
+        "mask_area_px": 1606,
+        "proposal_score": 0.3515625,
+        "sources": [
+          "text_sam"
+        ]
+      }
+    ],
+    "candidate_sources": {
+      "C0": [
+        "qwen_region_sam_point",
+        "text_sam"
+      ],
+      "C1": [
+        "qwen_region_sam_point"
+      ],
+      "C2": [
+        "text_sam"
+      ],
+      "C3": [
+        "text_sam"
+      ]
+    },
+    "pool_counts": {
+      "raw_proposals": 21,
+      "filtered_proposals": 21,
+      "deduplicated_proposals": 17,
+      "final_candidates": 4,
+      "candidate_pool_k": 4
+    },
+    "proposal_response": "{\"decision\": \"PROPOSE\", \"regions\": [{\"bbox_norm_1000\": [345, 484, 416, 634]}]}",
+    "selector_response": "{\"candidate_id\": \"C1\", \"decision\": \"SELECT\"}",
+    "candidate_sheet": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/semantic_candidate_sheet.png",
+    "runtime_reference_overlay": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/runtime_reference_overlay.png",
+    "agent_calls_per_initialization": 2
+  },
+  "scene_ready_trigger_environment_tick": 19,
+  "verified_scales_mm": [
+    3.0,
+    6.0,
+    9.0
+  ],
+  "max_alignment_steps": 6,
+  "initial_error_px": 152.85265695293126,
+  "final_error_px": 123.26958097246069,
+  "cumulative_improvement_px": 29.583075980470568,
+  "alignment_steps": [
+    {
+      "alignment_step": 1,
+      "executed": true,
+      "semantic_option_id": "ALIGN_TO_TARGET_BOUNDED",
+      "semantic_step": 1,
+      "task_id": 9,
+      "task_instruction": "pick up the orange juice and place it in the basket",
+      "approval_trace_id": "305478462c0542c880a51eb32bfb9733",
+      "approval_id": "305478462c0542c880a51eb32bfb9733",
+      "entity_key": "target",
+      "entity_phrase": "the orange juice",
+      "target_visible": true,
+      "identity_valid": true,
+      "identity_status_before": "SAME_TARGET",
+      "reference_valid": true,
+      "scene_ready": true,
+      "direction": "DOWN",
+      "scale_m": 0.009,
+      "scale_mm": 9.0,
+      "max_ticks": 10,
+      "frame_id_before": 55,
+      "frame_id_after": 65,
+      "episode_initial_alignment_error_px": 152.85265695293126,
+      "error_before_px": 152.85265695293126,
+      "predicted_error_after_px": 148.34676254828807,
+      "predicted_improvement_px": 4.505894404643186,
+      "actual_improvement_px": 5.223817845066179,
+      "error_after_px": 147.62883910786508,
+      "prediction_residual_actual_minus_predicted_px": 0.717923440422993,
+      "candidate_lattice": [
+        {
+          "direction": "FWD",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            247.34,
+            130.06
+          ],
+          "predicted_error_px": 152.28313913879487,
+          "predicted_improvement_px": 0.5695178141363897,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "BACK",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            247.38,
+            128.86
+          ],
+          "predicted_error_px": 153.42240973591643,
+          "predicted_improvement_px": -0.5697527829851765,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "LEFT",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            249.05,
+            129.46000000000004
+          ],
+          "predicted_error_px": 153.4474675316979,
+          "predicted_improvement_px": -0.5948105787666407,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "RIGHT",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            245.67,
+            129.46000000000004
+          ],
+          "predicted_error_px": 152.2742801107577,
+          "predicted_improvement_px": 0.5783768421735545,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "UP",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            247.35,
+            127.84000000000003
+          ],
+          "predicted_error_px": 154.36951670246688,
+          "predicted_improvement_px": -1.5168597495356266,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "DOWN",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            247.37,
+            131.07
+          ],
+          "predicted_error_px": 151.3473008052251,
+          "predicted_improvement_px": 1.5053561477061521,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "FWD",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            247.32,
+            130.66999999999996
+          ],
+          "predicted_error_px": 151.70448945736948,
+          "predicted_improvement_px": 1.148167495561779,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "BACK",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            247.4,
+            128.26
+          ],
+          "predicted_error_px": 153.9923948796835,
+          "predicted_improvement_px": -1.1397379267522467,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "LEFT",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            250.74,
+            129.46000000000004
+          ],
+          "predicted_error_px": 154.0585214982036,
+          "predicted_improvement_px": -1.205864545272334,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "RIGHT",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            243.98,
+            129.46000000000004
+          ],
+          "predicted_error_px": 151.71252495733012,
+          "predicted_improvement_px": 1.1401319956011378,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "UP",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            247.34,
+            126.20999999999998
+          ],
+          "predicted_error_px": 155.89785601211918,
+          "predicted_improvement_px": -3.0451990591879223,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "DOWN",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            247.39,
+            132.69
+          ],
+          "predicted_error_px": 149.8383120642443,
+          "predicted_improvement_px": 3.0143448886869635,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "FWD",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            247.3,
+            131.26999999999998
+          ],
+          "predicted_error_px": 151.13545398058054,
+          "predicted_improvement_px": 1.7172029723507194,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "BACK",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            247.42,
+            127.67000000000002
+          ],
+          "predicted_error_px": 154.5532189232751,
+          "predicted_improvement_px": -1.7005619703438413,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "LEFT",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            252.43,
+            129.46000000000004
+          ],
+          "predicted_error_px": 154.6856263540134,
+          "predicted_improvement_px": -1.8329694010821527,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "RIGHT",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            242.29,
+            129.46000000000004
+          ],
+          "predicted_error_px": 151.16757679677056,
+          "predicted_improvement_px": 1.6850801561606943,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "UP",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            247.32,
+            124.57999999999998
+          ],
+          "predicted_error_px": 157.42486741547657,
+          "predicted_improvement_px": -4.572210462545314,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "DOWN",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            247.4,
+            134.28999999999996
+          ],
+          "predicted_error_px": 148.34676254828807,
+          "predicted_improvement_px": 4.505894404643186,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 10,
+          "selected": true
+        }
+      ],
+      "target_reference_before_px": [
+        194.30246913580248,
+        272.80864197530866
+      ],
+      "target_reference_after_px": [
+        194.30246913580248,
+        272.80864197530866
+      ],
+      "target_reference_unchanged": true,
+      "reference_matches_episode_initial": true,
+      "target_identity_status_after": "SAME_TARGET",
+      "target_visible_after": true,
+      "target_reference_valid_after": true,
+      "effect_verification_success": true,
+      "termination_reason": null,
+      "authorization_calls_for_step": 1,
+      "alignment_authorization_calls_for_step": 1,
+      "arbiter_approved_alignment_actions_for_step": 1,
+      "executor_calls_for_action": 1,
+      "execution": {
+        "direction": "DOWN",
+        "requested_displacement_m": 0.009,
+        "requested_mm": 9.0,
+        "actual_projection_m": 0.010228235275882569,
+        "actual_projection_mm": 10.228235275882568,
+        "total_displacement_xyz_m": [
+          0.0006695641689042353,
+          0.00014811200124721473,
+          -0.010228235275882569
+        ],
+        "total_displacement_xyz_mm": [
+          0.6695641689042353,
+          0.14811200124721474,
+          -10.228235275882568
+        ],
+        "absolute_displacement_error_m": 0.0012282352758825697,
+        "absolute_displacement_error_mm": 1.2282352758825696,
+        "ticks_executed": 9,
+        "max_ticks": 10,
+        "termination": "TARGET_REACHED",
+        "off_axis_displacement_xyz_m": [
+          0.0006695641689042353,
+          0.00014811200124721473,
+          0.0
+        ],
+        "off_axis_magnitude_m": 0.0006857502032036697,
+        "off_axis_magnitude_mm": 0.6857502032036696,
+        "direction_cosine": 0.9977600446293329,
+        "execution_duration_s": 0.15259359031915665,
+        "tick_observations": [
+          {
+            "tick": 1,
+            "observation_id": "libero-observation-56",
+            "frame_id": 56,
+            "eef_position_xyz_m": [
+              -0.15280719474882298,
+              -0.015308755441261994,
+              0.26020272706662456
+            ],
+            "incremental_delta_xyz_m": [
+              2.977397025025197e-05,
+              2.1398781652668536e-05,
+              -0.0005404243842917489
+            ],
+            "incremental_projection_m": 0.0005404243842917489,
+            "incremental_projection_mm": 0.5404243842917489,
+            "incremental_off_axis_xyz_m": [
+              2.977397025025197e-05,
+              2.1398781652668536e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 3.666602188241142e-05,
+            "total_displacement_xyz_m": [
+              2.977397025025197e-05,
+              2.1398781652668536e-05,
+              -0.0005404243842917489
+            ],
+            "cumulative_projection_m": 0.0005404243842917489,
+            "cumulative_projection_mm": 0.5404243842917489,
+            "off_axis_displacement_xyz_m": [
+              2.977397025025197e-05,
+              2.1398781652668536e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 3.666602188241142e-05,
+            "direction_cosine": 0.9977063269001503,
+            "elapsed_s": 0.017614055424928665
+          },
+          {
+            "tick": 2,
+            "observation_id": "libero-observation-57",
+            "frame_id": 57,
+            "eef_position_xyz_m": [
+              -0.1527281615073828,
+              -0.015290475297384051,
+              0.25911769792807904
+            ],
+            "incremental_delta_xyz_m": [
+              7.903324144017954e-05,
+              1.8280143877943272e-05,
+              -0.0010850291385455235
+            ],
+            "incremental_projection_m": 0.0010850291385455235,
+            "incremental_projection_mm": 1.0850291385455235,
+            "incremental_off_axis_xyz_m": [
+              7.903324144017954e-05,
+              1.8280143877943272e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 8.111976893914343e-05,
+            "total_displacement_xyz_m": [
+              0.0001088072116904315,
+              3.967892553061181e-05,
+              -0.0016254535228372724
+            ],
+            "cumulative_projection_m": 0.0016254535228372724,
+            "cumulative_projection_mm": 1.6254535228372724,
+            "off_axis_displacement_xyz_m": [
+              0.0001088072116904315,
+              3.967892553061181e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.00011581634792683722,
+            "direction_cosine": 0.9974712212236504,
+            "elapsed_s": 0.03369695693254471
+          },
+          {
+            "tick": 3,
+            "observation_id": "libero-observation-58",
+            "frame_id": 58,
+            "eef_position_xyz_m": [
+              -0.15263546786834456,
+              -0.015273752114445678,
+              0.25792359573446655
+            ],
+            "incremental_delta_xyz_m": [
+              9.269363903824379e-05,
+              1.672318293837252e-05,
+              -0.0011941021936124896
+            ],
+            "incremental_projection_m": 0.0011941021936124896,
+            "incremental_projection_mm": 1.1941021936124896,
+            "incremental_off_axis_xyz_m": [
+              9.269363903824379e-05,
+              1.672318293837252e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 9.419010333226366e-05,
+            "total_displacement_xyz_m": [
+              0.0002015008507286753,
+              5.640210846898433e-05,
+              -0.002819555716449762
+            ],
+            "cumulative_projection_m": 0.002819555716449762,
+            "cumulative_projection_mm": 2.819555716449762,
+            "off_axis_displacement_xyz_m": [
+              0.0002015008507286753,
+              5.640210846898433e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.00020924576622748418,
+            "direction_cosine": 0.9972575885312532,
+            "elapsed_s": 0.04994908720254898
+          },
+          {
+            "tick": 4,
+            "observation_id": "libero-observation-59",
+            "frame_id": 59,
+            "eef_position_xyz_m": [
+              -0.15254362584799833,
+              -0.015258141720416504,
+              0.2567044760982785
+            ],
+            "incremental_delta_xyz_m": [
+              9.184202034623334e-05,
+              1.5610394029174843e-05,
+              -0.0012191196361880374
+            ],
+            "incremental_projection_m": 0.0012191196361880374,
+            "incremental_projection_mm": 1.2191196361880374,
+            "incremental_off_axis_xyz_m": [
+              9.184202034623334e-05,
+              1.5610394029174843e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 9.315922446555702e-05,
+            "total_displacement_xyz_m": [
+              0.00029334287107490864,
+              7.201250249815917e-05,
+              -0.004038675352637799
+            ],
+            "cumulative_projection_m": 0.004038675352637799,
+            "cumulative_projection_mm": 4.038675352637799,
+            "off_axis_displacement_xyz_m": [
+              0.00029334287107490864,
+              7.201250249815917e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.00030205271150333653,
+            "direction_cosine": 0.9972149030867028,
+            "elapsed_s": 0.06693767011165619
+          },
+          {
+            "tick": 5,
+            "observation_id": "libero-observation-60",
+            "frame_id": 60,
+            "eef_position_xyz_m": [
+              -0.1524566899119108,
+              -0.015242910481727033,
+              0.2554765941620599
+            ],
+            "incremental_delta_xyz_m": [
+              8.693593608752326e-05,
+              1.5231238689470197e-05,
+              -0.0012278819362185889
+            ],
+            "incremental_projection_m": 0.0012278819362185889,
+            "incremental_projection_mm": 1.2278819362185889,
+            "incremental_off_axis_xyz_m": [
+              8.693593608752326e-05,
+              1.5231238689470197e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 8.826011338894564e-05,
+            "total_displacement_xyz_m": [
+              0.0003802788071624319,
+              8.724374118762937e-05,
+              -0.005266557288856388
+            ],
+            "cumulative_projection_m": 0.005266557288856388,
+            "cumulative_projection_mm": 5.266557288856388,
+            "off_axis_displacement_xyz_m": [
+              0.0003802788071624319,
+              8.724374118762937e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.0003901582263047854,
+            "direction_cosine": 0.9972671563651725,
+            "elapsed_s": 0.08267541974782944
+          },
+          {
+            "tick": 6,
+            "observation_id": "libero-observation-61",
+            "frame_id": 61,
+            "eef_position_xyz_m": [
+              -0.15237573121836023,
+              -0.01522765093104346,
+              0.25424306445619377
+            ],
+            "incremental_delta_xyz_m": [
+              8.095869355057017e-05,
+              1.52595506835735e-05,
+              -0.0012335297058661543
+            ],
+            "incremental_projection_m": 0.0012335297058661543,
+            "incremental_projection_mm": 1.2335297058661543,
+            "incremental_off_axis_xyz_m": [
+              8.095869355057017e-05,
+              1.52595506835735e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 8.238424575414696e-05,
+            "total_displacement_xyz_m": [
+              0.00046123750071300207,
+              0.00010250329187120287,
+              -0.006500086994722543
+            ],
+            "cumulative_projection_m": 0.006500086994722543,
+            "cumulative_projection_mm": 6.500086994722542,
+            "off_axis_displacement_xyz_m": [
+              0.00046123750071300207,
+              0.00010250329187120287,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.00047249016593830774,
+            "direction_cosine": 0.9973685185035198,
+            "elapsed_s": 0.09851318225264549
+          },
+          {
+            "tick": 7,
+            "observation_id": "libero-observation-62",
+            "frame_id": 62,
+            "eef_position_xyz_m": [
+              -0.15230082832635672,
+              -0.015212413458514871,
+              0.2530046308732241
+            ],
+            "incremental_delta_xyz_m": [
+              7.490289200351441e-05,
+              1.5237472528588716e-05,
+              -0.0012384335829696558
+            ],
+            "incremental_projection_m": 0.0012384335829696558,
+            "incremental_projection_mm": 1.2384335829696558,
+            "incremental_off_axis_xyz_m": [
+              7.490289200351441e-05,
+              1.5237472528588716e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 7.64370577635589e-05,
+            "total_displacement_xyz_m": [
+              0.0005361403927165165,
+              0.00011774076439979159,
+              -0.007738520577692198
+            ],
+            "cumulative_projection_m": 0.007738520577692198,
+            "cumulative_projection_mm": 7.738520577692198,
+            "off_axis_displacement_xyz_m": [
+              0.0005361403927165165,
+              0.00011774076439979159,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.0005489165768162479,
+            "direction_cosine": 0.997493707706408,
+            "elapsed_s": 0.11472594738006592
+          },
+          {
+            "tick": 8,
+            "observation_id": "libero-observation-63",
+            "frame_id": 63,
+            "eef_position_xyz_m": [
+              -0.15223159774833792,
+              -0.015197216920825086,
+              0.2517617457398763
+            ],
+            "incremental_delta_xyz_m": [
+              6.923057801880295e-05,
+              1.5196537689785364e-05,
+              -0.0012428851333478041
+            ],
+            "incremental_projection_m": 0.0012428851333478041,
+            "incremental_projection_mm": 1.2428851333478041,
+            "incremental_off_axis_xyz_m": [
+              6.923057801880295e-05,
+              1.5196537689785364e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 7.087882399260465e-05,
+            "total_displacement_xyz_m": [
+              0.0006053709707353194,
+              0.00013293730208957695,
+              -0.008981405711040003
+            ],
+            "cumulative_projection_m": 0.008981405711040003,
+            "cumulative_projection_mm": 8.981405711040003,
+            "off_axis_displacement_xyz_m": [
+              0.0006053709707353194,
+              0.00013293730208957695,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.0006197954005120387,
+            "direction_cosine": 0.9976273684642283,
+            "elapsed_s": 0.13147487863898277
+          },
+          {
+            "tick": 9,
+            "observation_id": "libero-observation-64",
+            "frame_id": 64,
+            "eef_position_xyz_m": [
+              -0.152167404550169,
+              -0.015182042221667448,
+              0.25051491617503374
+            ],
+            "incremental_delta_xyz_m": [
+              6.419319816891589e-05,
+              1.5174699157637778e-05,
+              -0.0012468295648425665
+            ],
+            "incremental_projection_m": 0.0012468295648425665,
+            "incremental_projection_mm": 1.2468295648425665,
+            "incremental_off_axis_xyz_m": [
+              6.419319816891589e-05,
+              1.5174699157637778e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 6.596239978714024e-05,
+            "total_displacement_xyz_m": [
+              0.0006695641689042353,
+              0.00014811200124721473,
+              -0.010228235275882569
+            ],
+            "cumulative_projection_m": 0.010228235275882569,
+            "cumulative_projection_mm": 10.228235275882568,
+            "off_axis_displacement_xyz_m": [
+              0.0006695641689042353,
+              0.00014811200124721473,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.0006857502032036697,
+            "direction_cosine": 0.9977600446293329,
+            "elapsed_s": 0.1525774523615837
+          }
+        ],
+        "last_backend_receipt": {
+          "backend_returned": true,
+          "done": false,
+          "truncated": false,
+          "info_keys": []
+        }
+      },
+      "visual_artifacts": {
+        "before": {
+          "canonical_rgb": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_01/before_canonical_rgb.png",
+          "alignment_overlay": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_01/before_alignment_overlay.png",
+          "sam_mask": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_01/before_sam_mask.png"
+        },
+        "after": {
+          "canonical_rgb": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_01/after_canonical_rgb.png",
+          "alignment_overlay": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_01/after_alignment_overlay.png",
+          "sam_mask": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_01/after_sam_mask.png"
+        },
+        "effect_overlay": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_01/effect_overlay.png"
+      },
+      "oracle_target_pose_after_diagnostic": null,
+      "oracle_used_by_runtime": false
+    },
+    {
+      "alignment_step": 2,
+      "executed": true,
+      "semantic_option_id": "ALIGN_TO_TARGET_BOUNDED",
+      "semantic_step": 2,
+      "task_id": 9,
+      "task_instruction": "pick up the orange juice and place it in the basket",
+      "approval_trace_id": "8042fe85f2c343a597fe72ca1b7fa5d7",
+      "approval_id": "8042fe85f2c343a597fe72ca1b7fa5d7",
+      "entity_key": "target",
+      "entity_phrase": "the orange juice",
+      "target_visible": true,
+      "identity_valid": true,
+      "identity_status_before": "SAME_TARGET",
+      "reference_valid": true,
+      "scene_ready": true,
+      "direction": "DOWN",
+      "scale_m": 0.009,
+      "scale_mm": 9.0,
+      "max_ticks": 10,
+      "frame_id_before": 66,
+      "frame_id_after": 75,
+      "episode_initial_alignment_error_px": 152.85265695293126,
+      "error_before_px": 147.62883910786508,
+      "predicted_error_after_px": 143.19493050216937,
+      "predicted_improvement_px": 4.433908605695706,
+      "actual_improvement_px": 5.011008030281374,
+      "error_after_px": 142.6178310775837,
+      "prediction_residual_actual_minus_predicted_px": 0.5770994245856684,
+      "candidate_lattice": [
+        {
+          "direction": "FWD",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            247.46,
+            135.7
+          ],
+          "predicted_error_px": 147.0527211305234,
+          "predicted_improvement_px": 0.5761179773416814,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "BACK",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            247.5,
+            134.48000000000002
+          ],
+          "predicted_error_px": 148.20523094945187,
+          "predicted_improvement_px": -0.5763918415867977,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "LEFT",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            249.16,
+            135.09000000000003
+          ],
+          "predicted_error_px": 148.24227818014543,
+          "predicted_improvement_px": -0.6134390722803573,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "RIGHT",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            245.8,
+            135.09000000000003
+          ],
+          "predicted_error_px": 147.03203743617314,
+          "predicted_improvement_px": 0.5968016716919351,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "UP",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            247.47,
+            133.48000000000002
+          ],
+          "predicted_error_px": 149.12832330875023,
+          "predicted_improvement_px": -1.4994842008851492,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "DOWN",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            247.49,
+            136.69
+          ],
+          "predicted_error_px": 146.1410213890413,
+          "predicted_improvement_px": 1.4878177188237771,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "FWD",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            247.44,
+            136.31
+          ],
+          "predicted_error_px": 146.47688024888788,
+          "predicted_improvement_px": 1.1519588589771956,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "BACK",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            247.52,
+            133.87
+          ],
+          "predicted_error_px": 148.78189347237392,
+          "predicted_improvement_px": -1.1530543645088471,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "LEFT",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            250.85,
+            135.09000000000003
+          ],
+          "predicted_error_px": 148.87594699735956,
+          "predicted_improvement_px": -1.2471078894944867,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "RIGHT",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            244.11,
+            135.09000000000003
+          ],
+          "predicted_error_px": 146.44867523576727,
+          "predicted_improvement_px": 1.1801638720978076,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "UP",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            247.46,
+            131.87
+          ],
+          "predicted_error_px": 150.63008958844296,
+          "predicted_improvement_px": -3.0012504805778804,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "DOWN",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            247.51,
+            138.27999999999997
+          ],
+          "predicted_error_px": 144.66857589810346,
+          "predicted_improvement_px": 2.960263209761621,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "FWD",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            247.42,
+            136.93
+          ],
+          "predicted_error_px": 145.89200605298115,
+          "predicted_improvement_px": 1.736833054883931,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "BACK",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            247.54,
+            133.26999999999998
+          ],
+          "predicted_error_px": 149.34948040361493,
+          "predicted_improvement_px": -1.7206412957498571,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "LEFT",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            252.53,
+            135.09000000000003
+          ],
+          "predicted_error_px": 149.52213781933534,
+          "predicted_improvement_px": -1.8932987114702655,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "RIGHT",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            242.43,
+            135.09000000000003
+          ],
+          "predicted_error_px": 145.88585803499777,
+          "predicted_improvement_px": 1.742981072867309,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "UP",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            247.44,
+            130.26
+          ],
+          "predicted_error_px": 152.13057718732378,
+          "predicted_improvement_px": -4.501738079458704,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "DOWN",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            247.52,
+            139.87
+          ],
+          "predicted_error_px": 143.19493050216937,
+          "predicted_improvement_px": 4.433908605695706,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 10,
+          "selected": true
+        }
+      ],
+      "target_reference_before_px": [
+        194.30246913580248,
+        272.80864197530866
+      ],
+      "target_reference_after_px": [
+        194.30246913580248,
+        272.80864197530866
+      ],
+      "target_reference_unchanged": true,
+      "reference_matches_episode_initial": true,
+      "target_identity_status_after": "SAME_TARGET",
+      "target_visible_after": true,
+      "target_reference_valid_after": true,
+      "effect_verification_success": true,
+      "termination_reason": null,
+      "authorization_calls_for_step": 1,
+      "alignment_authorization_calls_for_step": 1,
+      "arbiter_approved_alignment_actions_for_step": 1,
+      "executor_calls_for_action": 1,
+      "execution": {
+        "direction": "DOWN",
+        "requested_displacement_m": 0.009,
+        "requested_mm": 9.0,
+        "actual_projection_m": 0.010051069142592323,
+        "actual_projection_mm": 10.051069142592322,
+        "total_displacement_xyz_m": [
+          0.00042068910900075474,
+          0.00012078202827435491,
+          -0.010051069142592323
+        ],
+        "total_displacement_xyz_mm": [
+          0.42068910900075474,
+          0.12078202827435491,
+          -10.051069142592322
+        ],
+        "absolute_displacement_error_m": 0.0010510691425923233,
+        "absolute_displacement_error_mm": 1.0510691425923233,
+        "ticks_executed": 8,
+        "max_ticks": 10,
+        "termination": "TARGET_REACHED",
+        "off_axis_displacement_xyz_m": [
+          0.00042068910900075474,
+          0.00012078202827435491,
+          0.0
+        ],
+        "off_axis_magnitude_m": 0.00043768438947021626,
+        "off_axis_magnitude_mm": 0.43768438947021626,
+        "direction_cosine": 0.9990532169312487,
+        "execution_duration_s": 0.1386968344449997,
+        "tick_observations": [
+          {
+            "tick": 1,
+            "observation_id": "libero-observation-67",
+            "frame_id": 67,
+            "eef_position_xyz_m": [
+              -0.15210748643605548,
+              -0.015166858610827604,
+              0.249264714430539
+            ],
+            "incremental_delta_xyz_m": [
+              5.991811411351633e-05,
+              1.5183610839844194e-05,
+              -0.00125020174449475
+            ],
+            "incremental_projection_m": 0.00125020174449475,
+            "incremental_projection_mm": 1.25020174449475,
+            "incremental_off_axis_xyz_m": [
+              5.991811411351633e-05,
+              1.5183610839844194e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 6.181199266369107e-05,
+            "total_displacement_xyz_m": [
+              5.991811411351633e-05,
+              1.5183610839844194e-05,
+              -0.00125020174449475
+            ],
+            "cumulative_projection_m": 0.00125020174449475,
+            "cumulative_projection_mm": 1.25020174449475,
+            "off_axis_displacement_xyz_m": [
+              5.991811411351633e-05,
+              1.5183610839844194e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 6.181199266369107e-05,
+            "direction_cosine": 0.9987799996178393,
+            "elapsed_s": 0.0169336199760437
+          },
+          {
+            "tick": 2,
+            "observation_id": "libero-observation-68",
+            "frame_id": 68,
+            "eef_position_xyz_m": [
+              -0.15205103993666214,
+              -0.015151637066281028,
+              0.24801173519746245
+            ],
+            "incremental_delta_xyz_m": [
+              5.644649939334778e-05,
+              1.5221544546575524e-05,
+              -0.0012529792330765455
+            ],
+            "incremental_projection_m": 0.0012529792330765455,
+            "incremental_projection_mm": 1.2529792330765455,
+            "incremental_off_axis_xyz_m": [
+              5.644649939334778e-05,
+              1.5221544546575524e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.8462831886135956e-05,
+            "total_displacement_xyz_m": [
+              0.00011636461350686411,
+              3.040515538641972e-05,
+              -0.0025031809775712954
+            ],
+            "cumulative_projection_m": 0.0025031809775712954,
+            "cumulative_projection_mm": 2.5031809775712954,
+            "off_axis_displacement_xyz_m": [
+              0.00011636461350686411,
+              3.040515538641972e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.00012027134634098925,
+            "direction_cosine": 0.9988477182051015,
+            "elapsed_s": 0.0338246189057827
+          },
+          {
+            "tick": 3,
+            "observation_id": "libero-observation-69",
+            "frame_id": 69,
+            "eef_position_xyz_m": [
+              -0.15199728106757213,
+              -0.015136354370962026,
+              0.2467565554525496
+            ],
+            "incremental_delta_xyz_m": [
+              5.3758869090009265e-05,
+              1.528269531900217e-05,
+              -0.0012551797449128488
+            ],
+            "incremental_projection_m": 0.0012551797449128488,
+            "incremental_projection_mm": 1.2551797449128488,
+            "incremental_off_axis_xyz_m": [
+              5.3758869090009265e-05,
+              1.528269531900217e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.588896833946932e-05,
+            "total_displacement_xyz_m": [
+              0.00017012348259687338,
+              4.568785070542189e-05,
+              -0.003758360722484144
+            ],
+            "cumulative_projection_m": 0.003758360722484144,
+            "cumulative_projection_mm": 3.758360722484144,
+            "off_axis_displacement_xyz_m": [
+              0.00017012348259687338,
+              4.568785070542189e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.00017615157970614286,
+            "direction_cosine": 0.9989034426083412,
+            "elapsed_s": 0.050821542739868164
+          },
+          {
+            "tick": 4,
+            "observation_id": "libero-observation-70",
+            "frame_id": 70,
+            "eef_position_xyz_m": [
+              -0.1519454859733344,
+              -0.015120993058425654,
+              0.2454997058354509
+            ],
+            "incremental_delta_xyz_m": [
+              5.1795094237722106e-05,
+              1.5361312536371977e-05,
+              -0.0012568496170987098
+            ],
+            "incremental_projection_m": 0.0012568496170987098,
+            "incremental_projection_mm": 1.2568496170987098,
+            "incremental_off_axis_xyz_m": [
+              5.1795094237722106e-05,
+              1.5361312536371977e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.4025010041041293e-05,
+            "total_displacement_xyz_m": [
+              0.00022191857683459548,
+              6.104916324179387e-05,
+              -0.005015210339582854
+            ],
+            "cumulative_projection_m": 0.005015210339582854,
+            "cumulative_projection_mm": 5.015210339582854,
+            "off_axis_displacement_xyz_m": [
+              0.00022191857683459548,
+              6.104916324179387e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.0002301626709021588,
+            "direction_cosine": 0.9989485802801318,
+            "elapsed_s": 0.06939108669757843
+          },
+          {
+            "tick": 5,
+            "observation_id": "libero-observation-71",
+            "frame_id": 71,
+            "eef_position_xyz_m": [
+              -0.15189501554822005,
+              -0.015105540021262923,
+              0.2442416532035799
+            ],
+            "incremental_delta_xyz_m": [
+              5.047042511435729e-05,
+              1.5453037162731567e-05,
+              -0.0012580526318709817
+            ],
+            "incremental_projection_m": 0.0012580526318709817,
+            "incremental_projection_mm": 1.2580526318709817,
+            "incremental_off_axis_xyz_m": [
+              5.047042511435729e-05,
+              1.5453037162731567e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.27831428467149e-05,
+            "total_displacement_xyz_m": [
+              0.00027238900194895277,
+              7.650220040452543e-05,
+              -0.006273262971453836
+            ],
+            "cumulative_projection_m": 0.006273262971453836,
+            "cumulative_projection_mm": 6.2732629714538355,
+            "off_axis_displacement_xyz_m": [
+              0.00027238900194895277,
+              7.650220040452543e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.0002829281800200906,
+            "direction_cosine": 0.9989845150106544,
+            "elapsed_s": 0.08849696442484856
+          },
+          {
+            "tick": 6,
+            "observation_id": "libero-observation-72",
+            "frame_id": 72,
+            "eef_position_xyz_m": [
+              -0.1518453349932283,
+              -0.01509021138274942,
+              0.24298279137938716
+            ],
+            "incremental_delta_xyz_m": [
+              4.96805549917434e-05,
+              1.5328638513502704e-05,
+              -0.0012588618241927418
+            ],
+            "incremental_projection_m": 0.0012588618241927418,
+            "incremental_projection_mm": 1.2588618241927418,
+            "incremental_off_axis_xyz_m": [
+              4.96805549917434e-05,
+              1.5328638513502704e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.199158300114816e-05,
+            "total_displacement_xyz_m": [
+              0.00032206955694069617,
+              9.183083891802814e-05,
+              -0.0075321247956465776
+            ],
+            "cumulative_projection_m": 0.0075321247956465776,
+            "cumulative_projection_mm": 7.5321247956465776,
+            "off_axis_displacement_xyz_m": [
+              0.00032206955694069617,
+              9.183083891802814e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.0003349055127709384,
+            "direction_cosine": 0.9990129566851327,
+            "elapsed_s": 0.10573459416627884
+          },
+          {
+            "tick": 7,
+            "observation_id": "libero-observation-73",
+            "frame_id": 73,
+            "eef_position_xyz_m": [
+              -0.1517960187138863,
+              -0.015075506054856533,
+              0.24172343915646718
+            ],
+            "incremental_delta_xyz_m": [
+              4.9316279342015434e-05,
+              1.4705327892886727e-05,
+              -0.0012593522229199794
+            ],
+            "incremental_projection_m": 0.0012593522229199794,
+            "incremental_projection_mm": 1.2593522229199794,
+            "incremental_off_axis_xyz_m": [
+              4.9316279342015434e-05,
+              1.4705327892886727e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.146204500966718e-05,
+            "total_displacement_xyz_m": [
+              0.0003713858362827116,
+              0.00010653616681091486,
+              -0.008791477018566557
+            ],
+            "cumulative_projection_m": 0.008791477018566557,
+            "cumulative_projection_mm": 8.791477018566557,
+            "off_axis_displacement_xyz_m": [
+              0.0003713858362827116,
+              0.00010653616681091486,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.00038636432836142127,
+            "direction_cosine": 0.9990357007674637,
+            "elapsed_s": 0.12216738611459732
+          },
+          {
+            "tick": 8,
+            "observation_id": "libero-observation-74",
+            "frame_id": 74,
+            "eef_position_xyz_m": [
+              -0.15174671544116825,
+              -0.015061260193393093,
+              0.24046384703244142
+            ],
+            "incremental_delta_xyz_m": [
+              4.9303272718043134e-05,
+              1.4245861463440049e-05,
+              -0.0012595921240257657
+            ],
+            "incremental_projection_m": 0.0012595921240257657,
+            "incremental_projection_mm": 1.2595921240257657,
+            "incremental_off_axis_xyz_m": [
+              4.9303272718043134e-05,
+              1.4245861463440049e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.13201448706574e-05,
+            "total_displacement_xyz_m": [
+              0.00042068910900075474,
+              0.00012078202827435491,
+              -0.010051069142592323
+            ],
+            "cumulative_projection_m": 0.010051069142592323,
+            "cumulative_projection_mm": 10.051069142592322,
+            "off_axis_displacement_xyz_m": [
+              0.00042068910900075474,
+              0.00012078202827435491,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.00043768438947021626,
+            "direction_cosine": 0.9990532169312487,
+            "elapsed_s": 0.1386820636689663
+          }
+        ],
+        "last_backend_receipt": {
+          "backend_returned": true,
+          "done": false,
+          "truncated": false,
+          "info_keys": []
+        }
+      },
+      "visual_artifacts": {
+        "before": {
+          "canonical_rgb": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_02/before_canonical_rgb.png",
+          "alignment_overlay": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_02/before_alignment_overlay.png",
+          "sam_mask": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_02/before_sam_mask.png"
+        },
+        "after": {
+          "canonical_rgb": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_02/after_canonical_rgb.png",
+          "alignment_overlay": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_02/after_alignment_overlay.png",
+          "sam_mask": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_02/after_sam_mask.png"
+        },
+        "effect_overlay": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_02/effect_overlay.png"
+      },
+      "oracle_target_pose_after_diagnostic": null,
+      "oracle_used_by_runtime": false
+    },
+    {
+      "alignment_step": 3,
+      "executed": true,
+      "semantic_option_id": "ALIGN_TO_TARGET_BOUNDED",
+      "semantic_step": 3,
+      "task_id": 9,
+      "task_instruction": "pick up the orange juice and place it in the basket",
+      "approval_trace_id": "354fca1c2a7a478aac119dead16dc65b",
+      "approval_id": "354fca1c2a7a478aac119dead16dc65b",
+      "entity_key": "target",
+      "entity_phrase": "the orange juice",
+      "target_visible": true,
+      "identity_valid": true,
+      "identity_status_before": "SAME_TARGET",
+      "reference_valid": true,
+      "scene_ready": true,
+      "direction": "DOWN",
+      "scale_m": 0.009,
+      "scale_mm": 9.0,
+      "max_ticks": 10,
+      "frame_id_before": 76,
+      "frame_id_after": 85,
+      "episode_initial_alignment_error_px": 152.85265695293126,
+      "error_before_px": 142.6178310775837,
+      "predicted_error_after_px": 138.24404206764257,
+      "predicted_improvement_px": 4.3737890099411345,
+      "actual_improvement_px": 4.950020256259393,
+      "error_after_px": 137.6678108213243,
+      "prediction_residual_actual_minus_predicted_px": 0.5762312463182582,
+      "candidate_lattice": [
+        {
+          "direction": "FWD",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            247.57,
+            141.14
+          ],
+          "predicted_error_px": 142.03542207488331,
+          "predicted_improvement_px": 0.5824090027003876,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "BACK",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            247.61,
+            139.89999999999998
+          ],
+          "predicted_error_px": 143.20055851342954,
+          "predicted_improvement_px": -0.5827274358458396,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "LEFT",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            249.26,
+            140.51999999999998
+          ],
+          "predicted_error_px": 143.2501832262724,
+          "predicted_improvement_px": -0.6323521486887103,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "RIGHT",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            245.91,
+            140.51999999999998
+          ],
+          "predicted_error_px": 141.99866914013842,
+          "predicted_improvement_px": 0.6191619374452841,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "UP",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            247.57,
+            138.93
+          ],
+          "predicted_error_px": 144.0865039534276,
+          "predicted_improvement_px": -1.4686728758439074,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "DOWN",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            247.6,
+            142.10000000000002
+          ],
+          "predicted_error_px": 141.15727357543253,
+          "predicted_improvement_px": 1.4605575021511754,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "FWD",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            247.55,
+            141.76
+          ],
+          "predicted_error_px": 141.45333543860428,
+          "predicted_improvement_px": 1.1644956389794174,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "BACK",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            247.63,
+            139.27999999999997
+          ],
+          "predicted_error_px": 143.7836005107749,
+          "predicted_improvement_px": -1.1657694331912012,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "LEFT",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            250.94,
+            140.51999999999998
+          ],
+          "predicted_error_px": 143.90307397017037,
+          "predicted_improvement_px": -1.2852428925866661,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "RIGHT",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            244.24,
+            140.51999999999998
+          ],
+          "predicted_error_px": 141.40028919519253,
+          "predicted_improvement_px": 1.2175418823911741,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "UP",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            247.56,
+            137.33000000000004
+          ],
+          "predicted_error_px": 145.57069425274034,
+          "predicted_improvement_px": -2.9528631751566365,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "DOWN",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            247.61,
+            143.68
+          ],
+          "predicted_error_px": 139.69931648087908,
+          "predicted_improvement_px": 2.9185145967046253,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "FWD",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            247.53,
+            142.39
+          ],
+          "predicted_error_px": 140.86231652426721,
+          "predicted_improvement_px": 1.7555145533164875,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "BACK",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            247.64,
+            138.66999999999996
+          ],
+          "predicted_error_px": 144.3539658951886,
+          "predicted_improvement_px": -1.736134817604892,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "LEFT",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            252.61,
+            140.51999999999998
+          ],
+          "predicted_error_px": 144.56850608327787,
+          "predicted_improvement_px": -1.9506750056941655,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "RIGHT",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            242.56,
+            140.51999999999998
+          ],
+          "predicted_error_px": 140.81574514513773,
+          "predicted_improvement_px": 1.8020859324459764,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "UP",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            247.55,
+            135.73000000000002
+          ],
+          "predicted_error_px": 147.05731409531631,
+          "predicted_improvement_px": -4.439483017732613,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "DOWN",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            247.62,
+            145.26
+          ],
+          "predicted_error_px": 138.24404206764257,
+          "predicted_improvement_px": 4.3737890099411345,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 10,
+          "selected": true
+        }
+      ],
+      "target_reference_before_px": [
+        194.30246913580248,
+        272.80864197530866
+      ],
+      "target_reference_after_px": [
+        194.30246913580248,
+        272.80864197530866
+      ],
+      "target_reference_unchanged": true,
+      "reference_matches_episode_initial": true,
+      "target_identity_status_after": "SAME_TARGET",
+      "target_visible_after": true,
+      "target_reference_valid_after": true,
+      "effect_verification_success": true,
+      "termination_reason": null,
+      "authorization_calls_for_step": 1,
+      "alignment_authorization_calls_for_step": 1,
+      "arbiter_approved_alignment_actions_for_step": 1,
+      "executor_calls_for_action": 1,
+      "execution": {
+        "direction": "DOWN",
+        "requested_displacement_m": 0.009,
+        "requested_mm": 9.0,
+        "actual_projection_m": 0.010072329659267909,
+        "actual_projection_mm": 10.07232965926791,
+        "total_displacement_xyz_m": [
+          0.00041245151893509746,
+          0.0001069337377102228,
+          -0.010072329659267909
+        ],
+        "total_displacement_xyz_mm": [
+          0.41245151893509746,
+          0.1069337377102228,
+          -10.07232965926791
+        ],
+        "absolute_displacement_error_m": 0.0010723296592679097,
+        "absolute_displacement_error_mm": 1.0723296592679097,
+        "ticks_executed": 8,
+        "max_ticks": 10,
+        "termination": "TARGET_REACHED",
+        "off_axis_displacement_xyz_m": [
+          0.00041245151893509746,
+          0.0001069337377102228,
+          0.0
+        ],
+        "off_axis_magnitude_m": 0.00042608811263933165,
+        "off_axis_magnitude_mm": 0.42608811263933166,
+        "direction_cosine": 0.9991064341393617,
+        "execution_duration_s": 0.13477503508329391,
+        "tick_observations": [
+          {
+            "tick": 1,
+            "observation_id": "libero-observation-77",
+            "frame_id": 77,
+            "eef_position_xyz_m": [
+              -0.1516971612406504,
+              -0.015047321800371573,
+              0.2392042019150555
+            ],
+            "incremental_delta_xyz_m": [
+              4.955420051783177e-05,
+              1.393839302151964e-05,
+              -0.0012596451173859102
+            ],
+            "incremental_projection_m": 0.0012596451173859102,
+            "incremental_projection_mm": 1.2596451173859102,
+            "incremental_off_axis_xyz_m": [
+              4.955420051783177e-05,
+              1.393839302151964e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.147715599160297e-05,
+            "total_displacement_xyz_m": [
+              4.955420051783177e-05,
+              1.393839302151964e-05,
+              -0.0012596451173859102
+            ],
+            "cumulative_projection_m": 0.0012596451173859102,
+            "cumulative_projection_mm": 1.2596451173859102,
+            "off_axis_displacement_xyz_m": [
+              4.955420051783177e-05,
+              1.393839302151964e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 5.147715599160297e-05,
+            "direction_cosine": 0.9991660133073583,
+            "elapsed_s": 0.016320593655109406
+          },
+          {
+            "tick": 2,
+            "observation_id": "libero-observation-78",
+            "frame_id": 78,
+            "eef_position_xyz_m": [
+              -0.15164717032184788,
+              -0.015033612976356123,
+              0.23794463539048227
+            ],
+            "incremental_delta_xyz_m": [
+              4.999091880253381e-05,
+              1.3708824015450788e-05,
+              -0.0012595665245732357
+            ],
+            "incremental_projection_m": 0.0012595665245732357,
+            "incremental_projection_mm": 1.2595665245732357,
+            "incremental_off_axis_xyz_m": [
+              4.999091880253381e-05,
+              1.3708824015450788e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.1836510478697626e-05,
+            "total_displacement_xyz_m": [
+              9.954511932036558e-05,
+              2.764721703697043e-05,
+              -0.002519211641959146
+            ],
+            "cumulative_projection_m": 0.002519211641959146,
+            "cumulative_projection_mm": 2.5192116419591457,
+            "off_axis_displacement_xyz_m": [
+              9.954511932036558e-05,
+              2.764721703697043e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.00010331311335157395,
+            "direction_cosine": 0.9991601451994969,
+            "elapsed_s": 0.033849552273750305
+          },
+          {
+            "tick": 3,
+            "observation_id": "libero-observation-79",
+            "frame_id": 79,
+            "eef_position_xyz_m": [
+              -0.1515966214411383,
+              -0.015020086925599389,
+              0.23668523282063483
+            ],
+            "incremental_delta_xyz_m": [
+              5.05488807095722e-05,
+              1.3526050756733701e-05,
+              -0.0012594025698474398
+            ],
+            "incremental_projection_m": 0.0012594025698474398,
+            "incremental_projection_mm": 1.2594025698474398,
+            "incremental_off_axis_xyz_m": [
+              5.05488807095722e-05,
+              1.3526050756733701e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.232727195320139e-05,
+            "total_displacement_xyz_m": [
+              0.00015009400002993778,
+              4.117326779370413e-05,
+              -0.0037786142118065857
+            ],
+            "cumulative_projection_m": 0.0037786142118065857,
+            "cumulative_projection_mm": 3.7786142118065857,
+            "off_axis_displacement_xyz_m": [
+              0.00015009400002993778,
+              4.117326779370413e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.00015563883456836547,
+            "direction_cosine": 0.9991527947088605,
+            "elapsed_s": 0.05392986908555031
+          },
+          {
+            "tick": 4,
+            "observation_id": "libero-observation-80",
+            "frame_id": 80,
+            "eef_position_xyz_m": [
+              -0.15154544512265428,
+              -0.015006712086869444,
+              0.23542604241146897
+            ],
+            "incremental_delta_xyz_m": [
+              5.1176318484030814e-05,
+              1.3374838729944896e-05,
+              -0.0012591904091658612
+            ],
+            "incremental_projection_m": 0.0012591904091658612,
+            "incremental_projection_mm": 1.2591904091658612,
+            "incremental_off_axis_xyz_m": [
+              5.1176318484030814e-05,
+              1.3374838729944896e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.289519717924292e-05,
+            "total_displacement_xyz_m": [
+              0.0002012703185139686,
+              5.4548106523649026e-05,
+              -0.005037804620972447
+            ],
+            "cumulative_projection_m": 0.005037804620972447,
+            "cumulative_projection_mm": 5.037804620972447,
+            "off_axis_displacement_xyz_m": [
+              0.0002012703185139686,
+              5.4548106523649026e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.00020853114165522073,
+            "direction_cosine": 0.9991443984703013,
+            "elapsed_s": 0.07239953428506851
+          },
+          {
+            "tick": 5,
+            "observation_id": "libero-observation-81",
+            "frame_id": 81,
+            "eef_position_xyz_m": [
+              -0.15149361185686072,
+              -0.014993465313627781,
+              0.23416708374330225
+            ],
+            "incremental_delta_xyz_m": [
+              5.183326579355496e-05,
+              1.3246773241663151e-05,
+              -0.0012589586681667209
+            ],
+            "incremental_projection_m": 0.0012589586681667209,
+            "incremental_projection_mm": 1.2589586681667209,
+            "incremental_off_axis_xyz_m": [
+              5.183326579355496e-05,
+              1.3246773241663151e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.349920040656082e-05,
+            "total_displacement_xyz_m": [
+              0.00025310358430752355,
+              6.779487976531218e-05,
+              -0.006296763289139168
+            ],
+            "cumulative_projection_m": 0.006296763289139168,
+            "cumulative_projection_mm": 6.296763289139168,
+            "off_axis_displacement_xyz_m": [
+              0.00025310358430752355,
+              6.779487976531218e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.00026202589587998515,
+            "direction_cosine": 0.9991353106309699,
+            "elapsed_s": 0.08776331320405006
+          },
+          {
+            "tick": 6,
+            "observation_id": "libero-observation-82",
+            "frame_id": 82,
+            "eef_position_xyz_m": [
+              -0.15144112156451367,
+              -0.01498032845863332,
+              0.23290835540989258
+            ],
+            "incremental_delta_xyz_m": [
+              5.2490292347051604e-05,
+              1.3136854994461045e-05,
+              -0.0012587283334096755
+            ],
+            "incremental_projection_m": 0.0012587283334096755,
+            "incremental_projection_mm": 1.2587283334096755,
+            "incremental_off_axis_xyz_m": [
+              5.2490292347051604e-05,
+              1.3136854994461045e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.410922056197484e-05,
+            "total_displacement_xyz_m": [
+              0.00030559387665457516,
+              8.093173475977322e-05,
+              -0.007555491622548843
+            ],
+            "cumulative_projection_m": 0.007555491622548843,
+            "cumulative_projection_mm": 7.5554916225488435,
+            "off_axis_displacement_xyz_m": [
+              0.00030559387665457516,
+              8.093173475977322e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.00031612902925862087,
+            "direction_cosine": 0.9991258146347933,
+            "elapsed_s": 0.1037045493721962
+          },
+          {
+            "tick": 7,
+            "observation_id": "libero-observation-83",
+            "frame_id": 83,
+            "eef_position_xyz_m": [
+              -0.15138799453500199,
+              -0.01496728649699652,
+              0.23164984157394253
+            ],
+            "incremental_delta_xyz_m": [
+              5.31270295116848e-05,
+              1.3041961636799798e-05,
+              -0.001258513835950048
+            ],
+            "incremental_projection_m": 0.001258513835950048,
+            "incremental_projection_mm": 1.258513835950048,
+            "incremental_off_axis_xyz_m": [
+              5.31270295116848e-05,
+              1.3041961636799798e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.4704424209301255e-05,
+            "total_displacement_xyz_m": [
+              0.00035872090616625996,
+              9.397369639657302e-05,
+              -0.008814005458498891
+            ],
+            "cumulative_projection_m": 0.008814005458498891,
+            "cumulative_projection_mm": 8.814005458498892,
+            "off_axis_displacement_xyz_m": [
+              0.00035872090616625996,
+              9.397369639657302e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.0003708257598052999,
+            "direction_cosine": 0.9991161326742791,
+            "elapsed_s": 0.11915694177150726
+          },
+          {
+            "tick": 8,
+            "observation_id": "libero-observation-84",
+            "frame_id": 84,
+            "eef_position_xyz_m": [
+              -0.15133426392223315,
+              -0.01495432645568287,
+              0.2303915173731735
+            ],
+            "incremental_delta_xyz_m": [
+              5.3730612768837505e-05,
+              1.2960041313649778e-05,
+              -0.0012583242007690176
+            ],
+            "incremental_projection_m": 0.0012583242007690176,
+            "incremental_projection_mm": 1.2583242007690176,
+            "incremental_off_axis_xyz_m": [
+              5.3730612768837505e-05,
+              1.2960041313649778e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.527152448925462e-05,
+            "total_displacement_xyz_m": [
+              0.00041245151893509746,
+              0.0001069337377102228,
+              -0.010072329659267909
+            ],
+            "cumulative_projection_m": 0.010072329659267909,
+            "cumulative_projection_mm": 10.07232965926791,
+            "off_axis_displacement_xyz_m": [
+              0.00041245151893509746,
+              0.0001069337377102228,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.00042608811263933165,
+            "direction_cosine": 0.9991064341393617,
+            "elapsed_s": 0.1347644031047821
+          }
+        ],
+        "last_backend_receipt": {
+          "backend_returned": true,
+          "done": false,
+          "truncated": false,
+          "info_keys": []
+        }
+      },
+      "visual_artifacts": {
+        "before": {
+          "canonical_rgb": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_03/before_canonical_rgb.png",
+          "alignment_overlay": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_03/before_alignment_overlay.png",
+          "sam_mask": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_03/before_sam_mask.png"
+        },
+        "after": {
+          "canonical_rgb": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_03/after_canonical_rgb.png",
+          "alignment_overlay": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_03/after_alignment_overlay.png",
+          "sam_mask": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_03/after_sam_mask.png"
+        },
+        "effect_overlay": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_03/effect_overlay.png"
+      },
+      "oracle_target_pose_after_diagnostic": null,
+      "oracle_used_by_runtime": false
+    },
+    {
+      "alignment_step": 4,
+      "executed": true,
+      "semantic_option_id": "ALIGN_TO_TARGET_BOUNDED",
+      "semantic_step": 4,
+      "task_id": 9,
+      "task_instruction": "pick up the orange juice and place it in the basket",
+      "approval_trace_id": "ea888f8e0da049e5a113fb0a0534fd22",
+      "approval_id": "ea888f8e0da049e5a113fb0a0534fd22",
+      "entity_key": "target",
+      "entity_phrase": "the orange juice",
+      "target_visible": true,
+      "identity_valid": true,
+      "identity_status_before": "SAME_TARGET",
+      "reference_valid": true,
+      "scene_ready": true,
+      "direction": "DOWN",
+      "scale_m": 0.009,
+      "scale_mm": 9.0,
+      "max_ticks": 10,
+      "frame_id_before": 86,
+      "frame_id_after": 95,
+      "episode_initial_alignment_error_px": 152.85265695293126,
+      "error_before_px": 137.6678108213243,
+      "predicted_error_after_px": 133.36394079449346,
+      "predicted_improvement_px": 4.30387002683085,
+      "actual_improvement_px": 4.875044928851963,
+      "error_after_px": 132.79276589247235,
+      "prediction_residual_actual_minus_predicted_px": 0.571174902021113,
+      "candidate_lattice": [
+        {
+          "direction": "FWD",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            247.67,
+            146.53999999999996
+          ],
+          "predicted_error_px": 137.08341729337565,
+          "predicted_improvement_px": 0.584393527948663,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "BACK",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            247.7,
+            145.27999999999997
+          ],
+          "predicted_error_px": 138.25646757551485,
+          "predicted_improvement_px": -0.5886567541905379,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "LEFT",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            249.35,
+            145.90999999999997
+          ],
+          "predicted_error_px": 138.32388076330983,
+          "predicted_improvement_px": -0.6560699419855212,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "RIGHT",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            246.02,
+            145.90999999999997
+          ],
+          "predicted_error_px": 137.03272723647734,
+          "predicted_improvement_px": 0.6350835848469671,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "UP",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            247.67,
+            144.33000000000004
+          ],
+          "predicted_error_px": 139.12172653601093,
+          "predicted_improvement_px": -1.453915714686616,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "DOWN",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            247.7,
+            147.48000000000002
+          ],
+          "predicted_error_px": 136.22982346669917,
+          "predicted_improvement_px": 1.437987354625136,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "FWD",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            247.65,
+            147.18
+          ],
+          "predicted_error_px": 136.48631702066984,
+          "predicted_improvement_px": 1.181493800654465,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "BACK",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            247.72,
+            144.65999999999997
+          ],
+          "predicted_error_px": 138.83625983057647,
+          "predicted_improvement_px": -1.1684490092521571,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "LEFT",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            251.02,
+            145.90999999999997
+          ],
+          "predicted_error_px": 138.99691954323583,
+          "predicted_improvement_px": -1.329108721911524,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "RIGHT",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            244.35,
+            145.90999999999997
+          ],
+          "predicted_error_px": 136.4112190429379,
+          "predicted_improvement_px": 1.2565917783864222,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "UP",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            247.66,
+            142.75
+          ],
+          "predicted_error_px": 140.5783640976993,
+          "predicted_improvement_px": -2.9105532763749977,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "DOWN",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            247.71,
+            149.05
+          ],
+          "predicted_error_px": 134.79082244938948,
+          "predicted_improvement_px": 2.8769883719348286,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "FWD",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            247.63,
+            147.81
+          ],
+          "predicted_error_px": 135.89880810273257,
+          "predicted_improvement_px": 1.7690027185917359,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "BACK",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            247.74,
+            144.02999999999997
+          ],
+          "predicted_error_px": 139.425637290517,
+          "predicted_improvement_px": -1.757826469192679,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "LEFT",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            252.69,
+            145.90999999999997
+          ],
+          "predicted_error_px": 139.6866818834036,
+          "predicted_improvement_px": -2.0188710620792847,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "RIGHT",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            242.68,
+            145.90999999999997
+          ],
+          "predicted_error_px": 135.80740343476847,
+          "predicted_improvement_px": 1.8604073865558348,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "UP",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            247.65,
+            141.16999999999996
+          ],
+          "predicted_error_px": 142.0376397664014,
+          "predicted_improvement_px": -4.369828945077103,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "DOWN",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            247.72,
+            150.61
+          ],
+          "predicted_error_px": 133.36394079449346,
+          "predicted_improvement_px": 4.30387002683085,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 10,
+          "selected": true
+        }
+      ],
+      "target_reference_before_px": [
+        194.30246913580248,
+        272.80864197530866
+      ],
+      "target_reference_after_px": [
+        194.30246913580248,
+        272.80864197530866
+      ],
+      "target_reference_unchanged": true,
+      "reference_matches_episode_initial": true,
+      "target_identity_status_after": "SAME_TARGET",
+      "target_visible_after": true,
+      "target_reference_valid_after": true,
+      "effect_verification_success": true,
+      "termination_reason": null,
+      "authorization_calls_for_step": 1,
+      "alignment_authorization_calls_for_step": 1,
+      "arbiter_approved_alignment_actions_for_step": 1,
+      "executor_calls_for_action": 1,
+      "execution": {
+        "direction": "DOWN",
+        "requested_displacement_m": 0.009,
+        "requested_mm": 9.0,
+        "actual_projection_m": 0.010063190434202757,
+        "actual_projection_mm": 10.063190434202756,
+        "total_displacement_xyz_m": [
+          0.00044690910997299826,
+          0.00010192393655429274,
+          -0.010063190434202757
+        ],
+        "total_displacement_xyz_mm": [
+          0.44690910997299826,
+          0.10192393655429274,
+          -10.063190434202756
+        ],
+        "absolute_displacement_error_m": 0.0010631904342027574,
+        "absolute_displacement_error_mm": 1.0631904342027574,
+        "ticks_executed": 8,
+        "max_ticks": 10,
+        "termination": "TARGET_REACHED",
+        "off_axis_displacement_xyz_m": [
+          0.00044690910997299826,
+          0.00010192393655429274,
+          0.0
+        ],
+        "off_axis_magnitude_m": 0.0004583843817360938,
+        "off_axis_magnitude_mm": 0.4583843817360938,
+        "direction_cosine": 0.9989641829324245,
+        "execution_duration_s": 0.13378004357218742,
+        "tick_observations": [
+          {
+            "tick": 1,
+            "observation_id": "libero-observation-87",
+            "frame_id": 87,
+            "eef_position_xyz_m": [
+              -0.15127996976847735,
+              -0.014941436800014375,
+              0.22913335320339118
+            ],
+            "incremental_delta_xyz_m": [
+              5.429415375579616e-05,
+              1.2889655668495495e-05,
+              -0.0012581641697823331
+            ],
+            "incremental_projection_m": 0.0012581641697823331,
+            "incremental_projection_mm": 1.2581641697823331,
+            "incremental_off_axis_xyz_m": [
+              5.429415375579616e-05,
+              1.2889655668495495e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.580321097670288e-05,
+            "total_displacement_xyz_m": [
+              5.429415375579616e-05,
+              1.2889655668495495e-05,
+              -0.0012581641697823331
+            ],
+            "cumulative_projection_m": 0.0012581641697823331,
+            "cumulative_projection_mm": 1.2581641697823331,
+            "off_axis_displacement_xyz_m": [
+              5.429415375579616e-05,
+              1.2889655668495495e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 5.580321097670288e-05,
+            "direction_cosine": 0.9990178595842822,
+            "elapsed_s": 0.0166652649641037
+          },
+          {
+            "tick": 2,
+            "observation_id": "libero-observation-88",
+            "frame_id": 88,
+            "eef_position_xyz_m": [
+              -0.15122515444639395,
+              -0.014928607084121477,
+              0.2278753179653622
+            ],
+            "incremental_delta_xyz_m": [
+              5.481532208340134e-05,
+              1.2829715892897706e-05,
+              -0.001258035238028976
+            ],
+            "incremental_projection_m": 0.001258035238028976,
+            "incremental_projection_mm": 1.258035238028976,
+            "incremental_off_axis_xyz_m": [
+              5.481532208340134e-05,
+              1.2829715892897706e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.6296724105399764e-05,
+            "total_displacement_xyz_m": [
+              0.0001091094758391975,
+              2.57193715613932e-05,
+              -0.0025161994078113092
+            ],
+            "cumulative_projection_m": 0.0025161994078113092,
+            "cumulative_projection_mm": 2.5161994078113095,
+            "off_axis_displacement_xyz_m": [
+              0.0001091094758391975,
+              2.57193715613932e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.00011209979389551715,
+            "direction_cosine": 0.9990090685471307,
+            "elapsed_s": 0.032620497047901154
+          },
+          {
+            "tick": 3,
+            "observation_id": "libero-observation-89",
+            "frame_id": 89,
+            "eef_position_xyz_m": [
+              -0.151169859358593,
+              -0.014915827751226162,
+              0.22661738139856125
+            ],
+            "incremental_delta_xyz_m": [
+              5.529508780094394e-05,
+              1.2779332895314702e-05,
+              -0.0012579365668009546
+            ],
+            "incremental_projection_m": 0.0012579365668009546,
+            "incremental_projection_mm": 1.2579365668009546,
+            "incremental_off_axis_xyz_m": [
+              5.529508780094394e-05,
+              1.2779332895314702e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.6752604206004254e-05,
+            "total_displacement_xyz_m": [
+              0.00016440456364014144,
+              3.84987044567079e-05,
+              -0.003774135974612264
+            ],
+            "cumulative_projection_m": 0.003774135974612264,
+            "cumulative_projection_mm": 3.774135974612264,
+            "off_axis_displacement_xyz_m": [
+              0.00016440456364014144,
+              3.84987044567079e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.00016885203815930163,
+            "direction_cosine": 0.9990006993562839,
+            "elapsed_s": 0.04837208613753319
+          },
+          {
+            "tick": 4,
+            "observation_id": "libero-observation-90",
+            "frame_id": 90,
+            "eef_position_xyz_m": [
+              -0.1511141227081595,
+              -0.014903090015595227,
+              0.22535951564223478
+            ],
+            "incremental_delta_xyz_m": [
+              5.573665043351328e-05,
+              1.2737735630935151e-05,
+              -0.0012578657563264706
+            ],
+            "incremental_projection_m": 0.0012578657563264706,
+            "incremental_projection_mm": 1.2578657563264706,
+            "incremental_off_axis_xyz_m": [
+              5.573665043351328e-05,
+              1.2737735630935151e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.717363125210127e-05,
+            "total_displacement_xyz_m": [
+              0.00022014121407365472,
+              5.1236440087643054e-05,
+              -0.005032001730938734
+            ],
+            "cumulative_projection_m": 0.005032001730938734,
+            "cumulative_projection_mm": 5.032001730938735,
+            "off_axis_displacement_xyz_m": [
+              0.00022014121407365472,
+              5.1236440087643054e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.00022602505818310791,
+            "direction_cosine": 0.9989927319517237,
+            "elapsed_s": 0.06434889510273933
+          },
+          {
+            "tick": 5,
+            "observation_id": "libero-observation-91",
+            "frame_id": 91,
+            "eef_position_xyz_m": [
+              -0.1510579781464799,
+              -0.014890385786381362,
+              0.22410169616769365
+            ],
+            "incremental_delta_xyz_m": [
+              5.614456167959969e-05,
+              1.2704229213865437e-05,
+              -0.001257819474541122
+            ],
+            "incremental_projection_m": 0.001257819474541122,
+            "incremental_projection_mm": 1.257819474541122,
+            "incremental_off_axis_xyz_m": [
+              5.614456167959969e-05,
+              1.2704229213865437e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.7563957873940584e-05,
+            "total_displacement_xyz_m": [
+              0.0002762857757532544,
+              6.394066930150849e-05,
+              -0.006289821205479856
+            ],
+            "cumulative_projection_m": 0.006289821205479856,
+            "cumulative_projection_mm": 6.289821205479856,
+            "off_axis_displacement_xyz_m": [
+              0.0002762857757532544,
+              6.394066930150849e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.00028358815044762087,
+            "direction_cosine": 0.9989851355325169,
+            "elapsed_s": 0.07999078929424286
+          },
+          {
+            "tick": 6,
+            "observation_id": "libero-observation-92",
+            "frame_id": 92,
+            "eef_position_xyz_m": [
+              -0.15100145411126198,
+              -0.014877707611176844,
+              0.22284390221948053
+            ],
+            "incremental_delta_xyz_m": [
+              5.652403521791416e-05,
+              1.2678175204517902e-05,
+              -0.0012577939482131262
+            ],
+            "incremental_projection_m": 0.0012577939482131262,
+            "incremental_projection_mm": 1.2577939482131262,
+            "incremental_off_axis_xyz_m": [
+              5.652403521791416e-05,
+              1.2678175204517902e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.792842725150108e-05,
+            "total_displacement_xyz_m": [
+              0.0003328098109711686,
+              7.661884450602639e-05,
+              -0.0075476151536929825
+            ],
+            "cumulative_projection_m": 0.0075476151536929825,
+            "cumulative_projection_mm": 7.547615153692982,
+            "off_axis_displacement_xyz_m": [
+              0.0003328098109711686,
+              7.661884450602639e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.0003415154719951991,
+            "direction_cosine": 0.9989778726187986,
+            "elapsed_s": 0.09587113931775093
+          },
+          {
+            "tick": 7,
+            "observation_id": "libero-observation-93",
+            "frame_id": 93,
+            "eef_position_xyz_m": [
+              -0.1509445736833685,
+              -0.01486504862781046,
+              0.2215861168903901
+            ],
+            "incremental_delta_xyz_m": [
+              5.68804278934798e-05,
+              1.2658983366383575e-05,
+              -0.0012577853290904328
+            ],
+            "incremental_projection_m": 0.0012577853290904328,
+            "incremental_projection_mm": 1.2577853290904328,
+            "incremental_off_axis_xyz_m": [
+              5.68804278934798e-05,
+              1.2658983366383575e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.827205966169148e-05,
+            "total_displacement_xyz_m": [
+              0.0003896902388646484,
+              8.927782787240997e-05,
+              -0.008805400482783415
+            ],
+            "cumulative_projection_m": 0.008805400482783415,
+            "cumulative_projection_mm": 8.805400482783416,
+            "off_axis_displacement_xyz_m": [
+              0.0003896902388646484,
+              8.927782787240997e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.0003997862088867028,
+            "direction_cosine": 0.998970902329187,
+            "elapsed_s": 0.11229106411337852
+          },
+          {
+            "tick": 8,
+            "observation_id": "libero-observation-94",
+            "frame_id": 94,
+            "eef_position_xyz_m": [
+              -0.15088735481226015,
+              -0.014852402519128578,
+              0.22032832693897075
+            ],
+            "incremental_delta_xyz_m": [
+              5.721887110834989e-05,
+              1.2646108681882776e-05,
+              -0.0012577899514193414
+            ],
+            "incremental_projection_m": 0.0012577899514193414,
+            "incremental_projection_mm": 1.2577899514193414,
+            "incremental_off_axis_xyz_m": [
+              5.721887110834989e-05,
+              1.2646108681882776e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.859968665196042e-05,
+            "total_displacement_xyz_m": [
+              0.00044690910997299826,
+              0.00010192393655429274,
+              -0.010063190434202757
+            ],
+            "cumulative_projection_m": 0.010063190434202757,
+            "cumulative_projection_mm": 10.063190434202756,
+            "off_axis_displacement_xyz_m": [
+              0.00044690910997299826,
+              0.00010192393655429274,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.0004583843817360938,
+            "direction_cosine": 0.9989641829324245,
+            "elapsed_s": 0.13376209512352943
+          }
+        ],
+        "last_backend_receipt": {
+          "backend_returned": true,
+          "done": false,
+          "truncated": false,
+          "info_keys": []
+        }
+      },
+      "visual_artifacts": {
+        "before": {
+          "canonical_rgb": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_04/before_canonical_rgb.png",
+          "alignment_overlay": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_04/before_alignment_overlay.png",
+          "sam_mask": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_04/before_sam_mask.png"
+        },
+        "after": {
+          "canonical_rgb": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_04/after_canonical_rgb.png",
+          "alignment_overlay": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_04/after_alignment_overlay.png",
+          "sam_mask": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_04/after_sam_mask.png"
+        },
+        "effect_overlay": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_04/effect_overlay.png"
+      },
+      "oracle_target_pose_after_diagnostic": null,
+      "oracle_used_by_runtime": false
+    },
+    {
+      "alignment_step": 5,
+      "executed": true,
+      "semantic_option_id": "ALIGN_TO_TARGET_BOUNDED",
+      "semantic_step": 5,
+      "task_id": 9,
+      "task_instruction": "pick up the orange juice and place it in the basket",
+      "approval_trace_id": "7c66f5f823ce497e9aa9d5dbb2ef4717",
+      "approval_id": "7c66f5f823ce497e9aa9d5dbb2ef4717",
+      "entity_key": "target",
+      "entity_phrase": "the orange juice",
+      "target_visible": true,
+      "identity_valid": true,
+      "identity_status_before": "SAME_TARGET",
+      "reference_valid": true,
+      "scene_ready": true,
+      "direction": "DOWN",
+      "scale_m": 0.009,
+      "scale_mm": 9.0,
+      "max_ticks": 10,
+      "frame_id_before": 96,
+      "frame_id_after": 105,
+      "episode_initial_alignment_error_px": 152.85265695293126,
+      "error_before_px": 132.79276589247235,
+      "predicted_error_after_px": 128.56262425314154,
+      "predicted_improvement_px": 4.23014163933081,
+      "actual_improvement_px": 4.7957849749903545,
+      "error_after_px": 127.99698091748199,
+      "prediction_residual_actual_minus_predicted_px": 0.5656433356595443,
+      "candidate_lattice": [
+        {
+          "direction": "FWD",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            247.76,
+            151.89999999999998
+          ],
+          "predicted_error_px": 132.19911993054268,
+          "predicted_improvement_px": 0.593645961929667,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "BACK",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            247.8,
+            150.62
+          ],
+          "predicted_error_px": 133.3868435653829,
+          "predicted_improvement_px": -0.5940776729105437,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "LEFT",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            249.44,
+            151.26
+          ],
+          "predicted_error_px": 133.469920490881,
+          "predicted_improvement_px": -0.6771545984086629,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "RIGHT",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            246.12,
+            151.26
+          ],
+          "predicted_error_px": 132.13299690427002,
+          "predicted_improvement_px": 0.6597689882023303,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "UP",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            247.77,
+            149.7
+          ],
+          "predicted_error_px": 134.21816041698176,
+          "predicted_improvement_px": -1.4253945245094144,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "DOWN",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            247.79,
+            152.81
+          ],
+          "predicted_error_px": 131.37956474987573,
+          "predicted_improvement_px": 1.4132011425966198,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "FWD",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            247.74,
+            152.53999999999996
+          ],
+          "predicted_error_px": 131.60591152166018,
+          "predicted_improvement_px": 1.1868543708121706,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "BACK",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            247.81,
+            149.98000000000002
+          ],
+          "predicted_error_px": 133.97735311865807,
+          "predicted_improvement_px": -1.1845872261857266,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "LEFT",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            251.1,
+            151.26
+          ],
+          "predicted_error_px": 134.16419745338635,
+          "predicted_improvement_px": -1.3714315609140044,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "RIGHT",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            244.46,
+            151.26
+          ],
+          "predicted_error_px": 131.49087522879563,
+          "predicted_improvement_px": 1.3018906636767156,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "UP",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            247.75,
+            148.13
+          ],
+          "predicted_error_px": 135.65176858517748,
+          "predicted_improvement_px": -2.8590026927051326,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "DOWN",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            247.8,
+            154.37
+          ],
+          "predicted_error_px": 129.96036981142024,
+          "predicted_improvement_px": 2.83239608105211,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "FWD",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            247.72,
+            153.19
+          ],
+          "predicted_error_px": 131.00401563175294,
+          "predicted_improvement_px": 1.7887502607194108,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "BACK",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            247.83,
+            149.35000000000002
+          ],
+          "predicted_error_px": 134.5631184195917,
+          "predicted_improvement_px": -1.7703525271193428,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "LEFT",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            252.76,
+            151.26
+          ],
+          "predicted_error_px": 134.87533236578278,
+          "predicted_improvement_px": -2.082566473310436,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "RIGHT",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            242.79,
+            151.26
+          ],
+          "predicted_error_px": 130.86295509176108,
+          "predicted_improvement_px": 1.929810800711266,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "UP",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            247.74,
+            146.56
+          ],
+          "predicted_error_px": 137.09226566612622,
+          "predicted_improvement_px": -4.299499773653878,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "DOWN",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            247.81,
+            155.90999999999997
+          ],
+          "predicted_error_px": 128.56262425314154,
+          "predicted_improvement_px": 4.23014163933081,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 10,
+          "selected": true
+        }
+      ],
+      "target_reference_before_px": [
+        194.30246913580248,
+        272.80864197530866
+      ],
+      "target_reference_after_px": [
+        194.30246913580248,
+        272.80864197530866
+      ],
+      "target_reference_unchanged": true,
+      "reference_matches_episode_initial": true,
+      "target_identity_status_after": "SAME_TARGET",
+      "target_visible_after": true,
+      "target_reference_valid_after": true,
+      "effect_verification_success": true,
+      "termination_reason": null,
+      "authorization_calls_for_step": 1,
+      "alignment_authorization_calls_for_step": 1,
+      "arbiter_approved_alignment_actions_for_step": 1,
+      "executor_calls_for_action": 1,
+      "execution": {
+        "direction": "DOWN",
+        "requested_displacement_m": 0.009,
+        "requested_mm": 9.0,
+        "actual_projection_m": 0.010063191151518935,
+        "actual_projection_mm": 10.063191151518936,
+        "total_displacement_xyz_m": [
+          0.0004690283704295306,
+          0.00010131709115581561,
+          -0.010063191151518935
+        ],
+        "total_displacement_xyz_mm": [
+          0.4690283704295306,
+          0.10131709115581561,
+          -10.063191151518936
+        ],
+        "absolute_displacement_error_m": 0.001063191151518936,
+        "absolute_displacement_error_mm": 1.063191151518936,
+        "ticks_executed": 8,
+        "max_ticks": 10,
+        "termination": "TARGET_REACHED",
+        "off_axis_displacement_xyz_m": [
+          0.0004690283704295306,
+          0.00010131709115581561,
+          0.0
+        ],
+        "off_axis_magnitude_m": 0.0004798466059357478,
+        "off_axis_magnitude_mm": 0.4798466059357478,
+        "direction_cosine": 0.9988650843281699,
+        "execution_duration_s": 0.12875894084572792,
+        "tick_observations": [
+          {
+            "tick": 1,
+            "observation_id": "libero-observation-97",
+            "frame_id": 97,
+            "eef_position_xyz_m": [
+              -0.1508298107835428,
+              -0.014839763468927061,
+              0.21907052244027692
+            ],
+            "incremental_delta_xyz_m": [
+              5.7544028717354534e-05,
+              1.2639050201516608e-05,
+              -0.0012578044986938375
+            ],
+            "incremental_projection_m": 0.0012578044986938375,
+            "incremental_projection_mm": 1.2578044986938375,
+            "incremental_off_axis_xyz_m": [
+              5.7544028717354534e-05,
+              1.2639050201516608e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.8915709543551966e-05,
+            "total_displacement_xyz_m": [
+              5.7544028717354534e-05,
+              1.2639050201516608e-05,
+              -0.0012578044986938375
+            ],
+            "cumulative_projection_m": 0.0012578044986938375,
+            "cumulative_projection_mm": 1.2578044986938375,
+            "off_axis_displacement_xyz_m": [
+              5.7544028717354534e-05,
+              1.2639050201516608e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 5.8915709543551966e-05,
+            "direction_cosine": 0.9989048035461036,
+            "elapsed_s": 0.016942400485277176
+          },
+          {
+            "tick": 2,
+            "observation_id": "libero-observation-98",
+            "frame_id": 98,
+            "eef_position_xyz_m": [
+              -0.15077195082619582,
+              -0.014827126118881312,
+              0.21781269634276315
+            ],
+            "incremental_delta_xyz_m": [
+              5.785995734697291e-05,
+              1.2637350045748702e-05,
+              -0.0012578260975137645
+            ],
+            "incremental_projection_m": 0.0012578260975137645,
+            "incremental_projection_mm": 1.2578260975137645,
+            "incremental_off_axis_xyz_m": [
+              5.785995734697291e-05,
+              1.2637350045748702e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.9223958668534726e-05,
+            "total_displacement_xyz_m": [
+              0.00011540398606432745,
+              2.527640024726531e-05,
+              -0.002515630596207602
+            ],
+            "cumulative_projection_m": 0.002515630596207602,
+            "cumulative_projection_mm": 2.515630596207602,
+            "off_axis_displacement_xyz_m": [
+              0.00011540398606432745,
+              2.527640024726531e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.0001181396479129485,
+            "direction_cosine": 0.9988990946662637,
+            "elapsed_s": 0.03296925127506256
+          },
+          {
+            "tick": 3,
+            "observation_id": "libero-observation-99",
+            "frame_id": 99,
+            "eef_position_xyz_m": [
+              -0.1507137807799201,
+              -0.014814485527035647,
+              0.21655484398741964
+            ],
+            "incremental_delta_xyz_m": [
+              5.8170046275729526e-05,
+              1.2640591845665752e-05,
+              -0.0012578523553435084
+            ],
+            "incremental_projection_m": 0.0012578523553435084,
+            "incremental_projection_mm": 1.2578523553435084,
+            "incremental_off_axis_xyz_m": [
+              5.8170046275729526e-05,
+              1.2640591845665752e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.952763094504288e-05,
+            "total_displacement_xyz_m": [
+              0.00017357403234005697,
+              3.791699209293106e-05,
+              -0.0037734829515511104
+            ],
+            "cumulative_projection_m": 0.0037734829515511104,
+            "cumulative_projection_mm": 3.7734829515511104,
+            "off_axis_displacement_xyz_m": [
+              0.00017357403234005697,
+              3.791699209293106e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.0001776672254304731,
+            "direction_cosine": 0.9988934309240505,
+            "elapsed_s": 0.04977424070239067
+          },
+          {
+            "tick": 4,
+            "observation_id": "libero-observation-100",
+            "frame_id": 100,
+            "eef_position_xyz_m": [
+              -0.15065530376377473,
+              -0.014801837128562445,
+              0.21529696263022174
+            ],
+            "incremental_delta_xyz_m": [
+              5.847701614536405e-05,
+              1.2648398473201136e-05,
+              -0.0012578813571978986
+            ],
+            "incremental_projection_m": 0.0012578813571978986,
+            "incremental_projection_mm": 1.2578813571978986,
+            "incremental_off_axis_xyz_m": [
+              5.847701614536405e-05,
+              1.2648398473201136e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 5.9829285481292895e-05,
+            "total_displacement_xyz_m": [
+              0.00023205104848542102,
+              5.05653905661322e-05,
+              -0.005031364308749009
+            ],
+            "cumulative_projection_m": 0.005031364308749009,
+            "cumulative_projection_mm": 5.0313643087490085,
+            "off_axis_displacement_xyz_m": [
+              0.00023205104848542102,
+              5.05653905661322e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.00023749641644936183,
+            "direction_cosine": 0.998887787977608,
+            "elapsed_s": 0.06643272563815117
+          },
+          {
+            "tick": 5,
+            "observation_id": "libero-observation-101",
+            "frame_id": 101,
+            "eef_position_xyz_m": [
+              -0.15059652080517683,
+              -0.014789176699398872,
+              0.21403905099607176
+            ],
+            "incremental_delta_xyz_m": [
+              5.8782958597902724e-05,
+              1.2660429163573877e-05,
+              -0.001257911634149983
+            ],
+            "incremental_projection_m": 0.001257911634149983,
+            "incremental_projection_mm": 1.257911634149983,
+            "incremental_off_axis_xyz_m": [
+              5.8782958597902724e-05,
+              1.2660429163573877e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 6.013087965537023e-05,
+            "total_displacement_xyz_m": [
+              0.00029083400708332374,
+              6.322581972970608e-05,
+              -0.006289275942898992
+            ],
+            "cumulative_projection_m": 0.006289275942898992,
+            "cumulative_projection_mm": 6.289275942898992,
+            "off_axis_displacement_xyz_m": [
+              0.00029083400708332374,
+              6.322581972970608e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.0002976271559462209,
+            "direction_cosine": 0.9988821459071372,
+            "elapsed_s": 0.08184563368558884
+          },
+          {
+            "tick": 6,
+            "observation_id": "libero-observation-102",
+            "frame_id": 102,
+            "eef_position_xyz_m": [
+              -0.15053743140325695,
+              -0.014776500323160587,
+              0.21278110888178614
+            ],
+            "incremental_delta_xyz_m": [
+              5.9089401919870665e-05,
+              1.2676376238284978e-05,
+              -0.0012579421142856206
+            ],
+            "incremental_projection_m": 0.0012579421142856206,
+            "incremental_projection_mm": 1.2579421142856206,
+            "incremental_off_axis_xyz_m": [
+              5.9089401919870665e-05,
+              1.2676376238284978e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 6.0433831036784115e-05,
+            "total_displacement_xyz_m": [
+              0.0003499234090031944,
+              7.590219596799105e-05,
+              -0.007547218057184613
+            ],
+            "cumulative_projection_m": 0.007547218057184613,
+            "cumulative_projection_mm": 7.547218057184613,
+            "off_axis_displacement_xyz_m": [
+              0.0003499234090031944,
+              7.590219596799105e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.00035806079863785734,
+            "direction_cosine": 0.9988764888720415,
+            "elapsed_s": 0.09718245640397072
+          },
+          {
+            "tick": 7,
+            "observation_id": "libero-observation-103",
+            "frame_id": 103,
+            "eef_position_xyz_m": [
+              -0.15047803401251023,
+              -0.0147638043615121,
+              0.21152313681724413
+            ],
+            "incremental_delta_xyz_m": [
+              5.939739074672934e-05,
+              1.2695961648486603e-05,
+              -0.0012579720645420067
+            ],
+            "incremental_projection_m": 0.0012579720645420067,
+            "incremental_projection_mm": 1.2579720645420067,
+            "incremental_off_axis_xyz_m": [
+              5.939739074672934e-05,
+              1.2695961648486603e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 6.073909342177813e-05,
+            "total_displacement_xyz_m": [
+              0.00040932079974992375,
+              8.859815761647766e-05,
+              -0.00880519012172662
+            ],
+            "cumulative_projection_m": 0.00880519012172662,
+            "cumulative_projection_mm": 8.80519012172662,
+            "off_axis_displacement_xyz_m": [
+              0.00040932079974992375,
+              8.859815761647766e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.0004187996545377651,
+            "direction_cosine": 0.9988708046824095,
+            "elapsed_s": 0.11268819868564606
+          },
+          {
+            "tick": 8,
+            "observation_id": "libero-observation-104",
+            "frame_id": 104,
+            "eef_position_xyz_m": [
+              -0.15041832644183062,
+              -0.014751085427972762,
+              0.21026513578745182
+            ],
+            "incremental_delta_xyz_m": [
+              5.970757067960686e-05,
+              1.2718933539337951e-05,
+              -0.001258001029792316
+            ],
+            "incremental_projection_m": 0.001258001029792316,
+            "incremental_projection_mm": 1.258001029792316,
+            "incremental_off_axis_xyz_m": [
+              5.970757067960686e-05,
+              1.2718933539337951e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 6.104723799516523e-05,
+            "total_displacement_xyz_m": [
+              0.0004690283704295306,
+              0.00010131709115581561,
+              -0.010063191151518935
+            ],
+            "cumulative_projection_m": 0.010063191151518935,
+            "cumulative_projection_mm": 10.063191151518936,
+            "off_axis_displacement_xyz_m": [
+              0.0004690283704295306,
+              0.00010131709115581561,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.0004798466059357478,
+            "direction_cosine": 0.9988650843281699,
+            "elapsed_s": 0.1287461519241333
+          }
+        ],
+        "last_backend_receipt": {
+          "backend_returned": true,
+          "done": false,
+          "truncated": false,
+          "info_keys": []
+        }
+      },
+      "visual_artifacts": {
+        "before": {
+          "canonical_rgb": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_05/before_canonical_rgb.png",
+          "alignment_overlay": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_05/before_alignment_overlay.png",
+          "sam_mask": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_05/before_sam_mask.png"
+        },
+        "after": {
+          "canonical_rgb": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_05/after_canonical_rgb.png",
+          "alignment_overlay": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_05/after_alignment_overlay.png",
+          "sam_mask": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_05/after_sam_mask.png"
+        },
+        "effect_overlay": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_05/effect_overlay.png"
+      },
+      "oracle_target_pose_after_diagnostic": null,
+      "oracle_used_by_runtime": false
+    },
+    {
+      "alignment_step": 6,
+      "executed": true,
+      "semantic_option_id": "ALIGN_TO_TARGET_BOUNDED",
+      "semantic_step": 6,
+      "task_id": 9,
+      "task_instruction": "pick up the orange juice and place it in the basket",
+      "approval_trace_id": "2487aca9f3a640e2a0950b32d7a2f09d",
+      "approval_id": "2487aca9f3a640e2a0950b32d7a2f09d",
+      "entity_key": "target",
+      "entity_phrase": "the orange juice",
+      "target_visible": true,
+      "identity_valid": true,
+      "identity_status_before": "SAME_TARGET",
+      "reference_valid": true,
+      "scene_ready": true,
+      "direction": "DOWN",
+      "scale_m": 0.009,
+      "scale_mm": 9.0,
+      "max_ticks": 10,
+      "frame_id_before": 106,
+      "frame_id_after": 115,
+      "episode_initial_alignment_error_px": 152.85265695293126,
+      "error_before_px": 127.99698091748199,
+      "predicted_error_after_px": 123.82911218283948,
+      "predicted_improvement_px": 4.167868734642511,
+      "actual_improvement_px": 4.727399945021304,
+      "error_after_px": 123.26958097246069,
+      "prediction_residual_actual_minus_predicted_px": 0.5595312103787933,
+      "candidate_lattice": [
+        {
+          "direction": "FWD",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            247.85,
+            157.21000000000004
+          ],
+          "predicted_error_px": 127.39852467037352,
+          "predicted_improvement_px": 0.5984562471084729,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "BACK",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            247.89,
+            155.91999999999996
+          ],
+          "predicted_error_px": 128.58685036563116,
+          "predicted_improvement_px": -0.5898694481491731,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "LEFT",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            249.52,
+            156.56
+          ],
+          "predicted_error_px": 128.69624110999553,
+          "predicted_improvement_px": -0.6992601925135347,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "RIGHT",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            246.22,
+            156.56
+          ],
+          "predicted_error_px": 127.31526527537221,
+          "predicted_improvement_px": 0.6817156421097792,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "UP",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            247.86,
+            155.01999999999998
+          ],
+          "predicted_error_px": 129.3930959930124,
+          "predicted_improvement_px": -1.3961150755304033,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "DOWN",
+          "scale_m": 0.003,
+          "scale_mm": 3.0,
+          "predicted_pixel": [
+            247.88,
+            158.10000000000002
+          ],
+          "predicted_error_px": 126.60420355313474,
+          "predicted_improvement_px": 1.3927773643472534,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 5,
+          "selected": false
+        },
+        {
+          "direction": "FWD",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            247.83,
+            157.87
+          ],
+          "predicted_error_px": 126.79151383095717,
+          "predicted_improvement_px": 1.2054670865248198,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "BACK",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            247.91,
+            155.26999999999998
+          ],
+          "predicted_error_px": 129.18629851015814,
+          "predicted_improvement_px": -1.1893175926761472,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "LEFT",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            251.18,
+            156.56
+          ],
+          "predicted_error_px": 129.41715604320487,
+          "predicted_improvement_px": -1.4201751257228779,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "RIGHT",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            244.56,
+            156.56
+          ],
+          "predicted_error_px": 126.64740885493576,
+          "predicted_improvement_px": 1.3495720625462297,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "UP",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            247.85,
+            153.46000000000004
+          ],
+          "predicted_error_px": 130.81068917715626,
+          "predicted_improvement_px": -2.8137082596742715,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "DOWN",
+          "scale_m": 0.006,
+          "scale_mm": 6.0,
+          "predicted_pixel": [
+            247.89,
+            159.64
+          ],
+          "predicted_error_px": 125.21487527708885,
+          "predicted_improvement_px": 2.782105640393141,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 7,
+          "selected": false
+        },
+        {
+          "direction": "FWD",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            247.81,
+            158.51999999999998
+          ],
+          "predicted_error_px": 126.19409472611362,
+          "predicted_improvement_px": 1.8028861913683727,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "BACK",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            247.92,
+            154.63
+          ],
+          "predicted_error_px": 129.77299809706702,
+          "predicted_improvement_px": -1.7760171795850255,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "LEFT",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            252.83,
+            156.56
+          ],
+          "predicted_error_px": 130.1507534752031,
+          "predicted_improvement_px": -2.1537725577210978,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "RIGHT",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            242.91,
+            156.56
+          ],
+          "predicted_error_px": 126.00174132851264,
+          "predicted_improvement_px": 1.9952395889693548,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "UP",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            247.83,
+            151.90999999999997
+          ],
+          "predicted_error_px": 132.2182974927884,
+          "predicted_improvement_px": -4.221316575306403,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": false,
+          "reason": "no_predicted_improvement",
+          "max_ticks": 10,
+          "selected": false
+        },
+        {
+          "direction": "DOWN",
+          "scale_m": 0.009,
+          "scale_mm": 9.0,
+          "predicted_pixel": [
+            247.9,
+            161.18
+          ],
+          "predicted_error_px": 123.82911218283948,
+          "predicted_improvement_px": 4.167868734642511,
+          "workspace_valid": true,
+          "contract_valid": true,
+          "valid": true,
+          "reason": null,
+          "max_ticks": 10,
+          "selected": true
+        }
+      ],
+      "target_reference_before_px": [
+        194.30246913580248,
+        272.80864197530866
+      ],
+      "target_reference_after_px": [
+        194.30246913580248,
+        272.80864197530866
+      ],
+      "target_reference_unchanged": true,
+      "reference_matches_episode_initial": true,
+      "target_identity_status_after": "SAME_TARGET",
+      "target_visible_after": true,
+      "target_reference_valid_after": true,
+      "effect_verification_success": true,
+      "termination_reason": "MAX_ALIGNMENT_STEPS",
+      "authorization_calls_for_step": 1,
+      "alignment_authorization_calls_for_step": 1,
+      "arbiter_approved_alignment_actions_for_step": 1,
+      "executor_calls_for_action": 1,
+      "execution": {
+        "direction": "DOWN",
+        "requested_displacement_m": 0.009,
+        "requested_mm": 9.0,
+        "actual_projection_m": 0.010064911435412771,
+        "actual_projection_mm": 10.064911435412771,
+        "total_displacement_xyz_m": [
+          0.0004891159205742124,
+          0.00010291735692300082,
+          -0.010064911435412771
+        ],
+        "total_displacement_xyz_mm": [
+          0.4891159205742124,
+          0.10291735692300082,
+          -10.064911435412771
+        ],
+        "absolute_displacement_error_m": 0.0010649114354127718,
+        "absolute_displacement_error_mm": 1.0649114354127718,
+        "ticks_executed": 8,
+        "max_ticks": 10,
+        "termination": "TARGET_REACHED",
+        "off_axis_displacement_xyz_m": [
+          0.0004891159205742124,
+          0.00010291735692300082,
+          0.0
+        ],
+        "off_axis_magnitude_m": 0.0004998263359559754,
+        "off_axis_magnitude_mm": 0.49982633595597536,
+        "direction_cosine": 0.9987692042387356,
+        "execution_duration_s": 0.12767647951841354,
+        "tick_observations": [
+          {
+            "tick": 1,
+            "observation_id": "libero-observation-107",
+            "frame_id": 107,
+            "eef_position_xyz_m": [
+              -0.15035830617063628,
+              -0.014738340364998832,
+              0.20900710701367672
+            ],
+            "incremental_delta_xyz_m": [
+              6.0020271194338726e-05,
+              1.274506297392966e-05,
+              -0.001258028773775094
+            ],
+            "incremental_projection_m": 0.001258028773775094,
+            "incremental_projection_mm": 1.258028773775094,
+            "incremental_off_axis_xyz_m": [
+              6.0020271194338726e-05,
+              1.274506297392966e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 6.135853310218066e-05,
+            "total_displacement_xyz_m": [
+              6.0020271194338726e-05,
+              1.274506297392966e-05,
+              -0.001258028773775094
+            ],
+            "cumulative_projection_m": 0.001258028773775094,
+            "cumulative_projection_mm": 1.258028773775094,
+            "off_axis_displacement_xyz_m": [
+              6.0020271194338726e-05,
+              1.274506297392966e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 6.135853310218066e-05,
+            "direction_cosine": 0.9988126881793,
+            "elapsed_s": 0.016590755432844162
+          },
+          {
+            "tick": 2,
+            "observation_id": "libero-observation-108",
+            "frame_id": 108,
+            "eef_position_xyz_m": [
+              -0.150297970588329,
+              -0.014725566224069462,
+              0.20774905178877595
+            ],
+            "incremental_delta_xyz_m": [
+              6.033558230728042e-05,
+              1.2774140929370723e-05,
+              -0.0012580552249007726
+            ],
+            "incremental_projection_m": 0.0012580552249007726,
+            "incremental_projection_mm": 1.2580552249007726,
+            "incremental_off_axis_xyz_m": [
+              6.033558230728042e-05,
+              1.2774140929370723e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 6.167301815901371e-05,
+            "total_displacement_xyz_m": [
+              0.00012035585350161915,
+              2.5519203903300383e-05,
+              -0.0025160839986758665
+            ],
+            "cumulative_projection_m": 0.0025160839986758665,
+            "cumulative_projection_mm": 2.5160839986758665,
+            "off_axis_displacement_xyz_m": [
+              0.00012035585350161915,
+              2.5519203903300383e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.0001230315457106893,
+            "direction_cosine": 0.9988066310292852,
+            "elapsed_s": 0.03280999884009361
+          },
+          {
+            "tick": 3,
+            "observation_id": "libero-observation-109",
+            "frame_id": 109,
+            "eef_position_xyz_m": [
+              -0.15023731716605707,
+              -0.014712760248459982,
+              0.20649097136002034
+            ],
+            "incremental_delta_xyz_m": [
+              6.065342227193349e-05,
+              1.280597560947977e-05,
+              -0.001258080428755609
+            ],
+            "incremental_projection_m": 0.001258080428755609,
+            "incremental_projection_mm": 1.258080428755609,
+            "incremental_off_axis_xyz_m": [
+              6.065342227193349e-05,
+              1.280597560947977e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 6.199056899729239e-05,
+            "total_displacement_xyz_m": [
+              0.00018100927577355264,
+              3.832517951278015e-05,
+              -0.0037741644274314756
+            ],
+            "cumulative_projection_m": 0.0037741644274314756,
+            "cumulative_projection_mm": 3.774164427431476,
+            "off_axis_displacement_xyz_m": [
+              0.00018100927577355264,
+              3.832517951278015e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.0001850220994928791,
+            "direction_cosine": 0.9988005182623222,
+            "elapsed_s": 0.04821706563234329
+          },
+          {
+            "tick": 4,
+            "observation_id": "libero-observation-110",
+            "frame_id": 110,
+            "eef_position_xyz_m": [
+              -0.15017634357112955,
+              -0.014699919858353715,
+              0.20523286685187658
+            ],
+            "incremental_delta_xyz_m": [
+              6.097359492751586e-05,
+              1.2840390106266808e-05,
+              -0.0012581045081437592
+            ],
+            "incremental_projection_m": 0.0012581045081437592,
+            "incremental_projection_mm": 1.2581045081437592,
+            "incremental_off_axis_xyz_m": [
+              6.097359492751586e-05,
+              1.2840390106266808e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 6.231095326237517e-05,
+            "total_displacement_xyz_m": [
+              0.0002419828707010685,
+              5.116556961904696e-05,
+              -0.005032268935575235
+            ],
+            "cumulative_projection_m": 0.005032268935575235,
+            "cumulative_projection_mm": 5.032268935575235,
+            "off_axis_displacement_xyz_m": [
+              0.0002419828707010685,
+              5.116556961904696e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.0002473330249424277,
+            "direction_cosine": 0.9987943518761251,
+            "elapsed_s": 0.06379552185535431
+          },
+          {
+            "tick": 5,
+            "observation_id": "libero-observation-111",
+            "frame_id": 111,
+            "eef_position_xyz_m": [
+              -0.1501150477347381,
+              -0.01468704263794833,
+              0.20397473922110637
+            ],
+            "incremental_delta_xyz_m": [
+              6.129583639144509e-05,
+              1.2877220405384596e-05,
+              -0.0012581276307702116
+            ],
+            "incremental_projection_m": 0.0012581276307702116,
+            "incremental_projection_mm": 1.2581276307702116,
+            "incremental_off_axis_xyz_m": [
+              6.129583639144509e-05,
+              1.2877220405384596e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 6.263387553309837e-05,
+            "total_displacement_xyz_m": [
+              0.0003032787070925136,
+              6.404279002443156e-05,
+              -0.006290396566345446
+            ],
+            "cumulative_projection_m": 0.006290396566345446,
+            "cumulative_projection_mm": 6.290396566345446,
+            "off_axis_displacement_xyz_m": [
+              0.0003032787070925136,
+              6.404279002443156e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.00030996685811521865,
+            "direction_cosine": 0.998788134401532,
+            "elapsed_s": 0.07932369038462639
+          },
+          {
+            "tick": 6,
+            "observation_id": "libero-observation-112",
+            "frame_id": 112,
+            "eef_position_xyz_m": [
+              -0.15005342788321124,
+              -0.0146741263242408,
+              0.2027165892369127
+            ],
+            "incremental_delta_xyz_m": [
+              6.161985152686178e-05,
+              1.2916313707530408e-05,
+              -0.001258149984193685
+            ],
+            "incremental_projection_m": 0.001258149984193685,
+            "incremental_projection_mm": 1.258149984193685,
+            "incremental_off_axis_xyz_m": [
+              6.161985152686178e-05,
+              1.2916313707530408e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 6.295901255566059e-05,
+            "total_displacement_xyz_m": [
+              0.00036489855861937537,
+              7.695910373196196e-05,
+              -0.007548546550539131
+            ],
+            "cumulative_projection_m": 0.007548546550539131,
+            "cumulative_projection_mm": 7.548546550539132,
+            "off_axis_displacement_xyz_m": [
+              0.00036489855861937537,
+              7.695910373196196e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.0003729258126353345,
+            "direction_cosine": 0.9987818686715749,
+            "elapsed_s": 0.0963420644402504
+          },
+          {
+            "tick": 7,
+            "observation_id": "libero-observation-113",
+            "frame_id": 113,
+            "eef_position_xyz_m": [
+              -0.149991482542109,
+              -0.014661168797194734,
+              0.20145841747959192
+            ],
+            "incremental_delta_xyz_m": [
+              6.194534110223748e-05,
+              1.2957527046065717e-05,
+              -0.001258171757320764
+            ],
+            "incremental_projection_m": 0.001258171757320764,
+            "incremental_projection_mm": 1.258171757320764,
+            "incremental_off_axis_xyz_m": [
+              6.194534110223748e-05,
+              1.2957527046065717e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 6.328603946702683e-05,
+            "total_displacement_xyz_m": [
+              0.00042684389972161285,
+              8.991663077802768e-05,
+              -0.008806718307859895
+            ],
+            "cumulative_projection_m": 0.008806718307859895,
+            "cumulative_projection_mm": 8.806718307859896,
+            "off_axis_displacement_xyz_m": [
+              0.00042684389972161285,
+              8.991663077802768e-05,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.0004362117779473939,
+            "direction_cosine": 0.9987755576392203,
+            "elapsed_s": 0.11205172538757324
+          },
+          {
+            "tick": 8,
+            "observation_id": "libero-observation-114",
+            "frame_id": 114,
+            "eef_position_xyz_m": [
+              -0.1499292105212564,
+              -0.014648168071049761,
+              0.20020022435203905
+            ],
+            "incremental_delta_xyz_m": [
+              6.227202085259953e-05,
+              1.3000726144973135e-05,
+              -0.0012581931275528757
+            ],
+            "incremental_projection_m": 0.0012581931275528757,
+            "incremental_projection_mm": 1.2581931275528757,
+            "incremental_off_axis_xyz_m": [
+              6.227202085259953e-05,
+              1.3000726144973135e-05,
+              0.0
+            ],
+            "incremental_off_axis_magnitude_m": 6.361464816662259e-05,
+            "total_displacement_xyz_m": [
+              0.0004891159205742124,
+              0.00010291735692300082,
+              -0.010064911435412771
+            ],
+            "cumulative_projection_m": 0.010064911435412771,
+            "cumulative_projection_mm": 10.064911435412771,
+            "off_axis_displacement_xyz_m": [
+              0.0004891159205742124,
+              0.00010291735692300082,
+              0.0
+            ],
+            "off_axis_magnitude_m": 0.0004998263359559754,
+            "direction_cosine": 0.9987692042387356,
+            "elapsed_s": 0.1276622787117958
+          }
+        ],
+        "last_backend_receipt": {
+          "backend_returned": true,
+          "done": false,
+          "truncated": false,
+          "info_keys": []
+        }
+      },
+      "visual_artifacts": {
+        "before": {
+          "canonical_rgb": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_06/before_canonical_rgb.png",
+          "alignment_overlay": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_06/before_alignment_overlay.png",
+          "sam_mask": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_06/before_sam_mask.png"
+        },
+        "after": {
+          "canonical_rgb": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_06/after_canonical_rgb.png",
+          "alignment_overlay": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_06/after_alignment_overlay.png",
+          "sam_mask": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_06/after_sam_mask.png"
+        },
+        "effect_overlay": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/steps/step_06/effect_overlay.png"
+      },
+      "oracle_target_pose_after_diagnostic": null,
+      "oracle_used_by_runtime": false
+    }
+  ],
+  "executed_alignment_steps": 6,
+  "control_ticks": 49,
+  "total_physical_displacement_mm": 60.61869426203165,
+  "termination_reason": "MAX_ALIGNMENT_STEPS",
+  "all_steps_positive": true,
+  "step_verification_rate": 1.0,
+  "direction_sequence": [
+    "DOWN",
+    "DOWN",
+    "DOWN",
+    "DOWN",
+    "DOWN",
+    "DOWN"
+  ],
+  "scale_sequence_mm": [
+    9.0,
+    9.0,
+    9.0,
+    9.0,
+    9.0,
+    9.0
+  ],
+  "direction_transitions": 0,
+  "direction_reversal_count": 0,
+  "error_trajectory_px": [
+    152.85265695293126,
+    147.62883910786508,
+    142.6178310775837,
+    137.6678108213243,
+    132.79276589247235,
+    127.99698091748199,
+    123.26958097246069
+  ],
+  "normalized_error_trajectory": [
+    1.0,
+    0.9658244877831939,
+    0.9330412301665177,
+    0.9006569696967525,
+    0.8687632164180433,
+    0.8373880014195422,
+    0.8064601782513977
+  ],
+  "mean_improvement_per_step_px": 4.930512663411761,
+  "mean_improvement_per_control_tick_px": 0.6037362444993993,
+  "mean_prediction_residual_px": 0.5946005932310617,
+  "target_reference_fixed_for_episode": true,
+  "arbiter_authorization_calls": 6,
+  "arbiter_alignment_authorization_calls": 6,
+  "arbiter_approved_alignment_actions": 6,
+  "one_approval_per_executed_step": true,
+  "oracle_target_motion_diagnostic": {
+    "collected": false,
+    "source": "not_collected_for_cross_object_experiment"
+  },
+  "oracle_used_by_runtime": false,
+  "qwen_actions": 0,
+  "contact_sheet": "/root/autodl-tmp/Show-Harness/rollouts/runtime_v3_m3_8/stage_c_20261003T141205Z_1d5a947b/task_9/init_state_0/stage_b/init_state_0/contact_sheet.png",
+  "legacy_modified": false,
+  "stage_a_visually_correct": true,
+  "qwen_physical_actions": 0,
+  "physical_contract_changes": 0
+}

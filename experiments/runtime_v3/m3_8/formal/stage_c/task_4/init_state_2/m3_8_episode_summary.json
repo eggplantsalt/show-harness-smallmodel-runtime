@@ -1,0 +1,12 @@
+{
+  "task_id": 4,
+  "init_state_index": 2,
+  "status": "FAILED",
+  "error": "RuntimeError: semantic re-grounding did not reproduce the visually audited candidate ID",
+  "alignment_steps": [],
+  "executed_alignment_steps": 0,
+  "oracle_used_by_runtime": false,
+  "stage_a_visually_correct": true,
+  "qwen_physical_actions": 0,
+  "physical_contract_changes": 0
+}

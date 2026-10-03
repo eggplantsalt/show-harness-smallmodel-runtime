@@ -268,7 +268,14 @@ do not use simulator depth to clear the M3.5 blocker.
   Post-hoc visual review found the intended target proposal in all 12 pools,
   but only 4/12 semantic selections were correct; 8/12 selected a wrong object.
 - Only task 4 init state 2 and task 9 init states 0–2 qualify for Stage B.
-  Stage B/C results will be recorded in the evidence ledger after those runs.
+- Stage B executed 18 steps across three episodes; all 18 had positive effects,
+  all three episodes were monotonic, and mean normalized error reduction was
+  17.37%. One eligible rerun failed closed on candidate-ID mismatch before
+  action.
+- Stage C compiled `ketchup` and `orange juice` in two calls, chose zero
+  physical actions, and completed 18/18 positive orange-juice steps across
+  three monotonic episodes (18.46% mean normalized reduction). The ketchup
+  episode failed closed on candidate-ID mismatch before ALIGN.
 - The implementation commit is `f0fc7b2` (`refactor: add general entity
   grounding contract`). Development and Stage A visual evidence is archived in
   `experiments/runtime_v3/m3_8/visual_audit/`.
